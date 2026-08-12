@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="../build/AMS.API.props" />
-</Project>
