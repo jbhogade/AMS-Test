@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<!--
+#-------------- Start Code for : USER MASTER PAGE (user-master.html) ------------
+#
+#  PURPOSE   : Manage system login accounts (Username, Role, optionally linked
+#              to an Employee record). No password field by design - frontend
+#              dummy data only, no real auth exists yet.
+#              Config-only page over the generic engine (js/master-table.js);
+#              the inline AMS_MASTER_CONFIG below is the only page-specific part.
+#
+#              ROLE GUARDS (via the topbar "Viewing As" role simulator):
+#                - "Supreme Root" is only offered as an assignable Role while
+#                  viewing as Supreme Root.
+#                - Supreme Root accounts can never be deleted from this screen.
+#                - Super Root accounts can only be deleted while viewing as
+#                  Supreme Root.
+#
+#  FILES USED :
+#    - css/themes.css, css/main.css, css/master-table.css
+#    - js/dummy-data.js, js/theme.js, js/app.js, js/layout.js,
+#      js/master-table.js
+#------------------------------------------------------------------------------
+-->
+<html lang="en" data-theme="dark-grey">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Master | Asset Management System</title>
+
+    <link rel="stylesheet" href="../css/themes.css">
+    <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/master-table.css">
+</head>
+<body>
+    <div class="app">
+        <aside class="sidebar" id="sidebar">
+            <div id="sidebar-mount"></div>
+        </aside>
+
+        <main class="app-main">
+            <header class="topbar" id="topbar-mount"></header>
+
+            <div class="app-content">
+                <!-- ==================== PAGE HEADING ==================== -->
+                <div class="page-heading flex items-center justify-between">
+                    <div>
+                        <h1 id="pageTitle">User Master</h1>
+                        <p class="page-sub" id="pageSub"></p>
+                    </div>
+                </div>
+
+                <!-- ==================== ROLE HINT BAR ==================== -->
+                <div class="card" style="padding:12px 16px; margin-bottom:16px;">
+                    <p class="form-hint" id="userRoleHint" style="margin:0; font-size:12.5px;"></p>
+                </div>
+
+                <!-- ==================== TOOLBAR ==================== -->
+                <div class="toolbar">
+                    <input type="text" id="searchBox" class="search-input" placeholder="Search username, role, email...">
+
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button class="btn btn-primary" id="btnAddMaster">+ Add</button>
+                        <button class="btn" id="btnTemplate">Template</button>
+                        <button class="btn" id="btnExport">Export</button>
+                        <button class="btn" id="btnImport">Import</button>
+                        <input type="file" id="importFileInput" accept=".csv" style="display:none;">
+                    </div>
+                </div>
+
+                <!-- ==================== USER TABLE ==================== -->
+                <div class="card">
+                    <div class="table-wrap">
+                        <table class="table" id="masterTable"></table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ====================================================================
+         MODAL : ADD / EDIT (fields built dynamically by master-table.js)
+         ==================================================================== -->
+    <div class="modal-overlay" id="modalForm">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="mtModalTitle">Add User</h3>
+                <button class="modal-close" data-close="modalForm">&times;</button>
+            </div>
+            <form id="mtForm">
+                <div class="modal-body">
+                    <div id="mtFormFields"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" data-close="modalForm">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="../js/dummy-data.js"></script>
+    <script src="../js/theme.js"></script>
+    <script src="../js/app.js"></script>
+    <script src="../js/layout.js"></script>
+    <script src="../js/master-table.js"></script>
+
+    <!-- ====================================================================
+         THIS PAGE'S MASTER CONFIG + ROLE GUARDS (only part unique to User Master)
+         ==================================================================== -->
+    <script>
+        (function () {
+            /* Only a Supreme Root can create/see "Supreme Root" as an assignable
+               role - everyone else's Add/Edit form simply doesn't offer it. */
+            function amsGetAllowedRoleOptions() {
+                const viewingAs = amsGetViewingAsRole();
+                return viewingAs === "Supreme Root"
+                    ? AMS_USER_ROLES
+                    : AMS_USER_ROLES.filter(r => r !== "Supreme Root");
+            }
+            window.amsGetAllowedRoleOptions = amsGetAllowedRoleOptions;
+
+            window.AMS_MASTER_CONFIG = {
+                pageTitle: "User Master",
+                pageSub: "Manage system login accounts and roles (no password field - dummy data only, no real auth yet)",
+                dataArray: AMS_DUMMY_USERS,
+                idKey: "username",
+                fields: [
+                    { key: "username",       label: "Username",         required: true },
+                    { key: "linkedEmployee", label: "Linked Employee",  type: "select",
+                        optionsFrom: () => [
+                            { value: "", label: "None (service/admin account)" },
+                            ...DUMMY_EMPLOYEES.filter(e => e.status === "Active")
+                                .map(e => ({ value: e.empId, label: `${getEmployeeFullName(e)} (${e.empId})` })),
+                        ],
+                        format: (empId) => {
+                            if (!empId) return "-";
+                            const emp = DUMMY_EMPLOYEES.find(e => e.empId === empId);
+                            return emp ? `${amsEsc(getEmployeeFullName(emp))} (${amsEsc(empId)})` : amsEsc(empId);
+                        } },
+                    { key: "role",           label: "Role",             required: true, type: "select",
+                        optionsFrom: () => amsGetAllowedRoleOptions(),
+                        format: (role) => {
+                            const cls = role === "Supreme Root" || role === "Super Root" ? "badge-red"
+                                : role === "Admin" ? "badge-amber" : "badge-grey";
+                            return `<span class="badge ${cls}">${amsEsc(role)}</span>`;
+                        } },
+                    { key: "email",          label: "Email",            type: "text" },
+                    { key: "remarks",        label: "Remarks",          multiline: true },
+                ],
+                deleteGuard: (item) => {
+                    const viewingAs = amsGetViewingAsRole();
+                    if (item.role === "Supreme Root") return { allowed: false, reason: "Supreme Root accounts cannot be deleted from this screen." };
+                    if (item.role === "Super Root" && viewingAs !== "Supreme Root") return { allowed: false, reason: "Only a Supreme Root user can delete a Super Root account." };
+                    return { allowed: true };
+                },
+            };
+
+            function amsUpdateUserRoleHint() {
+                const viewingAs = amsGetViewingAsRole();
+                const hint = document.getElementById("userRoleHint");
+                if (viewingAs === "Supreme Root") {
+                    hint.innerHTML = `Full control: can create Supreme Root accounts and delete Super Root accounts.`;
+                } else if (viewingAs === "Super Root") {
+                    hint.textContent = "Cannot create or delete other Supreme Root / Super Root accounts. Access Rights Control Master, Role Access Master, and Supreme Root's Log Report records are hidden from this role.";
+                } else {
+                    hint.textContent = "Limited role - some actions may be restricted depending on real access rights once auth is implemented.";
+                }
+            }
+
+            /* Keep the hint in sync with the shared topbar "Viewing As" selector */
+            function amsWireUserRoleSync() {
+                const viewingAs = document.getElementById("viewing-as");
+                if (viewingAs) viewingAs.addEventListener("change", () => amsUpdateUserRoleHint());
+            }
+
+            function initUserMaster() {
+                initLayout("user-master");
+                amsUpdateUserRoleHint();
+                amsWireUserRoleSync();
+            }
+
+            document.addEventListener("DOMContentLoaded", initUserMaster);
+        })();
+    </script>
+</body>
+</html>
+<!--
+#-------------- End of the code : USER MASTER PAGE ------------------------------
+#------------------------------------------------------------------------------
+-->

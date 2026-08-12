@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<!--
+#-------------- Start Code for : ROLE ACCESS MASTER (role-access.html) -----------
+#
+#  PURPOSE   : Sets the DEFAULT page access for each role (Standard User /
+#              Viewer / Admin / Super Root / Supreme Root) - a matrix of
+#              Role x Page checkboxes. This is what a user gets when Access
+#              Rights Control Master hasn't set a per-user override for them
+#              (AMS_DUMMY_USERS[].allowedPages === null) - see
+#              amsResolveAllowedPages() in js/access-rights.js. Ported from
+#              v3-3 role-access-master-v1-0.html to the v4-0 layout/data layer.
+#              EXCLUSIVE to Supreme Root - same simulated gate as Access Rights.
+#              DATA: amsGet/amsSaveRoleAccessDefaults() in js/dummy-data.js -
+#              localStorage-backed, so it applies to every other page's access
+#              resolution. NAV: not in the main sidebar - reachable only via
+#              System Administrator Master's tabs, embedded via ?embed=1.
+#
+#  FILES USED :
+#    - css/themes.css, css/main.css, css/embed-mode.css, css/role-gate.css,
+#      css/role-access.css
+#    - js/dummy-data.js, js/theme.js, js/app.js, js/layout.js,
+#      js/embed-mode.js, js/role-access.js
+#------------------------------------------------------------------------------
+-->
+<html lang="en" data-theme="dark-grey">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Role Access Master | Asset Management System</title>
+
+    <link rel="stylesheet" href="../css/themes.css">
+    <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/embed-mode.css">
+    <link rel="stylesheet" href="../css/role-gate.css">
+    <link rel="stylesheet" href="../css/role-access.css">
+</head>
+<body>
+    <script src="../js/embed-mode.js"></script>
+    <div class="app">
+        <aside class="sidebar" id="sidebar">
+            <div id="sidebar-mount"></div>
+        </aside>
+
+        <main class="app-main">
+            <header class="topbar" id="topbar-mount"></header>
+
+            <div class="app-content">
+                <!-- ==================== PAGE HEADING ==================== -->
+                <div class="page-heading flex items-center justify-between">
+                    <div>
+                        <h1>Role Access Master</h1>
+                        <p class="page-sub">Supreme Root only - set the default pages each Role can access</p>
+                    </div>
+                </div>
+
+                <!-- ==================== VIEWING AS (ROLE SIMULATOR) ==================== -->
+                <div class="viewing-as-bar">
+                    <label for="viewingAsRole">Viewing As (role simulator - no real login yet):</label>
+                    <select id="viewingAsRole"></select>
+                    <span class="form-hint">This page is only visible/usable when Viewing As = Supreme Root - even Super Root is locked out.</span>
+                </div>
+
+                <!-- ==================== LOCKED VIEW ==================== -->
+                <div id="lockedView" style="display:none;">
+                    <div class="card" style="text-align:center; padding:40px 20px;">
+                        <div style="font-size:32px; margin-bottom:10px;">&#128274;</div>
+                        <div style="font-size:15px; font-weight:600; margin-bottom:6px;">Access Denied</div>
+                        <div style="font-size:12.5px; color:var(--text-muted);">Role Access Master is exclusive to Supreme Root accounts. Switch "Viewing As" to Supreme Root to continue.</div>
+                    </div>
+                </div>
+
+                <!-- ==================== UNLOCKED VIEW (Supreme Root only) ==================== -->
+                <div id="unlockedView">
+                    <p class="form-hint" style="margin-bottom:12px;">Checked = that Role gets this page by default. A per-user override in Access Rights Control Master still wins over whatever's set here. Pages marked (always Supreme Root only) or (always Super Root+) ignore these checkboxes and gate purely on the simulated role itself.</p>
+                    <div class="card">
+                        <div class="table-wrap">
+                            <table class="table" id="roleAccessTable"></table>
+                        </div>
+                    </div>
+                    <div class="modal-footer" style="border-top:none; margin-top:14px; padding:0;">
+                        <button type="button" class="btn" id="btnResetRoleDefaults">Reset to Suggested Defaults</button>
+                        <button type="button" class="btn btn-primary" id="btnSaveRoleDefaults">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="../js/dummy-data.js"></script>
+    <script src="../js/theme.js"></script>
+    <script src="../js/app.js"></script>
+    <script src="../js/layout.js"></script>
+    <script src="../js/role-access.js"></script>
+</body>
+</html>
+<!--
+#-------------- End of the code : ROLE ACCESS MASTER ----------------------------
+#------------------------------------------------------------------------------
+-->
