@@ -28,7 +28,7 @@ const RAM_LOCKED_KEYS = {
 };
 
 function amsIsSupremeRootRAM() {
-    return document.getElementById("viewingAsRole").value === "Supreme Root";
+    return amsGetViewingAsRole() === "Supreme Root";
 }
 
 function amsApplyRoleAccessGate() {
@@ -107,15 +107,8 @@ document.getElementById("btnResetRoleDefaults").addEventListener("click", () => 
 /*-------------- Start Code for PAGE INIT ----------------------------------------*/
 document.addEventListener("DOMContentLoaded", () => {
     if (typeof initLayout === "function") initLayout("role-access");
-
-    const select = document.getElementById("viewingAsRole");
-    select.innerHTML = AMS_USER_ROLES.map(r => `<option value="${amsEsc(r)}">${amsEsc(r)}</option>`).join("");
-    select.value = amsGetViewingAsRole();
-    select.addEventListener("change", (e) => {
-        amsSetViewingAsRole(e.target.value);
-        amsApplyRoleAccessGate();
-    });
-
+    const roleInput = document.getElementById("viewingAsRole");
+    if (roleInput) roleInput.value = amsGetViewingAsRole();
     (typeof amsDbEnsureLoaded === "function" ? amsDbEnsureLoaded() : Promise.resolve()).then(() => amsApplyRoleAccessGate());
 });
 /*-------------- End of the code ------------------------------------------------*/

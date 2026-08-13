@@ -17,7 +17,7 @@
 
 /*-------------- Start Code for GATE: SUPREME ROOT ONLY -------------------------*/
 function amsIsSupremeRoot() {
-    return document.getElementById("viewingAsRole").value === "Supreme Root";
+    return amsGetViewingAsRole() === "Supreme Root";
 }
 
 function amsApplyAccessGate() {
@@ -28,13 +28,8 @@ function amsApplyAccessGate() {
 }
 
 function amsWireAccessGate() {
-    const select = document.getElementById("viewingAsRole");
-    select.innerHTML = AMS_USER_ROLES.map(r => `<option value="${amsEsc(r)}">${amsEsc(r)}</option>`).join("");
-    select.value = amsGetViewingAsRole();
-    select.addEventListener("change", (e) => {
-        amsSetViewingAsRole(e.target.value);
-        amsApplyAccessGate();
-    });
+    const roleInput = document.getElementById("viewingAsRole");
+    if (roleInput) roleInput.value = amsGetViewingAsRole();
 }
 /*-------------- End of the code ------------------------------------------------*/
 

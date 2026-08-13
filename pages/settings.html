@@ -153,19 +153,13 @@
                 <section class="settings-pane" id="paneData">
                     <div class="card">
                         <div class="card-header">
-                            <h3>Role Simulator</h3>
+                            <h3>Signed-in Role</h3>
                         </div>
                         <div class="card-body">
                             <div class="field field-full">
-                                <label>Viewing As</label>
-                                <select id="settingsViewingAs" class="input">
-                                    <option value="Standard User">Standard User</option>
-                                    <option value="Viewer (Read-Only)">Viewer (Read-Only)</option>
-                                    <option value="Admin">Admin</option>
-                                    <option value="Super Root">Super Root</option>
-                                    <option value="Supreme Root">Supreme Root</option>
-                                </select>
-                                <div class="form-hint">Same role simulator as the top header bar - demo only, no real login yet.</div>
+                                <label>Current Role</label>
+                                <input class="input" id="settingsSignedInRole" disabled>
+                                <div class="form-hint">Your role comes from the account used to log in. Use the user menu (top right) to switch accounts.</div>
                             </div>
                         </div>
                     </div>

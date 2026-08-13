@@ -16,18 +16,18 @@
 #      topbar selector via amsGet/SetViewingAsRole.
 #------------------------------------------------------------------------------*/
 
-/*-------------- Start Code for VIEWING AS SELECTOR (shared/localStorage-backed identity) -----------------*/
+/*-------------- Start Code for SIGNED-IN ROLE (real session role, no simulator) -----*/
 let logViewingAsSelect = null;
 
 function amsApplyLogAccessGate() {
-    const role = logViewingAsSelect.value;
+    const role = amsGetViewingAsRole();
     const allowed = role === "Super Root" || role === "Supreme Root";
     document.getElementById("accessDeniedCard").style.display = allowed ? "none" : "block";
     document.getElementById("logReportContent").style.display = allowed ? "block" : "none";
 
     const hint = document.getElementById("viewingAsHint");
     if (role === "Supreme Root") hint.textContent = "Full access - can see every record, including Super Root and Supreme Root.";
-    else if (role === "Super Root") hint.textContent = "Can see every record except ones logged while Viewing As was Supreme Root.";
+    else if (role === "Super Root") hint.textContent = "Can see every record except ones logged while the actor was Supreme Root.";
     else hint.textContent = "This role cannot view Log Report.";
 
     document.getElementById("btnLogClear").style.display = role === "Supreme Root" ? "inline-block" : "none";
@@ -122,12 +122,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (typeof initLayout === "function") initLayout("log");
 
     logViewingAsSelect = document.getElementById("viewingAsRole");
-    logViewingAsSelect.innerHTML = AMS_USER_ROLES.map(r => `<option value="${amsEsc(r)}">${amsEsc(r)}</option>`).join("");
-    logViewingAsSelect.value = amsGetViewingAsRole();
-    logViewingAsSelect.addEventListener("change", () => {
-        amsSetViewingAsRole(logViewingAsSelect.value);
-        amsApplyLogAccessGate();
-    });
+    if (logViewingAsSelect) logViewingAsSelect.value = amsGetViewingAsRole();
 
     document.getElementById("logSearch").addEventListener("input", renderLogTable);
     document.getElementById("btnLogFilter").addEventListener("click", renderLogTable);

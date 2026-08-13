@@ -86,6 +86,14 @@
 /* ---- Asset list: scrollable container + show-more footer ---- */
 #assetTableWrap { max-height: 560px; overflow: auto; }
 
+/* While a row menu is open, let the wrap overflow visibly so the dropdown
+   overlays the table frame instead of being clipped / creating scrollbars. */
+#assetTableWrap.mt-menu-open {
+    overflow: visible;
+    position: relative;
+    z-index: 140;
+}
+
 .asset-table-footer {
     display: flex;
     align-items: center;

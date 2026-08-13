@@ -63,6 +63,21 @@ function amsSetSession(s) {
 function amsClearSession() {
     try { localStorage.removeItem(AMS_SESSION_KEY); } catch (e) { /* storage unavailable */ }
 }
+
+/* Merge a partial update (e.g. new profile fields) into the stored session. */
+function amsUpdateSession(partial) {
+    const sess = amsGetSession() || {};
+    Object.assign(sess, partial);
+    amsSetSession(sess);
+    return sess;
+}
+
+/* Log the current user out and return to the login page. */
+function amsLogout() {
+    try { localStorage.removeItem(AMS_VIEWING_AS_STORAGE_KEY); } catch (e) { /* storage unavailable */ }
+    amsClearSession();
+    amsLoginRedirect();
+}
 function amsLoginRedirect() {
     const isPages = /\/pages\//.test(window.location.pathname);
     window.location.replace((isPages ? "../" : "") + "login.html");
@@ -563,10 +578,11 @@ function amsInitBell() {
 
 const AMS_VIEWING_AS_STORAGE_KEY = "ams_viewing_as_role";
 
+/* The "Viewing As" role simulator was removed in favour of the logged-in
+   account. amsGetViewingAsRole() now resolves to the real session role so
+   existing page code (role guards, hints) keeps working unchanged. */
 function amsGetViewingAsRole() {
     try {
-        const stored = localStorage.getItem(AMS_VIEWING_AS_STORAGE_KEY);
-        if (stored) return stored;
         const session = amsGetSession();
         if (session && session.role) return session.role;
         return "Standard User";
@@ -574,7 +590,8 @@ function amsGetViewingAsRole() {
     catch (e) { return "Standard User"; }
 }
 function amsSetViewingAsRole(role) {
-    try { localStorage.setItem(AMS_VIEWING_AS_STORAGE_KEY, role); } catch (e) { /* storage unavailable */ }
+    /* Compatibility stub - role is always the real session role now. */
+    if (role) { try { localStorage.removeItem(AMS_VIEWING_AS_STORAGE_KEY); } catch (e) { /* ignore */ } }
 }
 
 /* =============================================================================
@@ -1130,33 +1147,28 @@ function reassignAsset(assetId, toAmsId) {
 /* =============================================================================
    ASSET HOLDER HELPERS  (shared by Asset Master + print forms)
    An asset is always assigned to a Direct Employee (the custodian) and MAY
-   additionally record the ACTUAL USER / DEPARTMENT:
-     - as a record from the User/Department masters
-       (assignedToSubordinate / assignedDepartment) - a FORMAL sub-record of the
-       same assignment. The asset is still directly issued to the employee, so
-       the printed Asset Issue Form lists it under "Assets Issued".
-     - as FREE TEXT typed into the Assign modal for parties NOT present in the
-       masters (assignedSubText / assignedDeptText). Those assets are NOT
-       directly issued to the employee - the real holder is an outsider - so the
-       print routes them to the "Assets Currently Assigned to Subordinates (For
-       Reference)" section instead of "Assets Issued".
-     - as a DEPARTMENT/USE note typed into the "Actual Usage / Team Details
-       (Optional)" field (usageNote). The asset is issued to a Department/Use,
-       not to the custodian personally, so the print routes it to the reference
-       section the same way as a free-text holder.
+   additionally record the ACTUAL USER:
+     - as a record from the User master (assignedToSubordinate) - a FORMAL
+       sub-record of the same assignment. The asset is still directly issued to
+       the employee, so the printed Asset Issue Form lists it under
+       "Assets Issued".
+     - as FREE TEXT typed into the Assign modal for a party NOT present in the
+       User master (assignedSubText). Those assets are NOT directly issued to
+       the employee - the real holder is an outsider - so the print routes them
+       to the "Assets Currently Assigned to Subordinates (For Reference)"
+       section instead of "Assets Issued".
    ===========================================================================*/
 
 /* True when the asset is NOT personally held by the custodian: its real user
-   was typed as free text (assignedSubText / assignedDeptText) or as a
-   Department/Use note (usageNote). Only these assets are moved out of "Assets
-   Issued" into the "For Reference" section of the printed Asset Issue Form. */
+   was typed as free text (assignedSubText, not in the User master). Only these
+   assets are moved out of "Assets Issued" into the "For Reference" section of
+   the printed Asset Issue Form. */
 function amsAssetIsDeptOrSub(a) {
-    return !!(a && (a.assignedSubText || a.assignedDeptText || a.usageNote));
+    return !!(a && a.assignedSubText);
 }
 
-/* Human-readable label for the actual holder (subordinate/dept/use) of an
-   asset. Falls back to the "Actual Usage / Team Details" note when the holder
-   is neither a master record nor free text. */
+/* Human-readable label for the actual holder (subordinate/free-text user) of
+   an asset. */
 function amsAssetHolderLabel(a) {
     if (!a) return "";
     if (a.assignedToSubordinate) {
@@ -1164,18 +1176,14 @@ function amsAssetHolderLabel(a) {
         return emp ? `${emp.name} (${emp.empId})` : a.assignedToSubordinate;
     }
     if (a.assignedSubText) return a.assignedSubText;
-    if (a.assignedDepartment) return a.assignedDepartment;
-    if (a.assignedDeptText) return a.assignedDeptText;
-    if (a.usageNote) return a.usageNote;
     return "";
 }
 
 /* Splits an employee's currently-held assets into (a) assets issued directly to
-   them - including those whose actual user is a User/Department MASTER record -
-   and (b) assets whose real user was NOT the employee personally: free text
-   holders (assignedSubText / assignedDeptText) and Department/Use notes
-   (usageNote). Only the latter feed the "For Reference" section of the printed
-   Asset Issue Form; the former stay in "Assets Issued". */
+   them - including those whose actual user is a User MASTER record - and (b)
+   assets whose real user was NOT the employee personally: free text holders
+   (assignedSubText). Only the latter feed the "For Reference" section of the
+   printed Asset Issue Form; the former stay in "Assets Issued". */
 function amsSplitDirectVsSubordinateAssets(assets) {
     const direct = [];
     const subordinate = [];
@@ -1184,6 +1192,39 @@ function amsSplitDirectVsSubordinateAssets(assets) {
         else direct.push(a);
     });
     return { direct, subordinate };
+}
+
+/* Builds the "Accessories / Items Included" section of a printed form from the
+   accessories recorded on the assets (checked at assignment time). Renders each
+   asset's accessories as pre-checked blocks labelled with the asset ID, falling
+   back to the standard blank checklist when nothing was recorded. */
+function amsBuildPrintAccessoriesHtml(assets) {
+    const rows = [];
+    (assets || []).forEach(oa => {
+        const acc = (oa && Array.isArray(oa.accessories) && oa.accessories.length) ? oa.accessories : [];
+        if (!acc.length) return;
+        const label = (oa.id || oa.assetId || "").toUpperCase();
+        acc.forEach(name => {
+            rows.push(`<label class="pf-check-block"><input type="checkbox" checked> ${amsEsc(name)}${label ? ` <span class="pf-acc-asset">(${amsEsc(label)})</span>` : ""}</label>`);
+        });
+    });
+    if (!rows.length) {
+        return `
+        <div class="pf-section-bar">Accessories / Items Included</div>
+        <div class="pf-checklist-grid">
+            <label class="pf-check-block"><input type="checkbox" disabled> Power Adaptor / Charger</label>
+            <label class="pf-check-block"><input type="checkbox" disabled> Carrying Bag / Case</label>
+            <label class="pf-check-block"><input type="checkbox" disabled> Mouse / Keyboard (if applicable)</label>
+            <label class="pf-check-block"><input type="checkbox" disabled> Original Box / Documentation</label>
+            <label class="pf-check-block" style="grid-column:1 / -1;">Other: ________________________________</label>
+        </div>`;
+    }
+    return `
+        <div class="pf-section-bar">Accessories / Items Included</div>
+        <div class="pf-checklist-grid">
+            ${rows.join("")}
+            <label class="pf-check-block" style="grid-column:1 / -1;">Other: ________________________________</label>
+        </div>`;
 }
 
 /* =============================================================================
@@ -1409,28 +1450,7 @@ const AMS_EXIT_FACILITIES_CHECKLIST = [
 ];
 
 /* =============================================================================
-   13) ACTIVITY LOG  (recent events for the dashboard timeline)
-   ===========================================================================*/
-
-const DUMMY_ACTIVITY_LOG = [
-    { time: "2026-07-30 09:15", type: "checkout", text: "Hydraulic Oil 68 (x2) issued to Workshop A", user: "R. Sharma" },
-    { time: "2026-07-30 08:40", type: "service",  text: "CNC Milling Machine maintenance completed", user: "M. Ibrahim" },
-    { time: "2026-07-29 16:20", type: "add",      text: "New asset added: Cooling Tower Unit", user: "A. Patel" },
-    { time: "2026-07-29 11:05", type: "alert",    text: "Cutting Fluid below reorder level", user: "System" },
-    { time: "2026-07-29 09:30", type: "checkout", text: "Safety Gloves (x5) issued to Production", user: "R. Sharma" },
-    { time: "2026-07-28 14:45", type: "return",   text: "Laser Toner (Black) restocked (+2)", user: "S. Khan" }
-];
-
-const AMS_DUMMY_ACTIVITY = [
-    { date: "2026-07-10", action: "Asset Assigned",  detail: "LT00012SLPS assigned to Arjun Mehta (Production)" },
-    { date: "2026-07-09", action: "Asset Return",    detail: "LT00050VRSL retired - Employee exit" },
-    { date: "2026-07-08", action: "Asset Added",     detail: "MN00045SLIT added to Solapur - IT inventory" },
-    { date: "2026-07-07", action: "Stock Movement",  detail: "A4 Paper Ream -5 units issued at Solapur" },
-    { date: "2026-07-06", action: "Asset Repair",    detail: "LT00021HOHR sent for repair - screen issue" },
-];
-
-/* =============================================================================
-   14) STATUS COLORS  (maps a status string to a badge CSS class)
+   13) STATUS COLORS  (maps a status string to a badge CSS class)
    ===========================================================================*/
 
 const STATUS_BADGE_CLASS = {
@@ -1453,7 +1473,7 @@ const STATUS_BADGE_CLASS = {
 };
 
 /* =============================================================================
-   15) SUMMARY HELPERS  (small functions every page can reuse)
+   14) SUMMARY HELPERS  (small functions every page can reuse)
    ===========================================================================*/
 
 function getAssetSummary() {

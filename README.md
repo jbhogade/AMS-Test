@@ -16,9 +16,13 @@ The portal is gated by `login.html`. On a Windows machine with SQL Server:
    dotnet run
    ```
    The API serves BOTH the backend and the frontend on one URL (open it in your browser).
-4. **Log in** with the seeded Supreme Root account (delivered separately).
+4. **Log in** with a seeded account:
+   - `operator.sys` / `Sr#Ops@2026` (Supreme Root - for system administration)
+   - `testadmin` / `Admin@#$12345` (Super Root - the everyday admin account; use this so end users never need the Supreme Root login)
 
 How it works: business data is stored as JSON documents in the `dbo.ams_collections` table; the frontend loads every collection at startup and PUTs a collection back whenever the in-memory data changes (`js/dummy-data.js` data layer). Login accounts live in the relational `dbo.ams_users` table (PBKDF2-SHA256 hashed passwords, JWT sessions).
+
+Account management: the **User Master** page (`pages/user-master.html`) now has a password field - new accounts are synced to `dbo.ams_users` via the API so they can actually log in. The topbar user chip (display name, **My Profile**, **Logout**) opens the profile page (`pages/profile.html`) to edit profile fields or change the password.
 
 ## Folder Structure
 
@@ -154,8 +158,9 @@ The portal ships with **11 themes** switchable from the dropdown in the top-righ
 - [x] UX round 3 (Consumable & Spare Parts Add/Edit modal's Vendor field upgraded from free-text to the same pick-list + (+) quick-add as Assets; the master-table engine now supports optional pick-list fields with in-modal quick-add and preserves legacy values no longer in the master when editing)
 - [x] Settings page (portal preferences hub: Appearance - 11-theme gallery with live CSS-var previews + font size sm/md/lg; General - portal name shown in the sidebar brand + default list page size wired into the Asset table + currency note; Notifications - toast popup toggle, clear the bell / activity log; Data - "Viewing As" role shortcut + Reset Demo Data. Every choice is localStorage-backed and applies on all pages)
 - [x] Report round (Company Master gains a Slogan + rectangular banner image upload; the Reports page has a Report Appearance editor - header style classic/banner, show/hide logo/name/slogan/address, live white-paper preview - persisted portal-wide via `ams_report_header_prefs`; every printable form now uses the shared `amsBuildPrintHeader` letterhead engine so Company + Appearance changes apply uniformly)
-- [x] Assign fix (Asset Assign/Reassign: Subordinate and Department selects gain "Other / Not in the Master..." free-text options that store ONLY in `assignedSubText`/`assignedDeptText` - never in the Direct User field, which still requires a real User Master entry. In the printable Asset Issue Form, assets whose actual user was typed as free text go to the "Subordinates (For Reference)" section, while assets directly issued to the employee - including ones whose actual user is a User/Department master record - stay in "Assets Issued". Assets assigned to a Department/Use via the "Actual Usage / Team Details (Optional)" field also route to the reference section, with the note shown as the holder. The Asset Handover Form's Exit Reason is now a full-width box with a ruled writing line beneath it, and its signature order is Employee | Received By (IT/Admin) | Authorised By)
+- [x] Assign fix (Asset Assign/Reassign: the Subordinate select gains "Other / Not in the Master..." free-text that stores ONLY in `assignedSubText` - never in the Direct User field, which still requires a real User Master entry. In the printable Asset Issue Form, assets whose actual user was typed as free text go to the "Subordinates (For Reference)" section, while assets directly issued to the employee - including ones whose actual user is a User master record - stay in "Assets Issued". The "Assign to Department" and "Actual Usage / Team Details" fields were removed from the Assign/Reassign modal in the 15.7 cleanup round. The Asset Handover Form's Exit Reason is now a full-width box with a ruled writing line beneath it, and its signature order is Employee | Received By (IT/Admin) | Authorised By)
 - [x] SQL Server migration (Phase 15) - ASP.NET Core Web API (`server/AMS.API`), JSON-document storage in `dbo.ams_collections`, relational `dbo.ams_users` + JWT login, login.html gate, every page loads from and saves to the DB. Live-testing copy = this project; original dummy-data version = `../AMS-Backup/`.
+- [x] 15.7 cleanup round (profile page uses the app-wide `.field`/`.input` form styling; Assign/Reassign modal no longer collects Department or Actual Usage/Team details; Assign Report is gated for employees holding no assets with the menu item shown disabled; Assign/Reassign removed from the employee Actions menu (header button remains); Asset Issue Form's "Accessories / Items Included" section now lists the accessories recorded on the assets; unused `DUMMY_ACTIVITY_LOG`/`AMS_DUMMY_ACTIVITY` arrays removed so the dashboard shows only real activity; the actions-menu overflow fix from the master tables now applies to the Asset and Employee lists too)
 
 ## Code Comments Convention
 

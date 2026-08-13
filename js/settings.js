@@ -159,18 +159,12 @@ function initNotificationsTab() {
 
 /*-------------- Start Code for DATA TAB -------------------------------------*/
 function initDataTab() {
-    const roleSelect = document.getElementById("settingsViewingAs");
-    if (roleSelect) {
-        roleSelect.value = amsGetViewingAsRole();
-        roleSelect.addEventListener("change", () => {
-            amsSetViewingAsRole(roleSelect.value);
-            amsNotify("Now viewing as " + roleSelect.value, "info");
-        });
-    }
+    const roleInput = document.getElementById("settingsSignedInRole");
+    if (roleInput) roleInput.value = amsGetViewingAsRole();
 
     const resetBtn = document.getElementById("btnResetDemoData");
     if (resetBtn) resetBtn.addEventListener("click", () => {
-        if (!confirm("Reset all demo data and preferences? Theme, company details, notifications, activity log, portal settings and the role simulator will be restored to defaults.")) return;
+        if (!confirm("Reset all demo data and preferences? Theme, company details, notifications, activity log, portal settings and preferences will be restored to defaults.")) return;
         amsResetDemoData();
         location.reload();
     });

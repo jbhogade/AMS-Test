@@ -159,6 +159,7 @@ async function amsRenderMasterTable() {
                 ? `<span class="badge badge-green">Active</span>`
                 : `<span class="badge badge-grey">Inactive</span>`;
             const fieldCells = cfg.fields.map(f => {
+                if (f.hideInTable) return "";
                 let display = f.type === "date" ? amsFormatDate(item[f.key]) : amsEsc(item[f.key]);
                 if (f.format) display = f.format(item[f.key], item); // format() owns its own escaping
                 return `<td ${f.multiline ? 'style="white-space:pre-line; max-width:220px;"' : ""}>${display}</td>`;
@@ -183,11 +184,12 @@ async function amsRenderMasterTable() {
             </tr>`;
         }).join("");
 
-    const headCells = cfg.fields.map(f => `<th>${amsEsc(f.label)}</th>`).join("");
+    const visibleFields = cfg.fields.filter(f => !f.hideInTable);
+    const headCells = visibleFields.map(f => `<th>${amsEsc(f.label)}</th>`).join("");
     const extraColCount = (cfg.rowBadge ? 1 : 0) + (cfg.usageCount ? 1 : 0);
     document.getElementById("masterTable").innerHTML = `
         <thead><tr>${headCells}${cfg.rowBadge ? `<th>${amsEsc(cfg.rowBadgeLabel || "Flag")}</th>` : ""}${cfg.usageCount ? "<th>Used By</th>" : ""}<th>Status</th><th></th></tr></thead>
-        <tbody>${rows || `<tr><td colspan="${cfg.fields.length + extraColCount + 2}" style="color:var(--text-muted)">No records found</td></tr>`}</tbody>`;
+        <tbody>${rows || `<tr><td colspan="${visibleFields.length + extraColCount + 2}" style="color:var(--text-muted)">No records found</td></tr>`}</tbody>`;
 }
 
 /* ---- MODAL open/close ------------------------------------------------------- */
@@ -221,6 +223,8 @@ function amsMtBuildFormFields() {
                     </div>
                 </div>`
                 : selectHtml;
+        } else if (f.type === "password") {
+            control = `<input type="password" id="mt-${f.key}" autocomplete="new-password" placeholder="${f.editOnly ? "Leave blank to keep current password" : ""}">`;
         } else if (f.type === "number") {
             control = `<input type="number" id="mt-${f.key}" ${f.min !== undefined ? `min="${f.min}"` : ""} step="${f.step || "1"}">`;
         } else if (f.type === "date") {
@@ -269,13 +273,14 @@ function amsMtOpenEdit(key) {
     cfg.fields.forEach(f => {
         const el = document.getElementById(`mt-${f.key}`);
         if (f.type === "select" && item[f.key]) amsMtEnsureOption(el, item[f.key]);
+        if (f.type === "password") { el.value = ""; return; } // never render a stored password back
         el.value = item[f.key] || "";
     });
     document.getElementById("mt-active").checked = !!item.active;
     amsMtOpenModal();
 }
 
-document.getElementById("mtForm").addEventListener("submit", (e) => {
+document.getElementById("mtForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const cfg = AMS_MASTER_CONFIG;
 
@@ -283,10 +288,11 @@ document.getElementById("mtForm").addEventListener("submit", (e) => {
     for (const f of cfg.fields) {
         let val = document.getElementById(`mt-${f.key}`).value.trim();
         if (f.upper) val = val.toUpperCase();
-        if (f.required && !val) { amsToast(`${f.label} is required.`, "warning"); return; }
+        if (f.required && !val && !(f.editOnly && AMS_MT_STATE.editingKey)) { amsToast(`${f.label} is required.`, "warning"); return; }
         values[f.key] = val;
     }
     const active = document.getElementById("mt-active").checked;
+    values.active = active;
 
     if (cfg.autoIdField && !AMS_MT_STATE.editingKey) {
         values[cfg.autoIdField] = cfg.autoIdGenerate(values); // auto IDs are always unique
@@ -296,13 +302,28 @@ document.getElementById("mtForm").addEventListener("submit", (e) => {
         if (dupExists) { amsToast(`A record with this ${cfg.idKey} already exists.`, "warning"); return; }
     }
 
+    /* Optional page hook: e.g. User Master syncs the login (with password) to
+       the ams_users table via the API. If the hook throws, the local record
+       is not saved. */
+    if (typeof cfg.onBeforeSave === "function") {
+        try {
+            await cfg.onBeforeSave(values, AMS_MT_STATE.editingKey);
+        } catch (err) {
+            amsToast(err.message || "Save cancelled.", "danger");
+            return;
+        }
+    }
+
     if (AMS_MT_STATE.editingKey) {
         const item = cfg.dataArray.find(i => i[cfg.idKey] === AMS_MT_STATE.editingKey);
+        delete values.password; // passwords live only in the API (hashed), never in the local copy
         Object.assign(item, values);
         item.active = active;
         amsToast(`${cfg.pageTitle.replace(" Master", "")} updated: ${values[cfg.fields[0].key]}`, "info");
     } else {
-        cfg.dataArray.push({ ...values, active });
+        delete values.password; // passwords live only in the API (hashed), never in the local copy
+        const rec = { ...values, active };
+        cfg.dataArray.push(rec);
         amsToast(`${cfg.pageTitle.replace(" Master", "")} added: ${values[cfg.fields[0].key]}`, "success");
     }
 
@@ -312,17 +333,22 @@ document.getElementById("mtForm").addEventListener("submit", (e) => {
 });
 
 /* ---- TOGGLE active / deactivate --------------------------------------------- */
-function amsMtToggleActive(key) {
+async function amsMtToggleActive(key) {
     const cfg = AMS_MASTER_CONFIG;
     const item = cfg.dataArray.find(i => i[cfg.idKey] === key);
-    item.active = !item.active;
+    const newActive = !item.active;
+    if (typeof cfg.onBeforeToggle === "function") {
+        const hook = cfg.onBeforeToggle(item, newActive);
+        if (hook && typeof hook.then === "function") await hook;
+    }
+    item.active = newActive;
     amsToast(`${cfg.pageTitle.replace(" Master", "")} ${item.active ? "activated" : "deactivated"}: ${key}`, item.active ? "success" : "warning");
     amsRenderMasterTable();
     amsDbSaveArray(cfg.dataArray);
 }
 
 /* ---- DELETE (blocked if currently in use) ----------------------------------- */
-function amsMtDelete(key) {
+async function amsMtDelete(key) {
     const cfg = AMS_MASTER_CONFIG;
     const item = cfg.dataArray.find(i => i[cfg.idKey] === key);
     const usage = cfg.usageCount ? cfg.usageCount(item) : 0;
@@ -332,6 +358,10 @@ function amsMtDelete(key) {
         if (guard && !guard.allowed) { amsToast(guard.reason || "You don't have permission to delete this record.", "warning"); return; }
     }
     if (!confirm(`Delete "${item[cfg.idKey]}"? This cannot be undone.`)) return;
+    if (typeof cfg.onBeforeDelete === "function") {
+        const hook = cfg.onBeforeDelete(item);
+        if (hook && typeof hook.then === "function") await hook;
+    }
     cfg.dataArray.splice(cfg.dataArray.indexOf(item), 1);
     amsToast(`${cfg.pageTitle.replace(" Master", "")} deleted: ${key}`, "danger");
     amsRenderMasterTable();
@@ -339,7 +369,22 @@ function amsMtDelete(key) {
 }
 
 /* ---- ROW ACTION delegation --------------------------------------------------- */
-function amsMtCloseAllRowMenus() { document.querySelectorAll(".actions-menu.open").forEach(m => m.classList.remove("open")); }
+function amsMtCloseAllRowMenus() {
+    document.querySelectorAll(".actions-menu.open").forEach(m => m.classList.remove("open"));
+    document.querySelectorAll(".table-wrap.mt-menu-open").forEach(w => w.classList.remove("mt-menu-open"));
+}
+
+/* While a row menu is open the .table-wrap must stop clipping it (its
+   overflow-x:auto would otherwise turn overflow-y into auto too, cutting the
+   dropdown off or spawning a scrollbar). We lift the wrap to overflow:visible
+   for the duration, so the menu overlays the frame instead of expanding it. */
+function amsMtSyncWrapOverflow() {
+    const anyOpen = document.querySelector(".actions-menu.open");
+    document.querySelectorAll(".table-wrap").forEach(w => {
+        const inside = w.contains(anyOpen);
+        w.classList.toggle("mt-menu-open", !!inside);
+    });
+}
 
 document.addEventListener("click", (e) => {
     const trigger = e.target.closest("[data-actions-for]");
@@ -348,6 +393,7 @@ document.addEventListener("click", (e) => {
         const wasOpen = menu.classList.contains("open");
         amsMtCloseAllRowMenus();
         if (!wasOpen) menu.classList.add("open");
+        amsMtSyncWrapOverflow();
         return;
     }
     if (!e.target.closest(".actions-menu")) amsMtCloseAllRowMenus();

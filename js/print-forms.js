@@ -27,15 +27,14 @@ function amsGenerateFormNo(prefix) {
     return `${prefix}-${String(AMS_PRINT_COUNTERS[prefix]).padStart(6, "0")}`;
 }
 
-/* ---- "Remarks / Notes" body: ONLY each asset's stored remarks + usage note
-       (added when the asset was created in the system). The typed pre-print
-       note is rendered separately by amsBuildAdditionalRemarks() below. */
+/* ---- "Remarks / Notes" body: ONLY each asset's stored remarks (added when
+       the asset was created in the system). The typed pre-print note is
+       rendered separately by amsBuildAdditionalRemarks() below. */
 function amsBuildReportRemarks(assetsList) {
     const lines = [];
     assetsList.forEach(oa => {
         const assetLabel = oa.id || oa.assetId;
         if (oa.remarks) lines.push(`<div><strong>${amsEsc(assetLabel)} - Remarks (on record):</strong> ${amsEsc(oa.remarks)}</div>`);
-        if (oa.usageNote) lines.push(`<div><strong>${amsEsc(assetLabel)} - Actual Usage / Team:</strong> ${amsEsc(oa.usageNote)}</div>`);
     });
     if (!lines.length) lines.push(`<div class="pf-notes-empty">No remarks recorded against the asset(s) in the system.</div>`);
     return lines.join("");
@@ -145,10 +144,9 @@ function amsGenerateReport(amsId, type, extraRemarks) {
         <label class="pf-check-inline"><input type="checkbox" disabled> ${o}</label>`).join("");
 
     /* Assets issued directly to the employee (ALL assets assigned to them,
-       including ones whose actual user is a User/Department MASTER record)
-       stay in "Assets Issued". Assets whose real user was typed as FREE TEXT
-       (assignedSubText / assignedDeptText, not in the User/Department masters)
-       or as a Department/Use note (usageNote) show in the "For Reference"
+       including ones whose actual user is a User MASTER record) stay in
+       "Assets Issued". Assets whose real user was typed as FREE TEXT
+       (assignedSubText, not in the User master) show in the "For Reference"
        section instead, since they were never issued to the employee personally. */
     const splitOwned = isIssue ? amsSplitDirectVsSubordinateAssets(owned) : null;
     const directOwned = splitOwned ? splitOwned.direct : owned;
@@ -169,7 +167,9 @@ function amsGenerateReport(amsId, type, extraRemarks) {
             </tbody>
         </table>`;
 
-    const accessoriesHtml = isIssue ? `
+    const accessoriesHtml = isIssue ? ((typeof amsBuildPrintAccessoriesHtml === "function")
+        ? amsBuildPrintAccessoriesHtml(directOwned)
+        : `
         <div class="pf-section-bar">Accessories / Items Included</div>
         <div class="pf-checklist-grid">
             <label class="pf-check-block"><input type="checkbox" disabled> Power Adaptor / Charger</label>
@@ -177,7 +177,7 @@ function amsGenerateReport(amsId, type, extraRemarks) {
             <label class="pf-check-block"><input type="checkbox" disabled> Mouse / Keyboard (if applicable)</label>
             <label class="pf-check-block"><input type="checkbox" disabled> Original Box / Documentation</label>
             <label class="pf-check-block" style="grid-column:1 / -1;">Other: ________________________________</label>
-        </div>` : "";
+        </div>`) : "";
 
     const subAssets = isIssue ? amsSubordinateAssetsDetailed(amsId) : [];
     const subRows = subAssets.map(sa => ({

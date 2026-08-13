@@ -66,17 +66,17 @@
                     </div>
                 </div>
 
-                <!-- ==================== VIEWING AS (ROLE SIMULATOR) ==================== -->
+                <!-- ==================== SIGNED-IN ROLE BAR ==================== -->
                 <div class="viewing-as-bar">
-                    <label for="viewingAsRole">Viewing As (role simulator - no real login yet):</label>
-                    <select id="viewingAsRole"></select>
+                    <label for="viewingAsRole">Signed-in Role:</label>
+                    <input id="viewingAsRole" class="input" disabled style="width:auto; max-width:220px;">
                     <span class="form-hint" id="viewingAsHint"></span>
                 </div>
 
                 <!-- ==================== ACCESS DENIED ==================== -->
                 <div id="accessDeniedCard" class="access-denied-card" style="display:none;">
                     <div class="ad-title">&#128274; Access Denied</div>
-                    <div class="ad-sub">Log Report is only visible to Super Root and Supreme Root. Switch "Viewing As" above to see it (this is a simulated check - there's no real login yet).</div>
+                    <div class="ad-sub">Log Report is only visible to Super Root and Supreme Root. Sign in with a Super Root or Supreme Root account to see it.</div>
                 </div>
 
                 <!-- ==================== LOG CONTENT (Super Root / Supreme Root) ==================== -->

@@ -129,6 +129,12 @@
 .actions-menu a:hover { background: var(--bg-elevated); text-decoration: none; }
 .actions-menu a.danger { color: var(--danger); }
 .actions-menu a.danger:hover { background: rgba(239, 68, 68, 0.1); }
+.actions-menu a.menu-disabled {
+    color: var(--text-muted);
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+.actions-menu a.menu-disabled:hover { background: transparent; }
 
 .actions-menu .menu-sep {
     height: 1px;

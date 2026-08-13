@@ -301,32 +301,6 @@
                         <div class="form-hint">Optional - the person who actually uses the asset. Pick from the list, or choose "Other / Not in User Master..." and type a name for anyone not in the User Master.</div>
                     </div>
                     <div class="field field-full">
-                        <div class="accessories-header">
-                            <label>Assign to Department (Optional)</label>
-                            <div class="quickadd-inline">
-                                <button type="button" class="btn-quickadd" data-dept-quickadd="assignDept" title="Add a new Department">+</button>
-                                <div class="quickadd-popover" id="deptQaPopover-assignDept">
-                                    <label class="qa-label">New Department Name</label>
-                                    <input type="text" id="deptQaInput-assignDept" placeholder="e.g. Logistics">
-                                    <label class="qa-label">Shortform (for Employee/Asset IDs, max 4 chars)</label>
-                                    <input type="text" id="deptQaShortInput-assignDept" placeholder="e.g. LOG" maxlength="4" style="text-transform:uppercase;">
-                                    <div class="qa-actions">
-                                        <button type="button" class="btn btn-secondary" data-dept-qa-cancel="assignDept">Cancel</button>
-                                        <button type="button" class="btn btn-primary" data-dept-qa-save="assignDept">Add</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <select id="assignDept" class="select"></select>
-                        <input type="text" id="assignDeptText" class="input" style="display:none; margin-top:6px;" placeholder="Department name (not in Department Master)">
-                        <div class="form-hint">Optional - use when the asset serves a whole department rather than one person (e.g. a shared printer). Pick from the list, or choose "Other / Not in Department Master..." and type a department.</div>
-                    </div>
-                    <div class="field field-full">
-                        <label>Actual Usage / Team Details (Optional)</label>
-                        <textarea id="assignUsageNote" class="textarea" rows="2" placeholder="e.g. Used collectively by the Night Shift In-Charge team, not one specific person"></textarea>
-                        <div class="form-hint">Optional - fill in when no single employee record fits (a shift, a team, a role like Block In-Charge) instead of picking a Subordinate above</div>
-                    </div>
-                    <div class="field field-full">
                         <label>Assignment Date <span class="req">*</span></label>
                         <input type="date" id="assignDate" class="input" required>
                     </div>

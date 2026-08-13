@@ -128,13 +128,6 @@ function renderTopbar(currentPage) {
             <span class="search-icon"></span>
             <input type="search" placeholder="Quick search..." id="global-search" aria-label="Search">
         </div>
-        <select class="select" id="viewing-as" aria-label="Viewing As (role simulator)" title="Viewing As (role simulator - no real login yet)">
-            <option value="Standard User">Standard User</option>
-            <option value="Viewer (Read-Only)">Viewer (Read-Only)</option>
-            <option value="Admin">Admin</option>
-            <option value="Super Root">Super Root</option>
-            <option value="Supreme Root">Supreme Root</option>
-        </select>
         <div class="notif-bell-wrap">
             <button class="notif-bell-trigger" id="notifBellTrigger" title="Notifications">&#128276;</button>
             <span class="notif-bell-badge" id="notifBellBadge"></span>
@@ -149,11 +142,18 @@ function renderTopbar(currentPage) {
         <select class="select" id="theme-select" aria-label="Theme" style="width:auto;padding:8px 10px;font-size:13px;"></select>
         ${(function () {
             const session = (typeof amsGetSession === "function") ? amsGetSession() : null;
-            const name = (session && session.name) ? session.name : "Operator";
+            const name = (session && (session.displayName || session.name)) ? (session.displayName || session.name) : "Operator";
             const initials = name.split(/\s+/).map(w => w.charAt(0)).join("").slice(0, 2).toUpperCase() || "OP";
-            return `<div class="user-chip" title="Signed in user">
-                <div class="user-avatar">${escapeHtml(initials)}</div>
-                <span class="user-chip-name">${escapeHtml(name)}</span>
+            return `<div class="user-chip-wrap">
+                <div class="user-chip" id="user-chip" title="Account menu">
+                    <div class="user-avatar">${escapeHtml(initials)}</div>
+                    <span class="user-chip-name">${escapeHtml(name)}</span>
+                    <span class="user-chip-caret">&#9662;</span>
+                </div>
+                <div class="user-chip-menu" id="user-chip-menu">
+                    <a class="user-chip-menu-item" href="../pages/profile.html">My Profile</a>
+                    <button type="button" class="user-chip-menu-item" id="user-chip-logout">Logout</button>
+                </div>
             </div>`;
         })()}
     `;
@@ -161,14 +161,23 @@ function renderTopbar(currentPage) {
     /* Wire up the theme dropdown that was just created */
     buildThemeMenu("theme-select");
 
-    /* Restore the saved "viewing as" role + persist changes (role simulator) */
-    const viewingAs = document.getElementById("viewing-as");
-    if (viewingAs) {
-        viewingAs.value = (typeof amsGetViewingAsRole === "function") ? amsGetViewingAsRole() : "Standard User";
-        viewingAs.addEventListener("change", function () {
-            if (typeof amsSetViewingAsRole === "function") amsSetViewingAsRole(this.value);
-            amsNotify("Now viewing as " + this.value, "info");
+    /* User chip dropdown: My Profile / Logout */
+    const chip = document.getElementById("user-chip");
+    const chipMenu = document.getElementById("user-chip-menu");
+    if (chip && chipMenu) {
+        chip.addEventListener("click", function (e) {
+            e.stopPropagation();
+            chipMenu.classList.toggle("open");
         });
+        document.addEventListener("click", function (e) {
+            if (!e.target.closest(".user-chip-wrap")) chipMenu.classList.remove("open");
+        });
+        const logoutBtn = document.getElementById("user-chip-logout");
+        if (logoutBtn) {
+            logoutBtn.addEventListener("click", function () {
+                if (typeof amsLogout === "function") amsLogout();
+            });
+        }
     }
 
     /* Sidebar overlay lives outside the sidebar element, created here */

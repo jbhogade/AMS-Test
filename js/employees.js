@@ -124,6 +124,7 @@ function renderEmployeeTable() {
 function buildActionsMenu(emp) {
     const active = emp.status === "Active";
     const exited = emp.status === "Inactive" && !!getExitRecord(emp.amsId);
+    const holdsAssets = getEmployeeAssets(emp.amsId).length > 0 || getSubordinateAssets(emp.amsId).length > 0;
     return `
         <div class="row-actions">
             <button class="actions-btn" onclick="toggleRowActions(this)">Actions &#9662;</button>
@@ -131,10 +132,7 @@ function buildActionsMenu(emp) {
                 <a onclick="viewEmployee('${emp.amsId}')">&#128065; View</a>
                 <a onclick="openEditModal('${emp.amsId}')">&#9998; Edit</a>
                 ${active ? `<div class="menu-sep"></div>
-                <a onclick="openAssignModal('${emp.amsId}')">&#10133; Assign Asset</a>
-                <a onclick="openReassignModal('${emp.amsId}')">&#8644; Reassign Asset</a>
-                <div class="menu-sep"></div>
-                <a onclick="openIssueForm('${emp.amsId}')">&#128203; Assign Report (Asset Issue Form)</a>
+                <a class="${holdsAssets ? "" : "menu-disabled"}" onclick="${holdsAssets ? `openIssueForm('${emp.amsId}')` : `alert('No Assign Report can be generated - this employee is not holding any assets.')`}">&#128203; Assign Report (Asset Issue Form)</a>
                 <div class="menu-sep"></div>
                 <a class="danger" onclick="openExitModal('${emp.amsId}')">&#10006; Exit</a>`
                 : exited ? `<div class="menu-sep"></div>
@@ -147,13 +145,27 @@ function buildActionsMenu(emp) {
 /* Toggles the row actions dropdown open/closed */
 function toggleRowActions(btn) {
     document.querySelectorAll(".row-actions.open").forEach(el => el.classList.remove("open"));
-    btn.closest(".row-actions").classList.toggle("open");
+    const wasOpen = btn.closest(".row-actions").classList.contains("open");
+    btn.closest(".row-actions").classList.toggle("open", !wasOpen);
+    amsSyncEmpMenuOverflow();
+}
+
+/* While a row menu is open, the .table-wrap (overflow-x:auto) would clip the
+   dropdown or spawn scrollbars. Lift the wrap that contains the open menu to
+   overflow:visible so the menu overlays the table frame instead. */
+function amsSyncEmpMenuOverflow() {
+    const anyOpen = document.querySelector(".row-actions.open .actions-menu");
+    document.querySelectorAll("main .table-wrap, .content .table-wrap, .table-wrap").forEach(w => {
+        const inside = w.contains(anyOpen);
+        w.classList.toggle("mt-menu-open", !!inside);
+    });
 }
 
 /* Clicking anywhere else closes all open action menus */
 document.addEventListener("click", function (e) {
     if (!e.target.closest(".row-actions")) {
         document.querySelectorAll(".row-actions.open").forEach(el => el.classList.remove("open"));
+        amsSyncEmpMenuOverflow();
     }
 });
 
@@ -508,19 +520,14 @@ function confirmExit() {
         teamIncharge
     );
 
-    /* Log the event (front-end only) */
+    /* Log the event to the permanent activity log */
     const logPieces = ["Facilities disabled: " + (disabledFacilities.join(", ") || "none")];
     if (exitReason) logPieces.push("Reason: " + exitReason);
     if (teamIncharge) {
         const ic = findEmployee(teamIncharge);
         if (ic) logPieces.push("Team transferred to: " + getEmployeeFullName(ic));
     }
-    DUMMY_ACTIVITY_LOG.unshift({
-        time: new Date().toLocaleString(),
-        type: "alert",
-        text: getEmployeeFullName(emp) + " exited. " + logPieces.join(" | "),
-        user: "System"
-    });
+    amsNotify(getEmployeeFullName(emp) + " exited. " + logPieces.join(" | "), "danger");
 
     hideModal("modal-exit");
     renderEmployeeTable();
@@ -537,6 +544,12 @@ function openIssueForm(amsId) {
     if (!emp) return;
     if (emp.status !== "Active") {
         alert("The Assign Report (Asset Issue Form) is only available for active employees.");
+        return;
+    }
+    const directCount = getEmployeeAssets(amsId).length;
+    const subCount = getSubordinateAssets(amsId).length;
+    if (directCount === 0 && subCount === 0) {
+        alert("No Assign Report (Asset Issue Form) can be generated for " + getEmployeeFullName(emp) + " because they are not currently holding any assets.");
         return;
     }
     amsGenerateReport(amsId, "assign");

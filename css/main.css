@@ -303,7 +303,50 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     border: 1px solid var(--border);
     font-size: 13px;
     cursor: pointer;
+    user-select: none;
 }
+
+.user-chip-wrap { position: relative; }
+
+.user-chip-caret {
+    font-size: 9px;
+    color: var(--text-muted);
+    margin-left: 2px;
+}
+
+.user-chip-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    min-width: 170px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow);
+    z-index: 200;
+    padding: 4px;
+    display: none;
+}
+
+.user-chip-menu.open { display: block; }
+
+.user-chip-menu-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 9px 12px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 13px;
+    cursor: pointer;
+    text-decoration: none;
+    box-sizing: border-box;
+}
+
+.user-chip-menu-item:hover { background: var(--bg-elevated); }
+.user-chip-menu-item:first-child { border-bottom: 1px solid var(--border); border-radius: 6px 6px 0 0; }
 
 .user-avatar {
     width: 30px;
@@ -488,6 +531,15 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
    ===========================================================================*/
 .table-wrap {
     overflow-x: auto;
+}
+
+/* While a row actions menu is open, lift the wrap to overflow:visible so the
+   dropdown overlays the table frame instead of being clipped / spawning a
+   scrollbar (the overflow-x:auto above would otherwise force overflow-y:auto). */
+.table-wrap.mt-menu-open {
+    overflow: visible;
+    position: relative;
+    z-index: 140;
 }
 
 .table {

@@ -80,10 +80,9 @@ function renderAssetTable() {
             const directEmp = a.assignedTo ? amsGetEmployeeByAmsId(a.assignedTo) : null;
             const subEmp = a.assignedToSubordinate ? amsGetEmployeeByAmsId(a.assignedToSubordinate) : null;
             const holderName = a.assignedToSubordinate ? (subEmp ? subEmp.name : a.assignedToSubordinate)
-                : (a.assignedSubText ? a.assignedSubText : (a.usageNote ? a.usageNote : ""));
-            const deptName = a.assignedDepartment ? a.assignedDepartment : (a.assignedDeptText ? a.assignedDeptText : "");
+                : (a.assignedSubText ? a.assignedSubText : "");
             const assignedDisplay = directEmp
-                ? `${amsEsc(directEmp.name)}${holderName ? ` &rarr; ${amsEsc(holderName)}` : ""}${deptName ? ` <span style="color:var(--text-muted);">(Dept: ${amsEsc(deptName)})</span>` : ""}`
+                ? `${amsEsc(directEmp.name)}${holderName ? ` &rarr; ${amsEsc(holderName)}` : ""}`
                 : "-";
             const isTransferred = (a.currentSite || a.site) !== a.purchaseSite;
 
@@ -215,7 +214,19 @@ function renderAssetStockSummary() {
 /* =============================================================================
    5) ACTIONS DROPDOWN OPEN/CLOSE + ROW ACTION DELEGATION
    ===========================================================================*/
-function amsCloseAllMenus() { document.querySelectorAll(".actions-menu.open").forEach(m => m.classList.remove("open")); }
+function amsCloseAllMenus() {
+    document.querySelectorAll(".actions-menu.open").forEach(m => m.classList.remove("open"));
+    amsSyncWrapOverflow();
+}
+
+/* While a row menu is open, #assetTableWrap (overflow:auto) would clip the
+   dropdown or spawn scrollbars. Lift it to overflow:visible for the duration so
+   the menu overlays the table frame instead of expanding it. */
+function amsSyncWrapOverflow() {
+    const anyOpen = document.querySelector(".actions-menu.open");
+    const wrap = document.getElementById("assetTableWrap");
+    if (wrap) wrap.classList.toggle("mt-menu-open", !!(anyOpen && wrap.contains(anyOpen)));
+}
 
 function amsCloseAllQuickAdd() {
     document.querySelectorAll(".quickadd-popover.open").forEach(p => p.classList.remove("open"));
@@ -229,7 +240,10 @@ function amsWireRowActions() {
             const menu = document.getElementById(`menu-${key}`);
             const wasOpen = menu.classList.contains("open");
             amsCloseAllMenus();
-            if (!wasOpen) menu.classList.add("open");
+            if (!wasOpen) {
+                menu.classList.add("open");
+                amsSyncWrapOverflow();
+            }
             return;
         }
         if (!e.target.closest(".actions-menu")) amsCloseAllMenus();
@@ -455,38 +469,12 @@ function amsWireAccessoryQuickAdd(containerId, getAssetType) {
     });
 }
 
-/* Wires the "+" quick-add button next to the "Assign to Department" select. */
-function amsWireDeptQuickAdd(selectId) {
-    const btn = document.querySelector(`[data-dept-quickadd="${selectId}"]`);
-    const popover = document.getElementById(`deptQaPopover-${selectId}`);
-    const nameInput = document.getElementById(`deptQaInput-${selectId}`);
-    const shortInput = document.getElementById(`deptQaShortInput-${selectId}`);
-    if (!btn || !popover || !nameInput || !shortInput) return;
-    btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const isOpen = popover.classList.toggle("open");
-        if (isOpen) { nameInput.value = ""; shortInput.value = ""; nameInput.focus(); }
-    });
-    const cancelBtn = document.querySelector(`[data-dept-qa-cancel="${selectId}"]`);
-    if (cancelBtn) cancelBtn.addEventListener("click", () => popover.classList.remove("open"));
-    const saveBtn = document.querySelector(`[data-dept-qa-save="${selectId}"]`);
-    if (saveBtn) saveBtn.addEventListener("click", () => {
-        const added = amsQuickAddDepartment(nameInput.value, shortInput.value);
-        if (!added) { alert("Enter both a Name and a Shortform - or that Department name may already exist."); return; }
-        popover.classList.remove("open");
-        const select = document.getElementById(selectId);
-        select.innerHTML = `<option value="">None</option>` + AMS_DUMMY_DEPARTMENTS.map(d => `<option value="${amsEsc(d.name)}">${amsEsc(d.name)}</option>`).join("");
-        select.value = added; /* auto-select it - that's presumably why it was just added */
-    });
-}
-
 function amsWireAccessoryAndDeptQuickAdds() {
     amsWireAccessoryQuickAdd("assignAccessories", () => {
         const a = AST_STATE.assets.find(x => x.id === AST_STATE.editingId);
         return a ? a.type : "";
     });
     amsWireAccessoryQuickAdd("replAccessories", () => document.getElementById("replType").value);
-    amsWireDeptQuickAdd("assignDept");
 }
 
 /* =============================================================================
@@ -658,8 +646,6 @@ function amsOpenViewModal(key) {
         <div class="detail-row"><span class="detail-label">Status</span><span class="detail-value">${amsEsc(a.status)}</span></div>
         <div class="detail-row"><span class="detail-label">Assigned To (Direct)</span><span class="detail-value">${directEmp ? amsEsc(directEmp.name) + " (" + amsEsc(directEmp.empId) + ")" : "-"}</span></div>
         <div class="detail-row"><span class="detail-label">Assigned To (Subordinate)</span><span class="detail-value">${subEmp ? amsEsc(subEmp.name) + " (" + amsEsc(subEmp.empId) + ")" : (a.assignedSubText ? amsEsc(a.assignedSubText) : "-")}</span></div>
-        <div class="detail-row"><span class="detail-label">Assign to Department</span><span class="detail-value">${a.assignedDepartment ? amsEsc(a.assignedDepartment) : (a.assignedDeptText ? amsEsc(a.assignedDeptText) : "-")}</span></div>
-        <div class="detail-row"><span class="detail-label">Actual Usage / Team Details</span><span class="detail-value">${a.usageNote ? amsEsc(a.usageNote) : "-"}</span></div>
         <div class="detail-row"><span class="detail-label">Vendor</span><span class="detail-value">${amsEsc(a.vendor) || "-"}</span></div>
         <div class="detail-row"><span class="detail-label">Purchase Cost</span><span class="detail-value">${a.purchaseCost ? formatCurrency(a.purchaseCost) : "-"}</span></div>
         <div class="detail-row"><span class="detail-label">Remarks</span><span class="detail-value">${amsEsc(a.remarks) || "-"}</span></div>
@@ -697,9 +683,6 @@ function amsPopulateEmpDropdowns() {
     document.getElementById("assignDirectEmp").innerHTML = activeEmps
         .map(e => `<option value="${amsEsc(e.empId)}">${amsEsc(e.name)} (${amsEsc(e.dept)})</option>`).join("");
     document.getElementById("assignSubEmp").innerHTML = opts(true);
-    document.getElementById("assignDept").innerHTML = `<option value="">None</option>`
-        + AMS_DUMMY_DEPARTMENTS.map(d => `<option value="${amsEsc(d.name)}">${amsEsc(d.name)}</option>`).join("")
-        + `<option value="__other__">Other / Not in Department Master...</option>`;
 }
 
 function amsOpenAssignModal(key, mode) {
@@ -713,10 +696,6 @@ function amsOpenAssignModal(key, mode) {
     document.getElementById("assignSubEmp").value = a.assignedToSubordinate || (a.assignedSubText ? "__other__" : "");
     document.getElementById("assignSubText").value = a.assignedSubText || "";
     document.getElementById("assignSubText").style.display = a.assignedSubText ? "block" : "none";
-    document.getElementById("assignDept").value = a.assignedDepartment || (a.assignedDeptText ? "__other__" : "");
-    document.getElementById("assignDeptText").value = a.assignedDeptText || "";
-    document.getElementById("assignDeptText").style.display = a.assignedDeptText ? "block" : "none";
-    document.getElementById("assignUsageNote").value = a.usageNote || "";
     document.getElementById("assignDate").value = new Date().toISOString().slice(0, 10); /* suggested default - user can pick any date */
     amsRenderAccessoriesChecklist("assignAccessories", a.type);
 
@@ -734,14 +713,6 @@ function amsWireAssignOtherToggles() {
             if (subSelect.value !== "__other__") subText.value = "";
         });
     }
-    const deptSelect = document.getElementById("assignDept");
-    const deptText = document.getElementById("assignDeptText");
-    if (deptSelect && deptText) {
-        deptSelect.addEventListener("change", () => {
-            deptText.style.display = deptSelect.value === "__other__" ? "block" : "none";
-            if (deptSelect.value !== "__other__") deptText.value = "";
-        });
-    }
 }
 
 function amsConfirmAssign() {
@@ -752,11 +723,6 @@ function amsConfirmAssign() {
     const subTextEl = document.getElementById("assignSubText");
     const subText = (subId === "__other__" && subTextEl) ? subTextEl.value.trim() : "";
     const assignedSub = subId && subId !== "__other__" ? subId : (subText ? "__other__" : null);
-    const deptSel = document.getElementById("assignDept").value;
-    const deptTextEl = document.getElementById("assignDeptText");
-    const deptText = (deptSel === "__other__" && deptTextEl) ? deptTextEl.value.trim() : "";
-    const assignedDept = deptSel && deptSel !== "__other__" ? deptSel : (deptText ? "__other__" : null);
-    const usageNote = document.getElementById("assignUsageNote").value.trim() || null;
     const assignDate = document.getElementById("assignDate").value || new Date().toISOString().slice(0, 10);
     if (!directId) { alert("Select a Direct Employee to assign this asset to."); return; }
 
@@ -764,9 +730,6 @@ function amsConfirmAssign() {
     a.assignedTo = directId;
     a.assignedToSubordinate = subId && subId !== "__other__" ? subId : null;
     a.assignedSubText = subText || null;
-    a.assignedDepartment = deptSel && deptSel !== "__other__" ? deptSel : null;
-    a.assignedDeptText = deptText || null;
-    a.usageNote = usageNote;
     a.status = "Assigned";
     a.dept = directEmp ? directEmp.dept : ""; /* keep legacy convenience field in sync */
     a.id = amsComputeFullId(a);
@@ -780,12 +743,10 @@ function amsConfirmAssign() {
         empId: directEmp ? directEmp.empId : "", empName: directEmp ? directEmp.name : "", empDept: directEmp ? directEmp.dept : "",
         assetIdFull: a.id, statusLabel: "Assigned",
         accessories: accessories.length ? accessories.join(", ") : "",
-        assignedDepartment: a.assignedDepartment || "",
     });
 
     const holderBits = [];
     if (assignedSub) holderBits.push(assignedSub === "__other__" ? subText : (amsGetEmployeeByAmsId(assignedSub) || {}).name || assignedSub);
-    if (assignedDept) holderBits.push(assignedDept === "__other__" ? deptText : assignedDept);
     const holderNote = holderBits.length ? ` (${holderBits.join(" / ")})` : "";
     amsNotify(`Asset ${a.id} ${AST_STATE.assignMode === "reassign" ? "reassigned" : "assigned"} to ${directEmp ? directEmp.name : directId}${holderNote}`, "success");
 
@@ -1061,13 +1022,12 @@ function amsGenerateAssetFormNo() {
 }
 
 /* Builds the "Remarks / Notes" section body: ONLY each asset's own stored
-   Remarks and Actual Usage/Team details. The typed pre-print note is rendered
-   separately by amsBuildAdditionalRemarksHtml() below. */
+   Remarks. The typed pre-print note is rendered separately by
+   amsBuildAdditionalRemarksHtml() below. */
 function amsBuildRemarksLinesHtml(assetsList) {
     const lines = [];
     assetsList.forEach(oa => {
         if (oa.remarks) lines.push(`<div><strong>${amsEsc(oa.id)} - Remarks (on record):</strong> ${amsEsc(oa.remarks)}</div>`);
-        if (oa.usageNote) lines.push(`<div><strong>${amsEsc(oa.id)} - Actual Usage / Team:</strong> ${amsEsc(oa.usageNote)}</div>`);
     });
     if (!lines.length) lines.push(`<div class="pf-notes-empty">No remarks recorded against the asset(s) in the system.</div>`);
     return lines.join("");
@@ -1113,10 +1073,9 @@ function amsGenerateAssetIssueFormPrint(key, extraRemarks) {
     const subAssets = amsSubordinateAssetsForEmpDetailed(emp.empId);
 
     /* Assets issued directly to the employee (ALL assets assigned to them,
-       including ones whose actual user is a User/Department MASTER record)
-       stay in "Assets Issued". Assets whose real user was typed as FREE TEXT
-       (assignedSubText / assignedDeptText, not in the User/Department masters)
-       or as a Department/Use note (usageNote) show in the "For Reference"
+       including ones whose actual user is a User MASTER record) stay in
+       "Assets Issued". Assets whose real user was typed as FREE TEXT
+       (assignedSubText, not in the User master) show in the "For Reference"
        section instead, since they were never issued to the employee personally. */
     const splitOwned = amsSplitDirectVsSubordinateAssets(owned);
     const directOwned = splitOwned.direct;
@@ -1170,8 +1129,9 @@ function amsGenerateAssetIssueFormPrint(key, extraRemarks) {
             </tbody>
         </table>`;
 
-    const accessoriesHtml = `
-        <div class="pf-section-bar">Accessories / Items Included</div>
+    const accessoriesHtml = (typeof amsBuildPrintAccessoriesHtml === "function")
+        ? amsBuildPrintAccessoriesHtml(directOwned)
+        : `<div class="pf-section-bar">Accessories / Items Included</div>
         <div class="pf-checklist-grid">
             <label class="pf-check-block"><input type="checkbox" disabled> Power Adaptor / Charger</label>
             <label class="pf-check-block"><input type="checkbox" disabled> Carrying Bag / Case</label>

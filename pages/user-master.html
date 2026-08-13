@@ -2,18 +2,19 @@
 <!--
 #-------------- Start Code for : USER MASTER PAGE (user-master.html) ------------
 #
-#  PURPOSE   : Manage system login accounts (Username, Role, optionally linked
-#              to an Employee record). No password field by design - frontend
-#              dummy data only, no real auth exists yet.
-#              Config-only page over the generic engine (js/master-table.js);
-#              the inline AMS_MASTER_CONFIG below is the only page-specific part.
+#  PURPOSE   : Manage system login accounts (Username, Role, Password, optionally
+#              linked to an Employee record). Created/updated accounts are synced
+#              to the real ams_users table via the AMS-Test API, so new users can
+#              actually log in. Config-only page over the generic engine
+#              (js/master-table.js); the inline AMS_MASTER_CONFIG below is the
+#              only page-specific part.
 #
-#              ROLE GUARDS (via the topbar "Viewing As" role simulator):
-#                - "Supreme Root" is only offered as an assignable Role while
-#                  viewing as Supreme Root.
+#              ROLE GUARDS (resolved from the logged-in session role):
+#                - "Supreme Root" is only offered as an assignable Role while the
+#                  session role is "Supreme Root".
 #                - Supreme Root accounts can never be deleted from this screen.
-#                - Super Root accounts can only be deleted while viewing as
-#                  Supreme Root.
+#                - Super Root accounts can only be deleted while the session role
+#                  is Supreme Root.
 #
 #  FILES USED :
 #    - css/themes.css, css/main.css, css/master-table.css
@@ -121,7 +122,7 @@
 
             window.AMS_MASTER_CONFIG = {
                 pageTitle: "User Master",
-                pageSub: "Manage system login accounts and roles (no password field - dummy data only, no real auth yet)",
+                pageSub: "Manage system login accounts and roles. A password is required for new accounts so they can log in.",
                 dataArray: AMS_DUMMY_USERS,
                 idKey: "username",
                 fields: [
@@ -144,39 +145,66 @@
                                 : role === "Admin" ? "badge-amber" : "badge-grey";
                             return `<span class="badge ${cls}">${amsEsc(role)}</span>`;
                         } },
+                    { key: "password",       label: "Password",         type: "password", required: true, editOnly: true, hideInTable: true },
                     { key: "email",          label: "Email",            type: "text" },
                     { key: "remarks",        label: "Remarks",          multiline: true },
                 ],
                 deleteGuard: (item) => {
-                    const viewingAs = amsGetViewingAsRole();
+                    const sessionRole = amsGetViewingAsRole();
                     if (item.role === "Supreme Root") return { allowed: false, reason: "Supreme Root accounts cannot be deleted from this screen." };
-                    if (item.role === "Super Root" && viewingAs !== "Supreme Root") return { allowed: false, reason: "Only a Supreme Root user can delete a Super Root account." };
+                    if (item.role === "Super Root" && sessionRole !== "Supreme Root") return { allowed: false, reason: "Only a Supreme Root user can delete a Super Root account." };
                     return { allowed: true };
+                },
+                /* Sync login accounts to the real ams_users table via the API so
+                   new accounts can actually log in. Skipped silently when the
+                   API is unreachable so the screen still works offline. */
+                onBeforeSave: async (values, editingKey) => {
+                    const sess = amsGetSession();
+                    if (!sess || !sess.token) return; // not logged in / no API
+                    const payload = {
+                        role: values.role,
+                        linkedEmployee: values.linkedEmployee || null,
+                        email: values.email || null,
+                        remarks: values.remarks || null,
+                        active: values.active !== false,
+                    };
+                    if (editingKey) {
+                        if (values.password) payload.password = values.password;
+                        await amsApiFetch(`/api/auth/users/${encodeURIComponent(editingKey)}`, { method: "PUT", body: payload });
+                    } else {
+                        if (!values.password) throw new Error("A password is required to create a login account.");
+                        payload.username = values.username;
+                        payload.password = values.password;
+                        await amsApiFetch("/api/auth/users", { method: "POST", body: payload });
+                    }
+                },
+                onBeforeToggle: async (item, newActive) => {
+                    const sess = amsGetSession();
+                    if (!sess || !sess.token) return;
+                    await amsApiFetch(`/api/auth/users/${encodeURIComponent(item.username)}`, { method: "PUT", body: { active: newActive } });
+                },
+                onBeforeDelete: async (item) => {
+                    const sess = amsGetSession();
+                    if (!sess || !sess.token) return;
+                    await amsApiFetch(`/api/auth/users/${encodeURIComponent(item.username)}`, { method: "DELETE" });
                 },
             };
 
             function amsUpdateUserRoleHint() {
-                const viewingAs = amsGetViewingAsRole();
+                const sessionRole = amsGetViewingAsRole();
                 const hint = document.getElementById("userRoleHint");
-                if (viewingAs === "Supreme Root") {
-                    hint.innerHTML = `Full control: can create Supreme Root accounts and delete Super Root accounts.`;
-                } else if (viewingAs === "Super Root") {
-                    hint.textContent = "Cannot create or delete other Supreme Root / Super Root accounts. Access Rights Control Master, Role Access Master, and Supreme Root's Log Report records are hidden from this role.";
+                if (sessionRole === "Supreme Root") {
+                    hint.innerHTML = `Signed in as <strong>Supreme Root</strong> - full control: can create Supreme Root accounts and delete Super Root accounts.`;
+                } else if (sessionRole === "Super Root") {
+                    hint.textContent = "Signed in as Super Root - cannot create or delete other Supreme Root / Super Root accounts. Access Rights Control Master, Role Access Master, and Supreme Root's Log Report records are hidden from this role.";
                 } else {
-                    hint.textContent = "Limited role - some actions may be restricted depending on real access rights once auth is implemented.";
+                    hint.textContent = "Signed in as a limited role - some actions may be restricted by real access rights.";
                 }
-            }
-
-            /* Keep the hint in sync with the shared topbar "Viewing As" selector */
-            function amsWireUserRoleSync() {
-                const viewingAs = document.getElementById("viewing-as");
-                if (viewingAs) viewingAs.addEventListener("change", () => amsUpdateUserRoleHint());
             }
 
             function initUserMaster() {
                 initLayout("user-master");
                 amsUpdateUserRoleHint();
-                amsWireUserRoleSync();
             }
 
             document.addEventListener("DOMContentLoaded", initUserMaster);

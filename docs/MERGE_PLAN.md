@@ -699,6 +699,52 @@ normal low-level operator login while actually holding Supreme Root rights.
 3. `cd server\AMS.API && dotnet run` - serves the UI + API on one URL.
 4. Log in with `operator.sys` / `Sr#Ops@2026`.
 
+### 15.6 New-feature round (real login accounts, profile, live activity)
+The "6 new features" request is implemented. Summary of what changed and why:
+
+| Feature | Implementation |
+|---------|----------------|
+| 1. Logout + user menu | Topbar user chip is now a dropdown (`#user-chip-menu`) with **My Profile** + **Logout**; `amsLogout()` clears the session/role override and redirects to `login.html`. |
+| 2. Real dashboard activity | `index.html` banner + "Dummy data" label removed; `dashboard.js` renders the real stored activity log via `amsGetActivityLog()` (times via `amsTimeAgo`, actor role badges, type-coloured icons) and the welcome heading is dynamic ("Welcome back, {display name}"). |
+| 3. `testadmin` seed account | New **Super Root** account `testadmin` / `Admin@#$12345`, display name "Test Admin". Seeded/re-hashed idempotently on API startup alongside `operator.sys` so end users never need the Supreme Root login. |
+| 4. User Master passwords | `master-table.js` supports `type:"password"` fields (hidden in table, never rendered back on edit, never stored in the local copy) plus `onBeforeSave` / `onBeforeToggle` / `onBeforeDelete` hooks that sync to `POST/PUT/DELETE /api/auth/users`. New users now get real login accounts. |
+| 5. Actions-menu overlay | `.table-wrap` is lifted to `overflow:visible` (`.mt-menu-open`) while a row menu is open so the dropdown overlays the table frame instead of being clipped / spawning a scrollbar. |
+| 6. Display name in chip | Topbar chip shows `displayName` (falling back to linked employee, then username); populated from login/me + refreshed on profile save. |
+
+Role simulator removed: `amsGetViewingAsRole()` now resolves to the real session
+role (the `ams_viewing_as_role` localStorage override is ignored/cleared), and
+the per-page simulators on Settings, Role Access Master, Access Rights Master
+and Log Report became read-only "Signed-in Role" inputs.
+
+Profile page: `pages/profile.html` + `js/profile.js` reads `GET /api/auth/me`
+(offline fallback to the stored session), saves profile fields + changes the
+password via `PUT /api/auth/me` (current-password verified server-side), and
+refreshes the stored session so the topbar chip updates immediately.
+
+Login accounts now live in relational `dbo.ams_users` (with `display_name`,
+`contact_no`, `address`, `dob`, `gender` columns); business data stays JSON in
+`dbo.ams_collections`. User Master's local array still mirrors the account list
+for the shared engine, but passwords never persist client-side.
+
+---
+
+### 15.7 Follow-up round (assign/reassign + report + UI cleanup)
+Frontend-only polish following the 15.6 round. All changes are HTML/CSS/JS.
+
+| Point | Change |
+|-------|--------|
+| 1. Profile appearance | `pages/profile.html` form controls switched from `.form-field` (a class styled only in `css/master-table.css`, which profile.html does not load) to the app-wide `.field` + `.input`/`.select`/`.textarea` convention (styled in `css/main.css`), so textboxes/selects/date/textareas render correctly. |
+| 2. Assign/Reassign form cleanup | Removed the "Assign to Department" block (select + quick-add popover + free-text fallback) and the "Actual Usage / Team Details" textarea from the shared `#modalAssign` (`pages/assets.html`). Stripped `assignDept`/`assignDeptText`/`assignUsageNote` from `js/assets.js` populate/submit/other-toggles and removed the now-dead `amsWireDeptQuickAdd()`. The asset table + view modal + print remarks no longer show department/usage fields. |
+| 3. Assign Report gating | `openIssueForm()` (`js/employees.js`) now refuses to generate an Assign Report when the employee holds no assets (direct or via subordinates), and the row's "Assign Report (Asset Issue Form)" menu item is rendered disabled (`.menu-disabled`) in that case. |
+| 4. Employees actions cleanup | Removed the "Assign Asset" / "Reassign Asset" entries from the employee row Actions menu. The header "Assign Asset" button (`pages/employees.html`) remains the entry point for assigning; `openAssignModal`/`openReassignModal` still exist for it. |
+| 5. Accessories in Issue Form | New shared `amsBuildPrintAccessoriesHtml()` (`js/dummy-data.js`) renders the accessories recorded on the issued assets as pre-checked blocks (labelled with the asset ID) in the "Accessories / Items Included" section of the Asset Issue Form, falling back to the old blank checklist when nothing is recorded. Used by both `js/assets.js` and `js/print-forms.js`. |
+| 6. Dummy activity removed | Deleted the unused `DUMMY_ACTIVITY_LOG` and `AMS_DUMMY_ACTIVITY` arrays from `js/dummy-data.js`. The dashboard reads the real `amsGetActivityLog()`; the employee-exit event in `js/employees.js` now writes to the live audit log via `amsNotify()` instead of the removed dummy array. |
+| 7. Actions-menu overlay everywhere | Ported the 15.6 master-table overflow fix to the Asset Master and Employee Master pages: `#assetTableWrap` (`css/assets.css`) and the shared `.table-wrap` (`css/main.css`) get `.mt-menu-open` (`overflow:visible`) while a row menu is open, synced by `amsSyncWrapOverflow()` (`js/assets.js`) / `amsSyncEmpMenuOverflow()` (`js/employees.js`). |
+
+Regression status: all 15 `test-*-amstest.js` suites still pass, plus a new
+`probe-points257.js` covering points 2-7. No backend changes; API build is
+0 warnings / 0 errors.
+
 ---
 
 

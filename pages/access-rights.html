@@ -51,11 +51,11 @@
                     </div>
                 </div>
 
-                <!-- ==================== VIEWING AS (ROLE SIMULATOR) ==================== -->
+                <!-- ==================== SIGNED-IN ROLE BAR ==================== -->
                 <div class="viewing-as-bar">
-                    <label for="viewingAsRole">Viewing As (role simulator - no real login yet):</label>
-                    <select id="viewingAsRole"></select>
-                    <span class="form-hint">This page is only visible/usable when Viewing As = Supreme Root - even Super Root is locked out.</span>
+                    <label for="viewingAsRole">Signed-in Role:</label>
+                    <input id="viewingAsRole" class="input" disabled style="width:auto; max-width:220px;">
+                    <span class="form-hint">This page is only visible/usable when the signed-in account has the Supreme Root role - even Super Root is locked out.</span>
                 </div>
 
                 <!-- ==================== LOCKED VIEW ==================== -->
@@ -63,7 +63,7 @@
                     <div class="card" style="text-align:center; padding:40px 20px;">
                         <div style="font-size:32px; margin-bottom:10px;">&#128274;</div>
                         <div style="font-size:15px; font-weight:600; margin-bottom:6px;">Access Denied</div>
-                        <div style="font-size:12.5px; color:var(--text-muted);">Access Rights Control Master is exclusive to Supreme Root accounts. Switch "Viewing As" to Supreme Root to continue.</div>
+                        <div style="font-size:12.5px; color:var(--text-muted);">Access Rights Control Master is exclusive to Supreme Root accounts. Sign in with a Supreme Root account to continue.</div>
                     </div>
                 </div>
 

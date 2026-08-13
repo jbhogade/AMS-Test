@@ -67,9 +67,17 @@
                 username: result.username,
                 role: result.role,
                 name: result.name,
+                displayName: result.displayName,
                 linkedEmployee: result.linkedEmployee,
-                email: result.email
+                email: result.email,
+                contactNo: result.contactNo,
+                address: result.address,
+                dob: result.dob,
+                gender: result.gender
             });
+            /* A fresh login should start from the account's real role, not a
+               stale role-simulator override left over from earlier testing. */
+            try { localStorage.removeItem("ams_viewing_as_role"); } catch (e) { /* storage unavailable */ }
             window.location.replace("index.html");
         }).catch(function (err) {
             var msg = (err && err.message) ? err.message : "Could not reach the server.";

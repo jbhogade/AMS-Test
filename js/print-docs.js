@@ -136,6 +136,7 @@ function amsPrintDocument(printContent, pageTitle) {    const win = window.open(
                 .pf-checklist-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px;
                     border: 1px solid #999; border-top: none; padding: 10px 12px; }
                 .pf-check-block { display: flex; align-items: center; gap: 8px; font-size: 11.5px; }
+                .pf-acc-asset { color: #555; font-size: 10px; }
 
                 .pf-notes-box { border: 1px solid #999; border-top: none; min-height: 40px; padding: 8px 10px; }
                 .pf-notes-empty { color: #999; font-style: italic; }

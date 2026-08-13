@@ -185,21 +185,39 @@ function renderActivityLog() {
     if (!container) return;
 
     const iconMap = {
-        checkout: ["green", "&#8594;"],
-        return:   ["blue",  "&#8592;"],
-        add:      ["cyan",  "&#43;"],
-        service:  ["blue",  "&#9881;"],
-        alert:    ["amber-warn", "&#9888;"]
+        success: ["green", "&#10003;"],
+        info:    ["blue",  "&#8226;"],
+        warning: ["amber-warn", "&#9888;"],
+        danger:  ["red",  "&#9888;"]
     };
 
-    container.innerHTML = DUMMY_ACTIVITY_LOG.slice(0, 6).map(item => {
+    /* Real activity from the shared audit log (amsNotify writes to it), not dummy data. */
+    const log = (typeof amsGetActivityLog === "function") ? amsGetActivityLog() : [];
+    const entries = log.slice(0, 6);
+
+    if (!entries.length) {
+        container.innerHTML = `<li class="activity-item"><div class="activity-body"><div class="activity-meta">No activity recorded yet.</div></div></li>`;
+        return;
+    }
+
+    container.innerHTML = entries.map(item => {
         const icon = iconMap[item.type] || ["grey", "&#8226;"];
+        const bg = icon[0] === 'green' ? 'rgba(34,197,94,0.12)'
+            : icon[0] === 'red' ? 'rgba(239,68,68,0.12)'
+            : icon[0] === 'amber-warn' ? 'rgba(245,158,11,0.12)'
+            : icon[0] === 'blue' ? 'rgba(59,130,246,0.12)'
+            : 'var(--accent-soft)';
+        const fg = icon[0] === 'green' ? 'var(--success)'
+            : icon[0] === 'red' ? 'var(--danger)'
+            : icon[0] === 'amber-warn' ? 'var(--warning)'
+            : 'var(--accent)';
+        const time = (typeof amsTimeAgo === "function") ? amsTimeAgo(item.time) : (item.time || "");
         return `
             <li class="activity-item">
-                <div class="activity-icon" style="background:${icon[0] === 'green' ? 'rgba(34,197,94,0.12)' : icon[0] === 'cyan' ? 'rgba(6,182,212,0.12)' : icon[0] === 'amber-warn' ? 'rgba(245,158,11,0.12)' : 'var(--accent-soft)'};color:${icon[0] === 'green' ? 'var(--success)' : icon[0] === 'cyan' ? 'var(--info)' : 'var(--accent)'};">${icon[1]}</div>
+                <div class="activity-icon" style="background:${bg};color:${fg};">${icon[1]}</div>
                 <div class="activity-body">
-                    <div class="activity-title">${escapeHtml(item.text)}</div>
-                    <div class="activity-meta">${escapeHtml(item.time)} &middot; ${escapeHtml(item.user)}</div>
+                    <div class="activity-title">${escapeHtml(item.message || "")}</div>
+                    <div class="activity-meta">${escapeHtml(time)} &middot; ${escapeHtml(item.actorRole || "System")}</div>
                 </div>
             </li>
         `;
@@ -229,6 +247,15 @@ function renderRecentAssets() {
 /* ---- Kick off all dashboard rendering -------------------------------------- */
 async function initDashboard() {
     if (typeof amsDbEnsureLoaded === "function") await amsDbEnsureLoaded();
+
+    /* Personalise the welcome heading with the signed-in user's display name. */
+    const welcome = document.getElementById("welcome-greeting");
+    if (welcome) {
+        const session = (typeof amsGetSession === "function") ? amsGetSession() : null;
+        const name = (session && (session.displayName || session.name)) ? (session.displayName || session.name) : "User";
+        welcome.textContent = "Welcome back, " + name;
+    }
+
     renderKpiCards();
     renderCategoryChart();
     renderStatusRing();
