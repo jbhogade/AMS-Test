@@ -598,19 +598,40 @@ function renderEmpStats() {
     document.getElementById("stat-assigned").textContent = s.assignedAssets;
 }
 
-/* Fills the department / manager / designation dropdowns */
+/* Fills the department / manager / designation dropdowns.
+   Departments & designations come from BOTH the hardcoded seeds (DEPARTMENTS /
+   DESIGNATIONS) AND the DB-backed masters (AMS_DUMMY_DEPARTMENTS /
+   AMS_DESIGNATION_OPTIONS), so lookups added in either place show up here. */
+function allDeptOptions() {
+    const out = DEPARTMENTS.map(d => ({ name: d.name, short: d.short }));
+    AMS_DUMMY_DEPARTMENTS.forEach(d => {
+        if (!out.some(x => x.name.toLowerCase() === d.name.toLowerCase())) out.push({ name: d.name, short: d.shortform });
+    });
+    return out;
+}
+function allDesigOptions() {
+    const out = DESIGNATIONS.slice();
+    AMS_DESIGNATION_OPTIONS.forEach(d => {
+        if (!out.some(x => x.toLowerCase() === d.name.toLowerCase())) out.push(d.name);
+    });
+    return out;
+}
+
 function populateSelects() {
     const deptFilter = document.getElementById("emp-dept-filter");
     const deptForm = document.getElementById("f-dept");
     const managerSelect = document.getElementById("f-manager");
     const desigList = document.getElementById("designation-list");
 
+    const deptOptions = allDeptOptions();
+    const desigOptions = allDesigOptions();
+
     /* Department filter options */
     deptFilter.innerHTML = `<option value="All">All Departments</option>` +
-        DEPARTMENTS.map(d => `<option value="${escapeHtml(d.name)}">${escapeHtml(d.name)}</option>`).join("");
+        deptOptions.map(d => `<option value="${escapeHtml(d.name)}">${escapeHtml(d.name)}</option>`).join("");
 
     /* Department field inside the form */
-    deptForm.innerHTML = DEPARTMENTS.map(d => `<option value="${escapeHtml(d.name)}">${escapeHtml(d.name)}</option>`).join("");
+    deptForm.innerHTML = deptOptions.map(d => `<option value="${escapeHtml(d.name)}">${escapeHtml(d.name)}</option>`).join("");
 
     /* Manager (reports-to) dropdown - all active employees */
     managerSelect.innerHTML = `<option value="">(None - top level)</option>` +
@@ -619,7 +640,7 @@ function populateSelects() {
             .join("");
 
     /* Designation suggestions (datalist) */
-    desigList.innerHTML = DESIGNATIONS.map(d => `<option value="${escapeHtml(d)}"></option>`).join("");
+    desigList.innerHTML = desigOptions.map(d => `<option value="${escapeHtml(d)}"></option>`).join("");
 
     /* Credential level selector */
     const credSelect = document.getElementById("emp-cred-level");
@@ -662,10 +683,8 @@ function closeQuickAddPopovers() {
 }
 
 /* Adds a brand-new department from the popover.
-   Updates BOTH master lists so the new dept appears everywhere:
-   - AMS_DUMMY_DEPARTMENTS  (asset/report dropdowns + master-table)
-   - DEPARTMENTS            (getDeptShort -> EMP-<DeptShort> IDs)
-   Then re-populates the form's department dropdown + filter. */
+   Uses the shared amsEnsureDepartment() helper so the department lands in BOTH
+   master sources (Employee form + Department Master) and persists to SQL. */
 function saveQuickAddDept() {
     const name = document.getElementById("qa-dept-name").value.trim();
     const short = document.getElementById("qa-dept-short").value.trim().toUpperCase();
@@ -673,12 +692,11 @@ function saveQuickAddDept() {
         alert("Enter both the department name and its shortform (e.g. EL).");
         return;
     }
-    if (DEPARTMENTS.some(d => d.name.toLowerCase() === name.toLowerCase())) {
+    if (amsDeptKnown(name)) {
         alert("That department already exists.");
         return;
     }
-    amsQuickAddDepartment(name, short);      /* -> AMS_DUMMY_DEPARTMENTS */
-    DEPARTMENTS.push({ name: name, short: short });  /* -> getDeptShort() */
+    amsEnsureDepartment(name, short); /* -> DEPARTMENTS + AMS_DUMMY_DEPARTMENTS */
     populateSelects();
     document.getElementById("f-dept").value = name;
     document.getElementById("qa-dept-name").value = "";
@@ -688,19 +706,19 @@ function saveQuickAddDept() {
 }
 
 /* Adds a brand-new designation from the popover.
-   Updates AMS_DESIGNATION_OPTIONS (master-table) + DESIGNATIONS (datalist). */
+   Uses the shared amsEnsureDesignation() helper so it lands in BOTH master
+   sources and persists to SQL. */
 function saveQuickAddDesig() {
     const name = document.getElementById("qa-desig-name").value.trim();
     if (!name) {
         alert("Enter the new designation name.");
         return;
     }
-    if (DESIGNATIONS.some(d => d.toLowerCase() === name.toLowerCase())) {
+    if (amsDesigKnown(name)) {
         alert("That designation already exists.");
         return;
     }
-    amsQuickAddDesignation(name);            /* -> AMS_DESIGNATION_OPTIONS */
-    DESIGNATIONS.push(name);                 /* -> form datalist + assets.js */
+    amsEnsureDesignation(name); /* -> DESIGNATIONS + AMS_DESIGNATION_OPTIONS */
     populateSelects();
     document.getElementById("f-desig").value = name;
     document.getElementById("qa-desig-name").value = "";
@@ -799,12 +817,13 @@ function amsImportEmployeesFile(file) {
                 continue;
             }
 
-            /* ---- Reference validation ---- */
-            if (!DEPARTMENTS.some(d => d.name === obj.dept)) {
+            /* ---- Reference validation (checks BOTH the hardcoded seeds AND the
+                    DB-backed masters so lookups added in either place import) ---- */
+            if (!amsDeptKnown(obj.dept)) {
                 results.push({ row: line, record, result: "skipped", reason: `Department "${obj.dept}" not found in the Department Master`, missingDept: obj.dept });
                 continue;
             }
-            if (obj.designation && !DESIGNATIONS.some(d => d.toLowerCase() === obj.designation.toLowerCase())) {
+            if (obj.designation && !amsDesigKnown(obj.designation)) {
                 results.push({ row: line, record, result: "skipped", reason: `Designation "${obj.designation}" not found in the Designation Master`, missingDesig: obj.designation });
                 continue;
             }

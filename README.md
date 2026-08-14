@@ -37,6 +37,7 @@ AMS-Test/                       <- live-testing project (SQL Server backed)
 │   ├── consumables.html       <- Consumable Master (built - Phase 6A)
 │   ├── spare-parts.html       <- Spare Parts Master (built - Phase 6B)
 │   ├── accessories.html       <- Accessory Master (built - Phase 9A)
+│   ├── sim-cards.html         <- SIM Card Master - mobile SIMs issued to employees (phone tracked separately as an Asset)
 │   ├── masters.html           <- lookup masters (Asset Type/Category/Make, Site, Department, Designation) - embedded in the hub
 │   ├── system-admin.html      <- System Administrator hub - tabs lazy-load the lookup masters + Company via ?embed=1
 │   ├── company.html           <- Company Master - single-record form (default hub tab)
@@ -80,6 +81,7 @@ AMS-Test/                       <- live-testing project (SQL Server backed)
 │   ├── master-configs.js   <- AMS_MASTER_CONFIGS registry (drives masters.html)
 │   ├── consumables.js      <- Consumable Master config + Restock/Used/report actions
 │   ├── spare-parts.js      <- Spare Parts Master config + Restock/Used/report actions
+│   ├── sim-cards.js        <- SIM Card Master page logic
 │   ├── embed-mode.js       <- adds embed-mode class when ?embed=1 (hub iframes)
 │   ├── system-admin.js     <- System Administrator hub logic (AMS_ADMIN_TABS, tab switching)
 │   ├── company.js          <- Company Master form logic
@@ -161,6 +163,9 @@ The portal ships with **11 themes** switchable from the dropdown in the top-righ
 - [x] Assign fix (Asset Assign/Reassign: the Subordinate select gains "Other / Not in the Master..." free-text that stores ONLY in `assignedSubText` - never in the Direct User field, which still requires a real User Master entry. In the printable Asset Issue Form, assets whose actual user was typed as free text go to the "Subordinates (For Reference)" section, while assets directly issued to the employee - including ones whose actual user is a User master record - stay in "Assets Issued". The "Assign to Department" and "Actual Usage / Team Details" fields were removed from the Assign/Reassign modal in the 15.7 cleanup round. The Asset Handover Form's Exit Reason is now a full-width box with a ruled writing line beneath it, and its signature order is Employee | Received By (IT/Admin) | Authorised By)
 - [x] SQL Server migration (Phase 15) - ASP.NET Core Web API (`server/AMS.API`), JSON-document storage in `dbo.ams_collections`, relational `dbo.ams_users` + JWT login, login.html gate, every page loads from and saves to the DB. Live-testing copy = this project; original dummy-data version = `../AMS-Backup/`.
 - [x] 15.7 cleanup round (profile page uses the app-wide `.field`/`.input` form styling; Assign/Reassign modal no longer collects Department or Actual Usage/Team details; Assign Report is gated for employees holding no assets with the menu item shown disabled; Assign/Reassign removed from the employee Actions menu (header button remains); Asset Issue Form's "Accessories / Items Included" section now lists the accessories recorded on the assets; unused `DUMMY_ACTIVITY_LOG`/`AMS_DUMMY_ACTIVITY` arrays removed so the dashboard shows only real activity; the actions-menu overflow fix from the master tables now applies to the Asset and Employee lists too)
+- [x] 15.8 access-round (System Administrator's hub now hides the Supreme-Root-exclusive tabs - Access Rights Control Master + Role Access Master - from every non-Supreme role, and Log Report from everyone below Super Root, so a Super Root never sees a button that would lead to a lock-out; those two pages no longer show an "Access Denied" wall - a non-Supreme role opening them directly is sent back to the dashboard instead. Asset Issue Form asset IDs now always print with the department suffix via the shared `amsPrintAssetId()` helper - the full Smart ID (base + site + dept, e.g. `BKMP00001SLIT`) shows even when the stored id is an older base+site form, in both the Employee Master and Asset Master form generators)
+- [x] SIM Card Master (`pages/sim-cards.html` + `js/sim-cards.js`) - a separate record type for mobile SIM cards issued to employees, mirroring the Asset Master: auto SIM ID (`SIM-000001`), ICCID/serial, mobile number, operator + plan pick-lists, status (In Store / Issued / Blocked / Retired), assign/reassign/return/block/retire with lifecycle history in the View modal, stock summary tiles, search + status filter, CSV Template/Export/Import, and a DB-backed `simCards` collection (server whitelist updated)
+- [x] Department / Designation Master sync fix - the Department & Designation Masters now reflect lookups created anywhere in the system (Employee form quick-add, bulk Employee import, Import Report quick-add) instead of dropping them on the next page load: departments/designations live in ONE unified view across the hardcoded seeds and the DB-backed masters, every mutation persists to SQL Server, the Employee import reference check accepts lookups from either source, and newly imported employees register their department/designation into both masters automatically
 
 ## Code Comments Convention
 

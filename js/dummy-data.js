@@ -136,6 +136,7 @@ const AMS_COLLECTIONS = {
     spareParts:      () => AMS_DUMMY_SPARE_PARTS,
     sparePartLog:    () => AMS_DUMMY_SPAREPART_LOG,
     accessories:     () => AMS_DUMMY_ACCESSORIES,
+    simCards:        () => AMS_DUMMY_SIM_CARDS,
     users:           () => AMS_DUMMY_USERS,
     exitRecords:     () => AMS_DUMMY_EXIT_RECORDS,
 };
@@ -433,9 +434,8 @@ function amsShowImportReport(results) {
             const short = wrap.querySelector("[data-dept-short]").value.trim().toUpperCase();
             const name = saveDept.getAttribute("data-save-dept");
             if (!short) { amsToast("Shortform is required for the department.", "warning"); return; }
-            if (DEPARTMENTS.some(d => d.name.toLowerCase() === name.toLowerCase())) { amsToast("Department already exists.", "warning"); return; }
-            DEPARTMENTS.push({ name, short });
-            AMS_DUMMY_DEPARTMENTS.push({ name, shortform: short, active: true });
+            if (amsDeptKnown(name)) { amsToast("Department already exists.", "warning"); return; }
+            amsEnsureDepartment(name, short); /* adds to BOTH masters + persists */
             amsToast(`Department "${name}" added to the Department Master.`, "success");
             const chip = wrap.closest(".lookup-chip");
             if (chip) chip.outerHTML = `<span class="badge badge-green" style="padding:5px 10px;">Department: <strong>${amsEsc(name)}</strong> - added</span>`;
@@ -445,7 +445,7 @@ function amsShowImportReport(results) {
 
 /* Inline editor for adding a missing Department straight from the Import Report */
 function amsQuickAddDeptFromReport(name, btn) {
-    if (DEPARTMENTS.some(d => d.name.toLowerCase() === name.toLowerCase())) {
+    if (amsDeptKnown(name)) {
         btn.outerHTML = `<span class="badge badge-green">Added</span>`;
         return;
     }
@@ -460,12 +460,11 @@ function amsQuickAddDeptFromReport(name, btn) {
 
 /* Adds a missing Designation straight from the Import Report (no extra data needed) */
 function amsQuickAddDesigFromReport(name, btn) {
-    if (AMS_DESIGNATION_OPTIONS.some(d => d.name.toLowerCase() === name.toLowerCase())) {
+    if (amsDesigKnown(name)) {
         btn.outerHTML = `<span class="badge badge-green">Added</span>`;
         return;
     }
-    AMS_DESIGNATION_OPTIONS.push({ name, active: true });
-    DESIGNATIONS.push(name);
+    amsEnsureDesignation(name); /* adds to BOTH masters + persists */
     amsToast(`Designation "${name}" added to the Designation Master.`, "success");
     btn.closest(".lookup-chip").outerHTML = `<span class="badge badge-green" style="padding:5px 10px;">Designation: <strong>${amsEsc(name)}</strong> - added</span>`;
 }
@@ -662,6 +661,73 @@ const AMS_DESIGNATION_OPTIONS = [];
 
 
 /* =============================================================================
+   5a-2) UNIFIED DEPARTMENT / DESIGNATION LOOKUP HELPERS
+   -----------------------------------------------------------------------------
+   Departments & designations live in TWO parallel sources:
+     - DEPARTMENTS / DESIGNATIONS  : hardcoded seeds used by the Employee form
+                                     dropdowns, AMS Employee ID shortforms and
+                                     the bulk-import reference check
+     - AMS_DUMMY_DEPARTMENTS / AMS_DESIGNATION_OPTIONS : DB-backed arrays used
+                                     by the Department/Designation Masters and
+                                     the asset/report dropdowns
+   These helpers keep BOTH in sync and persist to SQL Server, so a department
+   or designation created ANYWHERE (Employee form, bulk import, Import Report
+   quick-add) shows up in the Masters and survives navigation.
+   ===========================================================================*/
+
+/* Is this department known in EITHER master source? */
+function amsDeptKnown(name) {
+    const n = (name || "").trim().toLowerCase();
+    if (!n) return false;
+    if (DEPARTMENTS.some(d => d.name.toLowerCase() === n)) return true;
+    return AMS_DUMMY_DEPARTMENTS.some(d => d.name.toLowerCase() === n);
+}
+
+/* Is this designation known in EITHER master source? (blank is always ok) */
+function amsDesigKnown(name) {
+    const n = (name || "").trim().toLowerCase();
+    if (!n) return true;
+    if (DESIGNATIONS.some(d => d.toLowerCase() === n)) return true;
+    return AMS_DESIGNATION_OPTIONS.some(d => (d.name || "").toLowerCase() === n);
+}
+
+/* Ensures a department exists in BOTH masters (+ persists to SQL). Returns the
+   shortform in use (derived from the masters, or the caller's value, or a best
+   guess from the name). No-op if the department is already present. */
+function amsEnsureDepartment(name, shortform) {
+    const trimmedName = (name || "").trim();
+    if (!trimmedName) return "";
+    const trimmedShort = (shortform || "").trim().toUpperCase();
+    const dbRec = AMS_DUMMY_DEPARTMENTS.find(d => d.name.toLowerCase() === trimmedName.toLowerCase());
+    const seedRec = DEPARTMENTS.find(d => d.name.toLowerCase() === trimmedName.toLowerCase());
+    const short = trimmedShort
+        || (dbRec && dbRec.shortform)
+        || (seedRec && seedRec.short)
+        || (trimmedName.replace(/[^a-zA-Z]/g, "").slice(0, 3) || "NEW").toUpperCase();
+    if (!seedRec) DEPARTMENTS.push({ name: trimmedName, short });
+    if (!dbRec) {
+        AMS_DUMMY_DEPARTMENTS.push({ name: trimmedName, shortform: short, active: true });
+        amsDbSaveAsync("departments");
+    }
+    return short;
+}
+
+/* Ensures a designation exists in BOTH masters (+ persists to SQL). Returns
+   true if it was newly added to the DB-backed master. */
+function amsEnsureDesignation(name) {
+    const trimmedName = (name || "").trim();
+    if (!trimmedName) return false;
+    if (!DESIGNATIONS.some(d => d.toLowerCase() === trimmedName.toLowerCase())) {
+        DESIGNATIONS.push(trimmedName);
+    }
+    if (AMS_DESIGNATION_OPTIONS.some(d => (d.name || "").toLowerCase() === trimmedName.toLowerCase())) return false;
+    AMS_DESIGNATION_OPTIONS.push({ name: trimmedName, active: true });
+    amsDbSaveAsync("designations");
+    return true;
+}
+
+
+/* =============================================================================
    5b) ASSET ID HELPERS  (Smart Asset ID model - shared by Asset Master, Employee
    Master and Reports. Lookup shortforms come from the masters above.)
    ===========================================================================*/
@@ -725,6 +791,20 @@ function amsComputeFullId(asset) {
     return `${base}${siteShort}${deptShort}`;
 }
 
+/* Asset ID to display on a printed form. Uses the COMPUTED full ID so an
+   assigned asset always prints with its department suffix (base + site + dept),
+   even if the stored id is an older base+site form. For snapshot records (exit
+   reports) that have no live assignment, falls back to the stored id. */
+function amsPrintAssetId(oa) {
+    if (!oa) return "";
+    const stored = oa.id || oa.assetId || "";
+    if (oa.assignedTo || (typeof oa.id === "string" && oa.id && (oa.displayId || oa.currentSite || oa.site))) {
+        const full = amsComputeFullId(oa);
+        if (full) return full;
+    }
+    return stored;
+}
+
 /* =============================================================================
    6) ASSETS  (full lifecycle model with Smart Asset IDs - from v3-3)
    ===========================================================================*/
@@ -754,6 +834,30 @@ const AMS_DUMMY_CONSUMABLE_LOG = [];
 const AMS_SPAREPART_CATEGORIES = ["Internal Component", "Toner / Ink", "Mechanical Part"];
 const AMS_DUMMY_SPARE_PARTS = [];
 const AMS_DUMMY_SPAREPART_LOG = [];
+
+
+/* =============================================================================
+   8a) SIM CARD MASTER  (mobile SIM cards issued to employees)
+   ----------------------------------------------------------------------------
+   A SIM card and a mobile phone are issued together to some users. The phone
+   itself is tracked as a normal Asset; this collection stores the separate SIM
+   record (SIM serial / ICCID, the mobile number on it, operator, plan, issue
+   status and assignment). Rendered by pages/sim-cards.html + js/sim-cards.js
+   in the same style as the Asset Master.
+   ===========================================================================*/
+
+const AMS_SIM_STATUS_OPTIONS = ["In Store", "Issued", "Blocked", "Retired"];
+const AMS_SIM_OPERATOR_OPTIONS = ["Jio", "Airtel", "Vodafone Idea", "BSNL", "MTNL"];
+const AMS_DUMMY_SIM_CARDS = [];
+
+/* Next auto-generated SIM display ID (SIM-000001, SIM-000002, ...) */
+function amsNextSimId() {
+    const maxSeq = AMS_DUMMY_SIM_CARDS.reduce((m, s) => {
+        const n = parseInt(String(s.simId || "0").replace(/\D/g, ""), 10);
+        return isNaN(n) ? m : Math.max(m, n);
+    }, 0);
+    return "SIM-" + String(maxSeq + 1).padStart(6, "0");
+}
 
 
 /* =============================================================================
@@ -982,8 +1086,14 @@ function findEmployeeAny(identifier) {
     return DUMMY_EMPLOYEES.find(e => e.amsId === identifier || e.empId === identifier);
 }
 
-/* Adds a new employee and returns the record with its generated AMS ID */
+/* Adds a new employee and returns the record with its generated AMS ID.
+   Also registers the employee's department/designation in BOTH lookup masters
+   (and persists) so they show up in the Department / Designation Masters even
+   when the employee was bulk-imported with a lookup that only existed in one
+   master source. */
 function addEmployee(data) {
+    amsEnsureDepartment(data.department, data.deptShort || "");
+    amsEnsureDesignation(data.designation);
     const emp = {
         amsId: generateAmsId(data.department),
         empId: data.empId || "EMP-000001",
@@ -1203,7 +1313,7 @@ function amsBuildPrintAccessoriesHtml(assets) {
     (assets || []).forEach(oa => {
         const acc = (oa && Array.isArray(oa.accessories) && oa.accessories.length) ? oa.accessories : [];
         if (!acc.length) return;
-        const label = (oa.id || oa.assetId || "").toUpperCase();
+        const label = amsPrintAssetId(oa).toUpperCase();
         acc.forEach(name => {
             rows.push(`<label class="pf-check-block"><input type="checkbox" checked> ${amsEsc(name)}${label ? ` <span class="pf-acc-asset">(${amsEsc(label)})</span>` : ""}</label>`);
         });

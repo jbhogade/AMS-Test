@@ -57,6 +57,21 @@ async function initSystemAdmin() {
         btn.addEventListener("click", () => amsLoadAdminTab(btn.getAttribute("data-admin-tab")));
     });
 
+    /* Hide tabs for pages the signed-in role cannot use, so a Super Root (or
+       any non-Supreme role) never sees a button that leads to an "Access
+       Denied" wall: Access Rights + Role Access are Supreme Root only, Log
+       Report is Super Root + Supreme Root only. */
+    const role = (typeof amsGetViewingAsRole === "function") ? amsGetViewingAsRole() : "Standard User";
+    document.querySelectorAll(".admin-tab").forEach(btn => {
+        const key = btn.getAttribute("data-admin-tab");
+        if (key === "accessRights" || key === "roleAccess") {
+            if (role !== "Supreme Root") btn.style.display = "none";
+        }
+        if (key === "log") {
+            if (role !== "Supreme Root" && role !== "Super Root") btn.style.display = "none";
+        }
+    });
+
     /* Default to the first tab on load */
     amsLoadAdminTab("company");
 }

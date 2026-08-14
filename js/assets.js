@@ -485,9 +485,18 @@ let AST_QUICKADD_EMP_TARGET = null; /* which select ("assignDirectEmp" / "assign
 
 function amsOpenAddEmployeeModal(targetSelectId) {
     AST_QUICKADD_EMP_TARGET = targetSelectId;
-    /* Fill the department + designation pickers */
-    document.getElementById("qaEmpDept").innerHTML = DEPARTMENTS.map(d => `<option value="${amsEsc(d.name)}">${amsEsc(d.name)}</option>`).join("");
-    document.getElementById("qaEmpDesigList").innerHTML = DESIGNATIONS.map(d => `<option value="${amsEsc(d)}"></option>`).join("");
+    /* Fill the department + designation pickers (union of hardcoded seeds + the
+       DB-backed masters, so lookups added in either place are offered here) */
+    const deptUnion = DEPARTMENTS.map(d => ({ name: d.name, short: d.short }));
+    AMS_DUMMY_DEPARTMENTS.forEach(d => {
+        if (!deptUnion.some(x => x.name.toLowerCase() === d.name.toLowerCase())) deptUnion.push({ name: d.name, short: d.shortform });
+    });
+    const desigUnion = DESIGNATIONS.slice();
+    AMS_DESIGNATION_OPTIONS.forEach(d => {
+        if (!desigUnion.some(x => x.toLowerCase() === d.name.toLowerCase())) desigUnion.push(d.name);
+    });
+    document.getElementById("qaEmpDept").innerHTML = deptUnion.map(d => `<option value="${amsEsc(d.name)}">${amsEsc(d.name)}</option>`).join("");
+    document.getElementById("qaEmpDesigList").innerHTML = desigUnion.map(d => `<option value="${amsEsc(d)}"></option>`).join("");
     document.getElementById("qaEmpFirst").value = "";
     document.getElementById("qaEmpLast").value = "";
     document.getElementById("qaEmpDesig").value = "";
@@ -1027,7 +1036,7 @@ function amsGenerateAssetFormNo() {
 function amsBuildRemarksLinesHtml(assetsList) {
     const lines = [];
     assetsList.forEach(oa => {
-        if (oa.remarks) lines.push(`<div><strong>${amsEsc(oa.id)} - Remarks (on record):</strong> ${amsEsc(oa.remarks)}</div>`);
+        if (oa.remarks) lines.push(`<div><strong>${amsEsc(amsPrintAssetId(oa))} - Remarks (on record):</strong> ${amsEsc(oa.remarks)}</div>`);
     });
     if (!lines.length) lines.push(`<div class="pf-notes-empty">No remarks recorded against the asset(s) in the system.</div>`);
     return lines.join("");
@@ -1122,7 +1131,7 @@ function amsGenerateAssetIssueFormPrint(key, extraRemarks) {
             <tbody>
                 ${directOwned.length ? directOwned.map((oa, i) => `
                     <tr>
-                        <td>${i + 1}</td><td class="mono">${oa.id}</td><td>${oa.type}${oa.makeModel ? ` (${amsEsc(oa.makeModel)})` : ""}</td><td>${oa.currentSite || oa.site}</td>
+                        <td>${i + 1}</td><td class="mono">${amsPrintAssetId(oa)}</td><td>${oa.type}${oa.makeModel ? ` (${amsEsc(oa.makeModel)})` : ""}</td><td>${oa.currentSite || oa.site}</td>
                         <td>${conditionRow()}</td>
                     </tr>`).join("")
                     : `<tr><td colspan="5" style="text-align:center; color:#777;">No assets currently on record for this employee</td></tr>`}
@@ -1141,12 +1150,12 @@ function amsGenerateAssetIssueFormPrint(key, extraRemarks) {
         </div>`;
 
     const subRows = subAssets.map(sa => ({
-        id: sa.id, type: sa.type, makeModel: sa.makeModel,
+        id: amsPrintAssetId(sa), type: sa.type, makeModel: sa.makeModel,
         site: sa.currentSite || sa.site, holder: sa.subName, holderId: sa.subEmpId,
     }));
     subOwned.forEach(oa => {
         subRows.push({
-            id: oa.id, type: oa.type, makeModel: oa.makeModel,
+            id: amsPrintAssetId(oa), type: oa.type, makeModel: oa.makeModel,
             site: oa.currentSite || oa.site, holder: amsAssetHolderLabel(oa), holderId: "",
         });
     });

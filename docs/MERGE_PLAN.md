@@ -747,6 +747,40 @@ Regression status: all 15 `test-*-amstest.js` suites still pass, plus a new
 
 ---
 
+### 15.8 Access + Issue-Form ID round
+
+Frontend-only. Two user-reported fixes after 15.7.
+
+| Point | Change |
+|-------|--------|
+| 1. No Access Denied wall for non-Supreme roles | The System Administrator hub (`js/system-admin.js`) now hides the Supreme-Root-exclusive tabs - "Access Rights Control Master" and "Role Access Master" - from every role except Supreme Root, and the "Log Report" tab from everyone below Super Root. So a Super Root never sees a button that leads to a lock-out. On the pages themselves (`js/access-rights.js`, `js/role-access.js`), a non-Supreme role opening them directly (e.g. typed URL) is redirected to the dashboard instead of being shown the old "Access Denied" card. |
+| 2. Issue Form shows the full Smart Asset ID | New shared `amsPrintAssetId()` (`js/dummy-data.js`) returns the COMPUTED full ID (`amsComputeFullId()` = base + site + dept, e.g. `BKMP00001SLIT`) for live assigned assets, falling back to the stored id for snapshot records (exit reports). Both Issue Form generators now use it for the Asset ID column, subordinate rows, accessories labels and remarks headers: `js/print-forms.js` and `js/assets.js` (`amsGenerateAssetIssueFormPrint`), plus the accessories section in `js/dummy-data.js`. Previously they printed the stored `oa.id`, which could be an older base+site form (`BKMP00001SL`) without the department suffix. |
+
+Regression status: all 15 `test-*-amstest.js` suites pass (the two role-gate
+tests were updated: a non-Supreme role now gets no locked/unlocked view instead
+of a shown Access Denied card), plus new `probe-newtasks.js` covering both
+points. No backend changes; API build is 0 warnings / 0 errors.
+
+---
+
+### 15.9 SIM Card Master + Department/Designation sync round
+
+Two new user requests delivered on top of 15.8. Frontend + one backend
+whitelist entry (`CollectionsController` `AllowedKeys` gains `"simCards"`).
+
+| Point | Change |
+|-------|--------|
+| 1. SIM Card Master page | New standalone record type `pages/sim-cards.html` + `js/sim-cards.js`, mirroring the Asset Master but tracking **mobile SIM cards** independently (the phone stays in the Asset Master). Auto SIM ID (`SIM-000001` …) via `amsNextSimId()`; ICCID/serial, mobile number, operator + plan pick-lists (`AMS_SIM_OPERATOR_OPTIONS`), status (In Store / Issued / Blocked / Retired via `AMS_SIM_STATUS_OPTIONS`), vendor quick-add, cost, activation date, remarks. Lifecycle actions assign/reassign/return/block/retire each write a history entry visible in the View modal; stock-summary tiles, search + status filter, CSV Template / Export / Import (mobileNumber required, status defaults to In Store, dates via `amsParseDMY`, existing SIMs updated by simId). Persists to the DB-backed `AMS_DUMMY_SIM_CARDS` collection via `amsDbSaveAsync("simCards")`; `AMS_COLLECTIONS` + server `AllowedKeys` updated so the generic save path works. |
+| 2. Department / Designation Master sync fix | Departments/designations now stay in sync across the hardcoded seeds (`DEPARTMENTS` / `DESIGNATIONS`) and the DB-backed masters (`AMS_DUMMY_DEPARTMENTS` / `AMS_DESIGNATION_OPTIONS`). Root cause of the drop: the Import Report inline Add handlers pushed to both arrays but never called `amsDbSaveAsync`, so the value vanished on next page load (Masters read from SQL); and import validation only checked the const arrays, not the DB-backed ones. New shared helpers in `js/dummy-data.js`: `amsDeptKnown()` / `amsDesigKnown()` (union check), `amsEnsureDepartment(name, shortform)` and `amsEnsureDesignation(name)` (dedupe into both arrays + persist). Consumers now use them: Employee form quick-add + bulk import (`addEmployee()` registers the imported lookup into both masters), Import Report quick-add handlers (`[data-save-dept]`, `amsQuickAddDeptFromReport`, `amsQuickAddDesigFromReport`), Employee page `populateSelects()` + `allDeptOptions()` / `allDesigOptions()` union dropdowns, and the Asset Master quick-add employee pickers. |
+
+Regression status: all 17 `test-*-amstest.js` suites pass (15 prior + new
+`test-sim-cards-amstest.js` with 12 checks and `test-point2-amstest.js` with 5
+checks). No SQL Server in the sandbox, so DB persistence was verified by
+code-path analysis + the harness `saves[]` capture of `amsDbSaveAsync` calls.
+API build is 0 warnings / 0 errors.
+
+---
+
 
 ## Theme reconciliation (already applied in Phase 1)
 

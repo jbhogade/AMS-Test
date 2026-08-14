@@ -33,7 +33,7 @@ function amsGenerateFormNo(prefix) {
 function amsBuildReportRemarks(assetsList) {
     const lines = [];
     assetsList.forEach(oa => {
-        const assetLabel = oa.id || oa.assetId;
+        const assetLabel = amsPrintAssetId(oa);
         if (oa.remarks) lines.push(`<div><strong>${amsEsc(assetLabel)} - Remarks (on record):</strong> ${amsEsc(oa.remarks)}</div>`);
     });
     if (!lines.length) lines.push(`<div class="pf-notes-empty">No remarks recorded against the asset(s) in the system.</div>`);
@@ -160,7 +160,7 @@ function amsGenerateReport(amsId, type, extraRemarks) {
             <tbody>
                 ${directOwned.length ? directOwned.map((oa, i) => `
                     <tr>
-                        <td>${i + 1}</td><td class="mono">${amsEsc(oa.id || oa.assetId)}</td><td>${amsEsc(oa.type)}${oa.makeModel ? ` (${amsEsc(oa.makeModel)})` : ""}</td><td>${amsEsc(oa.currentSite || oa.site || "-")}</td>
+                        <td>${i + 1}</td><td class="mono">${amsEsc(amsPrintAssetId(oa))}</td><td>${amsEsc(oa.type)}${oa.makeModel ? ` (${amsEsc(oa.makeModel)})` : ""}</td><td>${amsEsc(oa.currentSite || oa.site || "-")}</td>
                         <td>${conditionRow()}</td>
                     </tr>`).join("")
                     : `<tr><td colspan="5" style="text-align:center; color:#777;">No assets currently on record for this employee</td></tr>`}
@@ -181,12 +181,12 @@ function amsGenerateReport(amsId, type, extraRemarks) {
 
     const subAssets = isIssue ? amsSubordinateAssetsDetailed(amsId) : [];
     const subRows = subAssets.map(sa => ({
-        id: sa.id, type: sa.type, makeModel: sa.makeModel,
+        id: amsPrintAssetId(sa), type: sa.type, makeModel: sa.makeModel,
         site: sa.currentSite || sa.site, holder: sa.subName, holderId: sa.subEmpId,
     }));
     subOwned.forEach(oa => {
         subRows.push({
-            id: oa.id || oa.assetId, type: oa.type, makeModel: oa.makeModel,
+            id: amsPrintAssetId(oa), type: oa.type, makeModel: oa.makeModel,
             site: oa.currentSite || oa.site, holder: amsAssetHolderLabel(oa), holderId: "",
         });
     });

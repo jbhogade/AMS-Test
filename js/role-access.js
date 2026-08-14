@@ -33,9 +33,18 @@ function amsIsSupremeRootRAM() {
 
 function amsApplyRoleAccessGate() {
     const unlocked = amsIsSupremeRootRAM();
-    document.getElementById("unlockedView").style.display = unlocked ? "block" : "none";
-    document.getElementById("lockedView").style.display = unlocked ? "none" : "block";
-    if (unlocked) renderRoleAccessTable();
+    if (!unlocked) {
+        /* This page is exclusive to Supreme Root accounts. Non-Supreme roles
+           (including Super Root) are sent back to the dashboard instead of
+           being shown an "Access Denied" wall - the entry point (System Admin
+           tab) is hidden for them anyway, so this only guards direct-URL
+           access. */
+        window.location.replace("../index.html");
+        return;
+    }
+    document.getElementById("unlockedView").style.display = "block";
+    document.getElementById("lockedView").style.display = "none";
+    renderRoleAccessTable();
 }
 /*-------------- End of the code ------------------------------------------------*/
 
