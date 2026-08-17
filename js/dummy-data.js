@@ -137,6 +137,12 @@ const AMS_COLLECTIONS = {
     sparePartLog:    () => AMS_DUMMY_SPAREPART_LOG,
     accessories:     () => AMS_DUMMY_ACCESSORIES,
     simCards:        () => AMS_DUMMY_SIM_CARDS,
+    simOperators:    () => AMS_DUMMY_SIM_OPERATORS,
+    simPlans:        () => AMS_DUMMY_SIM_PLANS,
+    consumableCategories: () => AMS_DUMMY_CONSUMABLE_CATEGORIES,
+    consumableUnits: () => AMS_DUMMY_CONSUMABLE_UNITS,
+    sparePartCategories: () => AMS_DUMMY_SPAREPART_CATEGORIES,
+    vendorCategories: () => AMS_DUMMY_VENDOR_CATEGORIES,
     users:           () => AMS_DUMMY_USERS,
     exitRecords:     () => AMS_DUMMY_EXIT_RECORDS,
 };
@@ -176,6 +182,7 @@ async function amsDbLoadAll() {
         const venMax = AMS_DUMMY_VENDORS.reduce((m, v) =>
             Math.max(m, parseInt(String(v.vendorId || "0").replace(/\D/g, ""), 10) || 0), 0);
         if (venMax >= AMS_VENDOR_SEQ) AMS_VENDOR_SEQ = venMax + 1;
+        amsMigrateEmployeeNames();
         AMS_DB_READY = true;
     })();
     return AMS_DB_LOADING;
@@ -821,8 +828,52 @@ const DUMMY_ASSETS = [];
    7) CONSUMABLES  (per-site stock with Restock/Used movement log)
    ===========================================================================*/
 
-const AMS_CONSUMABLE_CATEGORIES = ["Printer Supplies", "Cables", "Peripherals", "Stationery", "IT Accessories"];
-const AMS_CONSUMABLE_UNITS = ["Nos", "Box", "Pack", "Ream", "Meter"];
+/* Consumable Category Master - DB-backed (consumableCategories collection).
+   Previously a hardcoded string list; now records with a description, managed
+   from System Admin > Consumable Category Master. */
+const AMS_DUMMY_CONSUMABLE_CATEGORIES = [
+    { name: "Printer Supplies", description: "", active: true },
+    { name: "Cables",           description: "", active: true },
+    { name: "Peripherals",      description: "", active: true },
+    { name: "Stationery",       description: "", active: true },
+    { name: "IT Accessories",   description: "", active: true },
+];
+
+/* Unit of Measure Master - DB-backed (consumableUnits collection). */
+const AMS_DUMMY_CONSUMABLE_UNITS = [
+    { name: "Nos",   description: "Number of pieces", active: true },
+    { name: "Box",   description: "", active: true },
+    { name: "Pack",  description: "", active: true },
+    { name: "Ream",  description: "", active: true },
+    { name: "Meter", description: "", active: true },
+];
+
+function amsGetActiveConsumableCategoryNames() {
+    return AMS_DUMMY_CONSUMABLE_CATEGORIES.filter(c => c.active).map(c => c.name);
+}
+function amsGetActiveConsumableUnitNames() {
+    return AMS_DUMMY_CONSUMABLE_UNITS.filter(u => u.active).map(u => u.name);
+}
+
+/* Quick-add helpers used by the Consumable Master "+" buttons. Return the new
+   name on success, or null when it already exists (caller alerts). */
+function amsQuickAddConsumableCategory(name, description) {
+    const trimmed = (name || "").trim();
+    if (!trimmed) return null;
+    if (AMS_DUMMY_CONSUMABLE_CATEGORIES.some(c => c.name.toLowerCase() === trimmed.toLowerCase())) return null;
+    AMS_DUMMY_CONSUMABLE_CATEGORIES.push({ name: trimmed, description: (description || "").trim(), active: true });
+    amsDbSaveAsync("consumableCategories");
+    return trimmed;
+}
+function amsQuickAddConsumableUnit(name, description) {
+    const trimmed = (name || "").trim();
+    if (!trimmed) return null;
+    if (AMS_DUMMY_CONSUMABLE_UNITS.some(u => u.name.toLowerCase() === trimmed.toLowerCase())) return null;
+    AMS_DUMMY_CONSUMABLE_UNITS.push({ name: trimmed, description: (description || "").trim(), active: true });
+    amsDbSaveAsync("consumableUnits");
+    return trimmed;
+}
+
 const AMS_DUMMY_CONSUMABLES = [];
 const AMS_DUMMY_CONSUMABLE_LOG = [];
 
@@ -831,7 +882,27 @@ const AMS_DUMMY_CONSUMABLE_LOG = [];
    8) SPARE PARTS  (per-site stock with Restock/Used movement log)
    ===========================================================================*/
 
-const AMS_SPAREPART_CATEGORIES = ["Internal Component", "Toner / Ink", "Mechanical Part"];
+/* Spare Part Category Master - DB-backed (sparePartCategories collection).
+   Previously a hardcoded string list; now records managed from System Admin >
+   Spare Part Category Master. */
+const AMS_DUMMY_SPAREPART_CATEGORIES = [
+    { name: "Internal Component", description: "", active: true },
+    { name: "Toner / Ink",        description: "", active: true },
+    { name: "Mechanical Part",    description: "", active: true },
+];
+
+function amsGetActiveSparePartCategoryNames() {
+    return AMS_DUMMY_SPAREPART_CATEGORIES.filter(c => c.active).map(c => c.name);
+}
+function amsQuickAddSparePartCategory(name, description) {
+    const trimmed = (name || "").trim();
+    if (!trimmed) return null;
+    if (AMS_DUMMY_SPAREPART_CATEGORIES.some(c => c.name.toLowerCase() === trimmed.toLowerCase())) return null;
+    AMS_DUMMY_SPAREPART_CATEGORIES.push({ name: trimmed, description: (description || "").trim(), active: true });
+    amsDbSaveAsync("sparePartCategories");
+    return trimmed;
+}
+
 const AMS_DUMMY_SPARE_PARTS = [];
 const AMS_DUMMY_SPAREPART_LOG = [];
 
@@ -847,8 +918,81 @@ const AMS_DUMMY_SPAREPART_LOG = [];
    ===========================================================================*/
 
 const AMS_SIM_STATUS_OPTIONS = ["In Store", "Issued", "Blocked", "Retired"];
-const AMS_SIM_OPERATOR_OPTIONS = ["Jio", "Airtel", "Vodafone Idea", "BSNL", "MTNL"];
+
+/* SIM Operator Master - DB-backed (simOperators collection). Previously a
+   hardcoded string list (AMS_SIM_OPERATOR_OPTIONS) that could not be extended;
+   now each operator is a record with details and can be added / edited /
+   deactivated from the SIM Operator Master (System Admin > SIM Operator Master).
+   The in-memory defaults below match the original hardcoded list so the form
+   works even before the API is reachable; the DB is the source of truth. */
+const AMS_DUMMY_SIM_OPERATORS = [
+    { name: "Jio",           helpline: "198", website: "https://www.jio.com",  active: true },
+    { name: "Airtel",        helpline: "198", website: "https://www.airtel.in", active: true },
+    { name: "Vodafone Idea", helpline: "199", website: "https://www.myvi.in",  active: true },
+    { name: "BSNL",          helpline: "1503", website: "https://www.bsnl.co.in", active: true },
+    { name: "MTNL",          helpline: "1503", website: "https://www.mtnl.co.in", active: true },
+];
+
+/* SIM Plan Master - DB-backed (simPlans collection). Feeds the Plan datalist on
+   the SIM Card form. */
+const AMS_DUMMY_SIM_PLANS = [
+    { name: "Prepaid",       planType: "Prepaid",  description: "", active: true },
+    { name: "Postpaid",      planType: "Postpaid", description: "", active: true },
+    { name: "Corporate Plan",planType: "Corporate",description: "", active: true },
+];
+
 const AMS_DUMMY_SIM_CARDS = [];
+
+/* Active operator / plan names for the SIM Card form datalists */
+function amsGetActiveSimOperatorNames() {
+    return AMS_DUMMY_SIM_OPERATORS.filter(o => o.active).map(o => o.name);
+}
+function amsGetActiveSimPlanNames() {
+    return AMS_DUMMY_SIM_PLANS.filter(p => p.active).map(p => p.name);
+}
+
+/* Ensures an operator exists in the SIM Operator Master (+ persists to SQL).
+   Called when a SIM card is saved with an operator typed on the form that is not
+   in the master yet - the new operator is registered automatically so it shows
+   up in the master and as a suggestion next time. */
+function amsEnsureSimOperator(name, helpline, website) {
+    const trimmed = (name || "").trim();
+    if (!trimmed) return null;
+    if (AMS_DUMMY_SIM_OPERATORS.some(o => o.name.toLowerCase() === trimmed.toLowerCase())) return trimmed;
+    AMS_DUMMY_SIM_OPERATORS.push({ name: trimmed, helpline: (helpline || "").trim(), website: (website || "").trim(), active: true });
+    amsDbSaveAsync("simOperators");
+    return trimmed;
+}
+
+/* Ensures a plan exists in the SIM Plan Master (+ persists to SQL). */
+function amsEnsureSimPlan(name, planType, description) {
+    const trimmed = (name || "").trim();
+    if (!trimmed) return null;
+    if (AMS_DUMMY_SIM_PLANS.some(p => p.name.toLowerCase() === trimmed.toLowerCase())) return trimmed;
+    AMS_DUMMY_SIM_PLANS.push({ name: trimmed, planType: (planType || "").trim(), description: (description || "").trim(), active: true });
+    amsDbSaveAsync("simPlans");
+    return trimmed;
+}
+
+/* Quick-add from the SIM Card form "+" buttons - adds an operator / plan to its
+   master (with details) and returns the name to fill into the form, or null if
+   it already exists (validation handled by the caller's alert). */
+function amsQuickAddSimOperator(name, helpline, website) {
+    const trimmed = (name || "").trim();
+    if (!trimmed) return null;
+    if (AMS_DUMMY_SIM_OPERATORS.some(o => o.name.toLowerCase() === trimmed.toLowerCase())) return null;
+    AMS_DUMMY_SIM_OPERATORS.push({ name: trimmed, helpline: (helpline || "").trim(), website: (website || "").trim(), active: true });
+    amsDbSaveAsync("simOperators");
+    return trimmed;
+}
+function amsQuickAddSimPlan(name, planType, description) {
+    const trimmed = (name || "").trim();
+    if (!trimmed) return null;
+    if (AMS_DUMMY_SIM_PLANS.some(p => p.name.toLowerCase() === trimmed.toLowerCase())) return null;
+    AMS_DUMMY_SIM_PLANS.push({ name: trimmed, planType: (planType || "").trim(), description: (description || "").trim(), active: true });
+    amsDbSaveAsync("simPlans");
+    return trimmed;
+}
 
 /* Next auto-generated SIM display ID (SIM-000001, SIM-000002, ...) */
 function amsNextSimId() {
@@ -872,7 +1016,29 @@ function amsNextSimId() {
 
 let AMS_VENDOR_SEQ = 12;
 
-const AMS_VENDOR_CATEGORIES = ["Assets", "Consumables", "Spare Parts", "Services", "All"];
+/* Vendor Category Master - DB-backed (vendorCategories collection). Feeds the
+   "Supplies" dropdown on the Vendor Master form. Previously a hardcoded string
+   list; now managed from System Admin > Vendor Category Master. */
+const AMS_DUMMY_VENDOR_CATEGORIES = [
+    { name: "Assets",       description: "Supplies assets / capital equipment", active: true },
+    { name: "Consumables",  description: "Supplies consumable items",           active: true },
+    { name: "Spare Parts",  description: "Supplies spare / repair parts",       active: true },
+    { name: "Services",     description: "Provides services (AMC, repair, etc.)", active: true },
+    { name: "All",          description: "General supplier - multiple categories", active: true },
+];
+
+function amsGetActiveVendorCategoryNames() {
+    return AMS_DUMMY_VENDOR_CATEGORIES.filter(c => c.active).map(c => c.name);
+}
+function amsQuickAddVendorCategory(name, description) {
+    const trimmed = (name || "").trim();
+    if (!trimmed) return null;
+    if (AMS_DUMMY_VENDOR_CATEGORIES.some(c => c.name.toLowerCase() === trimmed.toLowerCase())) return null;
+    AMS_DUMMY_VENDOR_CATEGORIES.push({ name: trimmed, description: (description || "").trim(), active: true });
+    amsDbSaveAsync("vendorCategories");
+    return trimmed;
+}
+
 const AMS_DUMMY_VENDORS = [];
 
 
@@ -1044,6 +1210,17 @@ function getDeptShort(departmentName) {
     return dept ? dept.short : "GEN";
 }
 
+/* Returns the employee's COMPANY-ISSUED (display) ID - e.g. "00339" - never the
+   hidden internal AMS ID ("EMP-INS-000001"). Accepts both the raw employee
+   record (empId = company ID) and the portal view-model from
+   amsGetEmployeeByAmsId (which mirrors the AMS ID into empId and keeps the
+   company ID in empIdCompany), so printed forms always show the display ID. */
+function amsGetEmployeeDisplayId(emp) {
+    if (!emp) return "";
+    if (emp.empIdCompany) return emp.empIdCompany;
+    return emp.empId || emp.amsId || "";
+}
+
 /* Auto-generates the next AMS ID for a department, e.g. EMP-IT-000004.
    Uses the highest existing sequence number for that department so IDs stay
    unique even when records have been removed (leaving gaps). */
@@ -1060,14 +1237,37 @@ function generateAmsId(departmentName) {
     return prefix + String(maxSeq + 1).padStart(6, "0");
 }
 
-/* Combines first + middle + last into a display name */
+/* Combines first + middle + last into a display name. Newer records store a
+   single `name` field (full name, exactly as typed); older records still use
+   firstName/middleName/lastName and are migrated to `name` on load. */
 function getEmployeeFullName(emp) {
-    return [emp.firstName, emp.middleName, emp.lastName].filter(Boolean).join(" ");
+    if (emp && emp.name) return emp.name;
+    return [emp && emp.firstName, emp && emp.middleName, emp && emp.lastName].filter(Boolean).join(" ");
 }
 
-/* Returns the initials of an employee (for the avatar) */
+/* Returns the initials of an employee (for the avatar). With the single full
+   name format the initials come from the first and last word of the name. */
 function getEmployeeInitials(emp) {
-    return (emp.firstName[0] || "") + (emp.lastName[0] || "");
+    if (emp && emp.name) {
+        const parts = String(emp.name).trim().split(/\s+/);
+        const first = parts[0] || "";
+        const last = parts.length > 1 ? parts[parts.length - 1] : "";
+        return (first[0] || "") + (last[0] || "");
+    }
+    return ((emp && emp.firstName[0]) || "") + ((emp && emp.lastName[0]) || "");
+}
+
+/* Migrates legacy First/Middle/Last records to the single full-name `name`
+   field (idempotent - records that already have `name` are left alone). */
+function amsMigrateEmployeeNames() {
+    let changed = false;
+    DUMMY_EMPLOYEES.forEach(e => {
+        if (!e.name && (e.firstName || e.lastName)) {
+            e.name = [e.firstName, e.middleName, e.lastName].filter(Boolean).join(" ");
+            changed = true;
+        }
+    });
+    if (changed) amsDbSaveAsync("employees");
 }
 
 /* All employees, optionally filtered by status */
@@ -1083,7 +1283,18 @@ function findEmployee(amsId) {
 
 /* Finds one employee by AMS ID OR company ID */
 function findEmployeeAny(identifier) {
-    return DUMMY_EMPLOYEES.find(e => e.amsId === identifier || e.empId === identifier);
+    if (!identifier) return null;
+    const id = String(identifier).trim().toLowerCase().replace(/\s+/g, " ");
+    return DUMMY_EMPLOYEES.find(e => {
+        if (e.amsId && e.amsId.toLowerCase().replace(/\s+/g, " ") === id) return true;
+        if (e.empId && e.empId.toLowerCase().replace(/\s+/g, " ") === id) return true;
+        /* Match by name too (case-insensitive, whitespace-tolerant) so a CSV
+           that references the reporting manager by FULL NAME still resolves,
+           even though records store First / Middle / Last separately. */
+        const name = getEmployeeFullName(e).toLowerCase().replace(/\s+/g, " ");
+        if (name === id) return true;
+        return false;
+    });
 }
 
 /* Adds a new employee and returns the record with its generated AMS ID.
@@ -1097,19 +1308,25 @@ function addEmployee(data) {
     const emp = {
         amsId: generateAmsId(data.department),
         empId: data.empId || "EMP-000001",
-        firstName: data.firstName,
+        name: data.name || "",
+        firstName: data.firstName || "",
         middleName: data.middleName || "",
-        lastName: data.lastName,
+        lastName: data.lastName || "",
         department: data.department,
         designation: data.designation,
         contact: data.contact || "",
         email: data.email || "",
         managerAmsId: data.managerAmsId || null,
+        /* As-typed reporting manager reference from a bulk import (kept verbatim
+           even when the manager record does not exist yet). */
+        managerName: data.managerName || "",
+        managerId: data.managerId || "",
         status: "Active",
         exitDate: null
     };
     DUMMY_EMPLOYEES.push(emp);
     amsDbSaveAsync("employees");
+    amsResolvePendingManagers();
     return emp;
 }
 
@@ -1118,16 +1335,42 @@ function updateEmployee(amsId, data) {
     const emp = findEmployee(amsId);
     if (!emp) return null;
     emp.empId = data.empId || "EMP-000001";
-    emp.firstName = data.firstName;
+    emp.name = data.name || "";
+    emp.firstName = data.firstName || "";
     emp.middleName = data.middleName || "";
-    emp.lastName = data.lastName;
+    emp.lastName = data.lastName || "";
     emp.department = data.department;
     emp.designation = data.designation;
     emp.contact = data.contact || "";
     emp.email = data.email || "";
     emp.managerAmsId = data.managerAmsId || null;
     amsDbSaveAsync("employees");
+    amsResolvePendingManagers();
     return emp;
+}
+
+/* Auto-links employees whose reporting manager did not exist yet when they were
+   added/imported. Such employees keep a pendingManagerRef (the manager's full
+   name, company Employee ID or AMS ID) until a matching employee record exists;
+   once it does, managerAmsId is filled in here. Called after every employee
+   mutation + on page init, so a manager that "joined later" links to their
+   reports automatically. Returns true if any link was made (so callers can
+   re-render/save if needed). */
+function amsResolvePendingManagers() {
+    let changed = false;
+    DUMMY_EMPLOYEES.forEach(emp => {
+        if (!emp.pendingManagerRef || emp.managerAmsId) return;
+        const mgr = findEmployeeAny(emp.pendingManagerRef);
+        if (mgr && mgr.amsId !== emp.amsId) {
+            emp.managerAmsId = mgr.amsId;
+            emp.managerName = getEmployeeFullName(mgr);
+            emp.managerId = emp.managerId || mgr.empId;
+            delete emp.pendingManagerRef;
+            changed = true;
+        }
+    });
+    if (changed) amsDbSaveAsync("employees");
+    return changed;
 }
 
 /* Marks an employee as exited: releases their assets back to the store. The
@@ -1304,36 +1547,60 @@ function amsSplitDirectVsSubordinateAssets(assets) {
     return { direct, subordinate };
 }
 
-/* Builds the "Accessories / Items Included" section of a printed form from the
-   accessories recorded on the assets (checked at assignment time). Renders each
-   asset's accessories as pre-checked blocks labelled with the asset ID, falling
-   back to the standard blank checklist when nothing was recorded. */
+/* Builds the "Accessories / Items Included" section of a printed form.
+   Lists EVERY active "Common / Supportive Accessory" from the Accessory Master
+   that applies to the asset type(s) of the issued assets (plus the recorded
+   accessories even if no longer in the master), pre-checking the ones actually
+   issued on the asset record. Always ends with an "Other" line. When the master
+   has no matching accessories AND nothing was recorded, falls back to a small
+   standard checklist so the section is never empty. */
 function amsBuildPrintAccessoriesHtml(assets) {
-    const rows = [];
-    (assets || []).forEach(oa => {
-        const acc = (oa && Array.isArray(oa.accessories) && oa.accessories.length) ? oa.accessories : [];
-        if (!acc.length) return;
-        const label = amsPrintAssetId(oa).toUpperCase();
-        acc.forEach(name => {
-            rows.push(`<label class="pf-check-block"><input type="checkbox" checked> ${amsEsc(name)}${label ? ` <span class="pf-acc-asset">(${amsEsc(label)})</span>` : ""}</label>`);
+    const list = (assets || []).filter(oa => oa);
+
+    /* Union of asset types on the issued assets (used to pull the master list) */
+    const types = [];
+    list.forEach(oa => { if (oa.type && !types.includes(oa.type)) types.push(oa.type); });
+
+    /* Every active master accessory for those types, deduplicated by name */
+    const masterOptions = [];
+    types.forEach(t => {
+        amsGetAccessoryOptions(t).forEach(name => {
+            if (!masterOptions.includes(name)) masterOptions.push(name);
         });
     });
+
+    /* Accessories actually recorded on the assets (pre-checked) */
+    const issued = [];
+    list.forEach(oa => {
+        (Array.isArray(oa.accessories) ? oa.accessories : []).forEach(name => {
+            if (!issued.includes(name)) issued.push(name);
+        });
+    });
+
+    const rows = [];
+    masterOptions.forEach(name => {
+        const checked = issued.includes(name) ? "checked" : "";
+        rows.push(`<label class="pf-check-block"><input type="checkbox" ${checked}> ${amsEsc(name)}</label>`);
+    });
+    /* Recorded accessories that are no longer in the master still show, checked */
+    issued.forEach(name => {
+        if (!masterOptions.includes(name)) {
+            rows.push(`<label class="pf-check-block"><input type="checkbox" checked> ${amsEsc(name)}</label>`);
+        }
+    });
     if (!rows.length) {
-        return `
-        <div class="pf-section-bar">Accessories / Items Included</div>
-        <div class="pf-checklist-grid">
-            <label class="pf-check-block"><input type="checkbox" disabled> Power Adaptor / Charger</label>
-            <label class="pf-check-block"><input type="checkbox" disabled> Carrying Bag / Case</label>
-            <label class="pf-check-block"><input type="checkbox" disabled> Mouse / Keyboard (if applicable)</label>
-            <label class="pf-check-block"><input type="checkbox" disabled> Original Box / Documentation</label>
-            <label class="pf-check-block" style="grid-column:1 / -1;">Other: ________________________________</label>
-        </div>`;
+        rows.push(
+            `<label class="pf-check-block"><input type="checkbox"> Power Adaptor / Charger</label>`,
+            `<label class="pf-check-block"><input type="checkbox"> Carrying Bag / Case</label>`,
+            `<label class="pf-check-block"><input type="checkbox"> Mouse / Keyboard (if applicable)</label>`,
+            `<label class="pf-check-block"><input type="checkbox"> Original Box / Documentation</label>`,
+        );
     }
+    rows.push(`<label class="pf-check-block" style="grid-column:1 / -1;">Other: ________________________________</label>`);
     return `
         <div class="pf-section-bar">Accessories / Items Included</div>
         <div class="pf-checklist-grid">
             ${rows.join("")}
-            <label class="pf-check-block" style="grid-column:1 / -1;">Other: ________________________________</label>
         </div>`;
 }
 
@@ -1358,6 +1625,12 @@ const AMS_PAGE_REGISTRY = [
     { key: "designation",   label: "Designation Master" },
     { key: "systemAdmin",   label: "System Administrator Master (hub)" },
     { key: "accessory",     label: "Accessory Master" },
+    { key: "simOperator",   label: "SIM Operator Master" },
+    { key: "simPlan",       label: "SIM Plan Master" },
+    { key: "consumableCategory", label: "Consumable Category Master" },
+    { key: "unitOfMeasure", label: "Unit of Measure Master" },
+    { key: "sparePartCategory", label: "Spare Part Category Master" },
+    { key: "vendorCategory", label: "Vendor Category Master" },
     { key: "company",       label: "Company Master" },
     { key: "userMaster",    label: "User Master" },
     { key: "accessRights",  label: "Access Rights Control Master (Supreme Root only)" },

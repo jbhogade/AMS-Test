@@ -578,6 +578,45 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
 .table .num { text-align: right; font-variant-numeric: tabular-nums; }
 .table .muted { color: var(--text-muted); }
 
+/* Monospace utility for codes/IDs/dates in tables (report-panel overrides it
+   with a tighter size where relevant). */
+.mono { font-family: 'Consolas', 'Menlo', 'Courier New', monospace; font-size: 12.5px; }
+.mono-cell { font-family: 'Consolas', 'Menlo', 'Courier New', monospace; font-size: 12.5px; }
+
+/* Clickable code/ID links inside tables (e.g. opening an asset/SIM from any
+   master list). */
+.clickable-id {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+    font-family: inherit;
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+/* Form helper text + checkbox rows (used on Settings/Profile and master pages;
+   kept here so every page that uses them renders consistently without needing
+   css/master-table.css). */
+.form-hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.form-checkbox { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.form-checkbox input { accent-color: var(--accent); }
+
+/* Title bar inside a card (e.g. "Spare Parts Used on This Asset"). */
+.card-title {
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+/* Empty-state row/note used across Asset, SIM and Employee tables. */
+.empty-note { color: var(--text-muted); font-size: 13px; font-style: italic; }
+
 /* =============================================================================
    7) BUTTONS & FORMS
    ===========================================================================*/

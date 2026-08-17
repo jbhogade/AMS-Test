@@ -67,6 +67,12 @@ const PAGE_TITLES = {
     "master-site":            { title: "Site Master",            sub: "Locations & Smart Asset ID site codes" },
     "master-department":      { title: "Department Master",      sub: "Departments & Employee ID shortforms" },
     "master-designation":     { title: "Designation Master",     sub: "Employee designations" },
+    "master-sim-operator":        { title: "SIM Operator Master",        sub: "Telecom operators used on SIM Card records" },
+    "master-sim-plan":            { title: "SIM Plan Master",            sub: "SIM plans used on SIM Card records" },
+    "master-consumable-category": { title: "Consumable Category Master", sub: "Categories used by the Consumable Master" },
+    "master-unit-of-measure":     { title: "Unit of Measure Master",     sub: "Units used by the Consumable Master" },
+    "master-spare-part-category": { title: "Spare Part Category Master", sub: "Categories used by the Spare Parts Master" },
+    "master-vendor-category":     { title: "Vendor Category Master",     sub: "Supply categories used by the Vendor Master" },
     "access-rights": { title: "Access Rights Control Master", sub: "Per-user page access (Supreme Root)" },
     "role-access":   { title: "Role Access Master",           sub: "Default page access per role (Supreme Root)" },
     "log":           { title: "Log Report",                   sub: "Activity audit trail (Super Root + Supreme Root)" }

@@ -19,6 +19,7 @@ const SIM_STATE = {
     sims: AMS_DUMMY_SIM_CARDS, /* live reference - the DB-backed collection cache */
     editingId: null,           /* simId currently being edited/acted on (Add modal = null) */
     assignMode: null,          /* "assign" | "reassign" - which action opened modalSimAssign */
+    qaKind: null,              /* "operator" | "plan" - which quick-add modal is open */
 };
 
 const SIM_STATUS_BADGE = {
@@ -171,7 +172,8 @@ function amsSimCloseModal(id) { document.getElementById(id).classList.remove("op
    ===========================================================================*/
 function amsPopulateSimFormSelects() {
     document.getElementById("fSimStatus").innerHTML = AMS_SIM_STATUS_OPTIONS.map(s => `<option value="${amsEsc(s)}">${amsEsc(s)}</option>`).join("");
-    document.getElementById("simOperatorList").innerHTML = AMS_SIM_OPERATOR_OPTIONS.map(o => `<option value="${amsEsc(o)}"></option>`).join("");
+    document.getElementById("simOperatorList").innerHTML = amsGetActiveSimOperatorNames().map(o => `<option value="${amsEsc(o)}"></option>`).join("");
+    document.getElementById("simPlanList").innerHTML = amsGetActiveSimPlanNames().map(p => `<option value="${amsEsc(p)}"></option>`).join("");
 }
 
 function amsSimUpdateIdPreview() {
@@ -225,6 +227,13 @@ function amsSimSubmitForm(e) {
     };
     const statusVal = document.getElementById("fSimStatus").value;
 
+    /* A new Operator / Plan typed on the form is registered into its master
+       automatically, so it shows up in the SIM Operator / SIM Plan Masters and
+       as a suggestion next time (same pattern as departments/designations). */
+    if (values.operator) amsEnsureSimOperator(values.operator);
+    if (values.plan) amsEnsureSimPlan(values.plan);
+    amsPopulateSimFormSelects();
+
     if (SIM_STATE.editingId) {
         const s = SIM_STATE.sims.find(x => x.simId === SIM_STATE.editingId);
         if (!s) return;
@@ -248,6 +257,43 @@ function amsSimSubmitForm(e) {
     amsSimCloseModal("modalSimForm");
     amsDbSaveAsync("simCards");
     renderSimTable();
+}
+
+/* =============================================================================
+   6a) QUICK ADD OPERATOR / PLAN  (from the "+" buttons on the SIM form)
+   ----------------------------------------------------------------------------
+   Opens a small modal that adds a new Operator / Plan to its master (with the
+   master's detail fields) and fills the form field with the new value. The
+   master is persisted to SQL so the new value survives navigation and shows up
+   in the SIM Operator / SIM Plan Masters under System Admin.
+   ===========================================================================*/
+function amsSimOpenQuickAdd(kind) {
+    SIM_STATE.qaKind = kind;
+    const isOperator = kind === "operator";
+    document.getElementById("simQuickAddTitle").textContent = isOperator ? "Add SIM Operator" : "Add SIM Plan";
+    document.getElementById("simQaName").value = "";
+    document.getElementById("simQaName").placeholder = isOperator ? "e.g. Jio, Airtel..." : "e.g. Prepaid, Postpaid...";
+    document.getElementById("simQaField2Label").textContent = isOperator ? "Helpline / Customer Care" : "Plan Type";
+    document.getElementById("simQaField2").value = "";
+    document.getElementById("simQaField3Label").textContent = isOperator ? "Website" : "Description";
+    document.getElementById("simQaField3").value = "";
+    amsSimOpenModal("modalSimQuickAdd");
+}
+
+function amsSimSaveQuickAdd() {
+    const isOperator = SIM_STATE.qaKind === "operator";
+    const name = document.getElementById("simQaName").value.trim();
+    if (!name) { alert(isOperator ? "Enter an Operator name." : "Enter a Plan name."); return; }
+    const field2 = document.getElementById("simQaField2").value.trim();
+    const field3 = document.getElementById("simQaField3").value.trim();
+    const added = isOperator
+        ? amsQuickAddSimOperator(name, field2, field3)
+        : amsQuickAddSimPlan(name, field2, field3);
+    if (!added) { alert(isOperator ? "This Operator already exists in the master." : "This Plan already exists in the master."); return; }
+    (isOperator ? document.getElementById("fSimOperator") : document.getElementById("fSimPlan")).value = added;
+    amsPopulateSimFormSelects();
+    amsNotify(`${isOperator ? "Operator" : "Plan"} added to master: ${added}`, "success");
+    amsSimCloseModal("modalSimQuickAdd");
 }
 
 /* =============================================================================
@@ -535,6 +581,11 @@ async function initSimCards() {
 
     /* Add/Edit form */
     document.getElementById("simForm").addEventListener("submit", amsSimSubmitForm);
+
+    /* Quick-add Operator / Plan on the form */
+    document.getElementById("btnSimQaOperator").addEventListener("click", () => amsSimOpenQuickAdd("operator"));
+    document.getElementById("btnSimQaPlan").addEventListener("click", () => amsSimOpenQuickAdd("plan"));
+    document.getElementById("btnSimQaSave").addEventListener("click", amsSimSaveQuickAdd);
 
     /* Assign/Reassign */
     document.getElementById("btnSimConfirmAssign").addEventListener("click", amsSimConfirmAssign);

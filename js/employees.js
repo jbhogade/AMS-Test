@@ -195,9 +195,7 @@ function openAddModal() {
 
     /* Clear the form */
     document.getElementById("f-empid").value = "EMP-000001";
-    document.getElementById("f-first").value = "";
-    document.getElementById("f-middle").value = "";
-    document.getElementById("f-last").value = "";
+    document.getElementById("f-name").value = "";
     document.getElementById("f-dept").value = "Admin";
     document.getElementById("f-desig").value = "";
     document.getElementById("f-manager").value = "";
@@ -221,9 +219,7 @@ function openEditModal(amsId) {
     document.getElementById("emp-ams-preview").textContent = "";
 
     document.getElementById("f-empid").value = emp.empId;
-    document.getElementById("f-first").value = emp.firstName;
-    document.getElementById("f-middle").value = emp.middleName;
-    document.getElementById("f-last").value = emp.lastName;
+    document.getElementById("f-name").value = getEmployeeFullName(emp);
     document.getElementById("f-dept").value = emp.department;
     document.getElementById("f-desig").value = emp.designation;
     document.getElementById("f-manager").value = emp.managerAmsId || "";
@@ -246,9 +242,7 @@ function onDeptChange() {
 function saveEmployee() {
     const data = {
         empId: document.getElementById("f-empid").value.trim(),
-        firstName: document.getElementById("f-first").value.trim(),
-        middleName: document.getElementById("f-middle").value.trim(),
-        lastName: document.getElementById("f-last").value.trim(),
+        name: document.getElementById("f-name").value.trim().replace(/\s+/g, " "),
         department: document.getElementById("f-dept").value,
         designation: document.getElementById("f-desig").value.trim(),
         managerAmsId: document.getElementById("f-manager").value || null,
@@ -257,8 +251,8 @@ function saveEmployee() {
     };
 
     /* ---- Validation of required fields ---- */
-    if (!data.firstName || !data.lastName || !data.department || !data.designation || !data.empId) {
-        showFormError("employee-form-error", "Please fill all required fields: Employee ID, First Name, Last Name, Department and Designation.");
+    if (!data.name || !data.department || !data.designation || !data.empId) {
+        showFormError("employee-form-error", "Please fill all required fields: Employee ID, Full Name, Department and Designation.");
         return;
     }
 
@@ -297,7 +291,7 @@ function viewEmployee(amsId) {
     document.getElementById("view-empid").textContent = emp.empId;
     document.getElementById("view-dept").textContent = emp.department;
     document.getElementById("view-desig").textContent = emp.designation;
-    document.getElementById("view-manager").textContent = manager ? getEmployeeFullName(manager) : "-";
+    document.getElementById("view-manager").textContent = manager ? getEmployeeFullName(manager) : (emp.managerName || emp.managerId || "-");
     document.getElementById("view-contact").textContent = emp.contact || "-";
     document.getElementById("view-email").textContent = emp.email || "-";
     document.getElementById("view-status").innerHTML =
@@ -728,22 +722,25 @@ function saveQuickAddDesig() {
 /* =============================================================================
    13d) CSV : TEMPLATE / IMPORT / EXPORT
    ---------------------------------------------------------------------------
-   Headers mirror the Add Employee form exactly - first/middle/last name split
-   like the form, plus Reports To (manager) and the Manager ID (the manager's
-   AMS ID, auto-filled on the form). Required form fields carry a * marker so
-   the template/export clearly highlight what must be supplied.
+   Headers mirror the Add Employee form exactly - a single "name" column for
+   the full name (First Middle Last, exactly as typed), plus Reports To
+   (manager) and the Manager ID (the manager's AMS ID, auto-filled on the
+   form). Required form fields carry a * marker so the template/export clearly
+   highlight what must be supplied.
    ===========================================================================*/
-const EMP_CSV_HEADERS = ["empId*", "firstName*", "middleName", "lastName*", "dept*", "designation*", "reportsTo", "managerId", "contact", "email", "status"];
+const EMP_CSV_HEADERS = ["empId*", "name*", "dept*", "designation*", "reportsTo", "managerId", "contact", "email", "status"];
 
 function amsDownloadEmployeeTemplate() {
     const instructionRows = [
-        ["# Fields marked with * are required: empId, firstName, lastName, dept, designation."],
+        ["# Fields marked with * are required: empId, name, dept, designation."],
         ["# AMS Employee ID is auto-generated - do not add it here. empId is the company ID (must be unique)."],
+        ["# name = the employee's FULL NAME in one column, e.g. Ravikumar Rajendra Tiparadi."],
         ["# dept must match a Department in the Department Master. designation is auto-created if new."],
-        ["# reportsTo = the manager's company Employee ID or AMS ID. managerId = the manager's AMS ID (auto-filled on the form)."],
+        ["# reportsTo = the manager's full name (or company Employee ID / AMS ID). managerId = the manager's AMS ID (auto-filled on the form)."],
+        ["# The reporting manager's name and ID are saved AS IS - the manager does not have to exist in the system yet. The link is filled in automatically once that manager is added."],
         ["# status = Active or Inactive (default Active)."],
     ];
-    const sample = ["EMP-000001", "Example", "", "Employee", "IT", "Engineer", "", "", "+91 99999 99999", "example@company.com", "Active"];
+    const sample = ["EMP-000001", "Example Employee", "IT", "Engineer", "", "", "+91 99999 99999", "example@company.com", "Active"];
     const rows = [...instructionRows, EMP_CSV_HEADERS, sample];
     amsDownloadFile(rows.map(amsCsvRow).join("\r\n"), "Employee_Master_import_template.csv", "text/csv");
 }
@@ -753,8 +750,8 @@ function amsExportEmployees() {
     getFilteredEmployees().forEach(e => {
         const mgr = e.managerAmsId ? findEmployee(e.managerAmsId) : null;
         rows.push([
-            e.empId, e.firstName, e.middleName || "", e.lastName, e.department, e.designation,
-            mgr ? mgr.empId : "", mgr ? mgr.amsId : "",
+            e.empId, getEmployeeFullName(e), e.department, e.designation,
+            e.managerName || (mgr ? mgr.empId : ""), e.managerId || (mgr ? mgr.amsId : ""),
             e.contact || "", e.email || "", e.status,
         ]);
     });
@@ -786,7 +783,14 @@ function amsImportEmployeesFile(file) {
 
         const results = [];
         const seenEmpIds = new Set(); /* in-file duplicate detection */
+        const pendingManagerRefs = []; /* {emp, ref} rows whose manager was not found yet */
 
+        /* ---- PASS 1: validate + add every employee. The reporting manager's
+                name and ID are stored AS IS (verbatim) - the manager does NOT
+                have to exist in the system yet. If the manager is found, the
+                managerAmsId link is set immediately; otherwise it is remembered
+                so amsResolvePendingManagers() auto-links it once that employee
+                is added (same file PASS 2, or on a later day). ---- */
         for (let i = 1; i < rows.length; i++) {
             const raw = rows[i];
             if (!raw.length || raw.every(c => !c)) continue;
@@ -794,10 +798,10 @@ function amsImportEmployeesFile(file) {
             headers.forEach((h, idx) => { obj[h] = raw[idx] !== undefined ? raw[idx].trim() : ""; });
             const line = i + 1;
 
-            const record = obj.empId || obj.firstName || "(unnamed)";
+            const record = obj.empId || obj.name || obj.firstName || "(unnamed)";
 
             /* ---- Required-field validation (same set as the Add form) ---- */
-            const missing = ["empId", "firstName", "lastName", "dept", "designation"]
+            const missing = ["empId", "name", "dept", "designation"]
                 .filter(k => !obj[k]);
             if (missing.length) {
                 results.push({ row: line, record, result: "error", reason: "Missing required field(s): " + missing.join(", ") });
@@ -827,26 +831,57 @@ function amsImportEmployeesFile(file) {
                 results.push({ row: line, record, result: "skipped", reason: `Designation "${obj.designation}" not found in the Designation Master`, missingDesig: obj.designation });
                 continue;
             }
-            const manager = (obj.reportsTo && findEmployeeAny(obj.reportsTo)) || (obj.managerId && findEmployeeAny(obj.managerId));
-            if ((obj.reportsTo || obj.managerId) && !manager) {
-                results.push({ row: line, record, result: "skipped", reason: `Manager "${obj.reportsTo || obj.managerId}" not found` });
-                continue;
-            }
+
+            /* ---- Reporting manager: saved AS IS (name + ID verbatim) ----
+               The manager does not need to exist. We still try to resolve the
+               AMS ID so the link works immediately when the manager is in the
+               system (by empId, AMS ID, or full name). */
+            const managerRef = (obj.reportsTo && obj.reportsTo.trim()) || (obj.managerId && obj.managerId.trim()) || "";
+            const manager = managerRef ? findEmployeeAny(managerRef) : null;
 
             /* ---- Create the employee ---- */
             const status = obj.status === "Inactive" ? "Inactive" : "Active";
-            addEmployee({
+            const emp = addEmployee({
                 empId: obj.empId,
-                firstName: obj.firstName, middleName: obj.middleName || "", lastName: obj.lastName,
+                name: obj.name,
                 department: obj.dept, designation: obj.designation,
                 contact: obj.contact || "", email: obj.email || "",
                 managerAmsId: manager ? manager.amsId : null,
+                managerName: (obj.reportsTo && obj.reportsTo.trim()) || (manager ? getEmployeeFullName(manager) : ""),
+                managerId: (obj.managerId && obj.managerId.trim()) || (manager ? manager.empId : ""),
             });
-            const addedEmp = DUMMY_EMPLOYEES.find(emp => emp.empId.toLowerCase() === obj.empId.toLowerCase());
-            if (addedEmp) { addedEmp.status = status; }
+            if (emp && status === "Inactive") emp.status = status;
 
-            results.push({ row: line, record, result: "added", reason: status === "Inactive" ? "Added (Inactive)" : "Added" });
+            if (managerRef && !manager) {
+                /* Manager not in the system yet - keep the raw reference and
+                   defer the link instead of skipping the employee. */
+                if (emp) emp.pendingManagerRef = managerRef;
+                pendingManagerRefs.push({ ref: managerRef, empId: obj.empId });
+                results.push({ row: line, record, result: "added", reason: `Added (manager "${managerRef}" saved as-is - will link automatically once that manager is added)` });
+            } else {
+                results.push({ row: line, record, result: "added", reason: status === "Inactive" ? "Added (Inactive)" : "Added" });
+            }
         }
+
+        /* ---- PASS 2: now every employee from the file exists, so link any
+                manager that appeared LATER in the same file ---- */
+        let linked = 0;
+        pendingManagerRefs.forEach(({ ref, empId }) => {
+            const emp = DUMMY_EMPLOYEES.find(x => x.empId.toLowerCase() === empId.toLowerCase());
+            if (!emp || emp.managerAmsId) return;
+            const mgr = findEmployeeAny(ref);
+            if (mgr && mgr.amsId !== emp.amsId) {
+                emp.managerAmsId = mgr.amsId;
+                delete emp.pendingManagerRef;
+                linked++;
+                const row = results.find(r => r.record === empId);
+                if (row) row.reason = `Added (manager "${ref}" linked)` + (emp.status === "Inactive" ? " - Inactive" : "");
+            }
+        });
+        if (linked) amsDbSaveAsync("employees");
+
+        /* Auto-link any employees who were waiting for a manager in this file */
+        amsResolvePendingManagers();
 
         populateSelects();
         renderEmployeeTable();
@@ -860,6 +895,7 @@ function amsImportEmployeesFile(file) {
 /* Initialises the whole page */
 async function initEmployees() {
     if (typeof amsDbEnsureLoaded === "function") await amsDbEnsureLoaded();
+    amsResolvePendingManagers();
     populateSelects();
     renderEmpStats();
     renderEmployeeTable();

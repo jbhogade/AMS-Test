@@ -121,8 +121,15 @@
                     { key: "phone", label: "Phone" },
                     { key: "email", label: "Email" },
                     { key: "city", label: "City" },
-                    { key: "category", label: "Supplies", type: "select",
-                        optionsFrom: () => AMS_VENDOR_CATEGORIES },
+                    { key: "category", label: "Supplies", type: "select", includeBlank: true,
+                        optionsFrom: () => amsGetActiveVendorCategoryNames(),
+                        quickAdd: { fields: [{ key: "name", label: "New Category Name" }, { key: "description", label: "Description (optional)" }],
+                            onAdd: (v) => {
+                                if (!v.name) { alert("Enter a Category name."); return null; }
+                                const added = amsQuickAddVendorCategory(v.name, v.description);
+                                if (!added) { alert("This Category already exists."); return null; }
+                                return added;
+                            } } },
                     { key: "gstin", label: "GSTIN", upper: true, maxLength: 15 },
                     { key: "remarks", label: "Remarks", multiline: true },
                 ],

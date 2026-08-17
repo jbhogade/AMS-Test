@@ -781,6 +781,116 @@ API build is 0 warnings / 0 errors.
 
 ---
 
+### 15.10 Lookup Master pages + relational SQL schema round
+
+Two work streams delivered together. Frontend + a full `AmsDb.cs`/SQL rewrite.
+
+| Point | Change |
+|-------|--------|
+| 1. Six new master pages | Every remaining hardcoded lookup list becomes a real, DB-backed master page reachable from System Admin (reusing the generic `master-table.js` engine via `masters.html?type=...`): **SIM Card Operator** (`sim-operator`), **SIM Plan** (`sim-plan`), **Consumable Category** (`consumable-category`), **Unit of Measure** (`unit-of-measure`), **Spare Part Category** (`spare-part-category`), **Vendor Category** (`vendor-category`). Each config in `js/master-configs.js` carries detail fields (e.g. helpline/website for operators, planType/description for plans) and `usageCount` guards. The SIM form's Operator/Plan fields now have "+" quick-add buttons (`.select-with-add`), and the SIM save auto-registers any typed operator/plan into its master (`amsEnsureSimOperator` / `amsEnsureSimPlan`) - the same pattern departments/designations already use. Consumables/spare-parts/vendors quick-adds now write through the master helpers too. |
+| 2. Relational SQL schema | `database/AMS-TEST.sql` rewritten from a single JSON collector table into **one table per entity** (30+ tables, each with `row_id` IDENTITY, `record_key` PK, typed queryable columns, `data_json NVARCHAR(MAX)`, `updated_at`): `ams_users`/`ams_user_profiles`, lookup masters (`ams_asset_types`, `ams_asset_makes`, `ams_asset_categories`, `ams_sites`, `ams_departments`, `ams_designations`, `ams_accessories`, `ams_vendors`, `ams_sim_operators`, `ams_sim_plans`, `ams_consumable_categories`, `ams_consumable_units`, `ams_spare_part_categories`, `ams_vendor_categories`), business entities (`ams_assets`, `ams_employees`, `ams_consumables`, `ams_consumable_log`, `ams_spare_parts`, `ams_spare_part_log`, `ams_sim_cards`, `ams_exit_records`), and documents (`ams_company`, `ams_documents`). |
+| 3. `AmsDb.cs` rewrite | Table-backed storage driven by a `TableDefs` registry mapping each collection key to a table + typed columns. `InitializeAsync` is idempotent: ensure DB → ensure schema (creates all per-entity tables + indexes + `ams_users` profile ALTERs) → re-hash/re-activate seed users → migrate legacy `ams_collections` rows (per-table, only into empty tables) → seed the 6 new lookups. Array collections are stored one row per record (wholesale replace = DELETE + re-INSERT in a transaction); document collections are single rows keyed by fixed keys. `ResolveRecordKey` maps per-collection JSON key fields (assets→`id`, employees→`amsId`, etc.) with GUID fallback for log records. The existing user/login CRUD surface is preserved. |
+| 4. Seeded lookups | 5 SIM operators (Jio, Airtel, Vodafone Idea, BSNL, MTNL), 3 SIM plans (Prepaid, Postpaid, Corporate Plan), 5 consumable categories, 5 consumable units, 3 spare-part categories, 5 vendor categories - guarded by empty-table checks so they never clobber user data. |
+| 5. Data-flow guarantee | Every table keeps a `data_json` column mirroring the record the frontend PUTs, so the frontend's whole-array `amsDbSaveAsync(key)` pattern works unchanged while the typed columns enable real SQL querying/indexing. |
+
+Regression status: `.NET` API builds with **0 warnings / 0 errors** (SDK 10.0.400
+installed in sandbox; `libicu` added). All edited JS files pass `node --check`.
+API boots, serves the frontend, `/api/health` responds, unauthorized collection
+access returns 401, and DB-init failure is handled gracefully. No SQL Server
+instance exists in the sandbox, so live CRUD/migration was verified by code-path
+analysis + build only; the rewritten `AmsDb.cs` compiles against the same
+`Microsoft.Data.SqlClient` surface the API already used.
+
+### 15.10.1 SQL execution-error fixes (user-run `AMS-TEST.sql` reported errors)
+
+When the user first ran the rewritten script in SSMS/sqlcmd it reported a chain
+of errors. Root cause analysis and fixes:
+
+| Reported error | Root cause | Fix |
+|----------------|-----------|-----|
+| `Incorrect syntax near 'plan'` | `plan` is a T-SQL **reserved keyword** used unquoted as a column in `CREATE TABLE dbo.ams_sim_cards` (single broken statement). | Renamed the column to `plan_name` in `database/AMS-TEST.sql` and in `AmsDb.cs` DDL; `TableDef` mapping is now `C("plan_name", "plan")` so persistence is unchanged. Scanned every column name in the script against the reserved-words list - `plan` was the only violation. |
+| `Incorrect syntax near '200'` / `'50'` / `'MAX'` / `')'` / `'record_key'` / `'GO'` | Cascade tokens from the same broken `CREATE TABLE ... ams_sim_cards` statement - not 8 separate schema bugs. | Resolved by the `plan_name` rename above. |
+| `Column name 'status' does not exist in the target table or view` | `CREATE INDEX` ran against a pre-existing table created before `status` existed (partial/older run); the new DDL defines `status` on `ams_assets`, `ams_employees`, `ams_sim_cards`. | Every `CREATE INDEX` block (assets, employees, consumables, spare_parts, sim_cards) is now guarded by `IF COL_LENGTH(...) IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = ...)` in both the SQL script and `AmsDb.SchemaIndexesSql`. |
+| `Could not locate entry in sysdatabases for database 'AMS-TEST'` | `CREATE DATABASE [AMS-TEST]` failed (e.g. login lacks the permission) but the script still ran `USE [AMS-TEST]`. | Added a `RAISERROR` guard after `CREATE DATABASE` that explains the permission/manual-creation options before the `USE`, so the cryptic error becomes self-explanatory. |
+| `plan_name` on an already-created `ams_sim_cards` | A DB from the failed run may already have the old `plan` column. | Added idempotent migration in both the SQL script and `AmsDb.cs`: if `plan_name` is missing it is added; if only `plan` exists it is renamed via `sp_rename` (mirrors the existing `ams_users` profile-column ALTER pattern). |
+
+Status: `.NET` build 0/0, all checks green, API smoke test (no SQL Server) passes
+health/static/401 paths. Final proof requires re-running the fixed script in SSMS/sqlcmd.
+
+### 15.10.2 Idempotence hardening (user re-ran a stale copy - index-exists errors)
+
+A second user run reported `The index ... already exists` for 7 indexes **plus the
+same `Incorrect syntax near 'plan'` errors** from round 15.10.1. The `plan` error
+cannot come from the fixed file (the bare `plan` column was renamed to
+`plan_name`), which proves the user executed a **stale copy** of the script
+captured before 15.10.1's fixes. Regardless, the script and `AmsDb.cs` were
+hardened so re-running over *any* prior partial DB state cannot fail:
+
+| Fix | Detail |
+|-----|--------|
+| `CREATE INDEX` moved outside table-creation blocks | Each of the 9 indexes is now a standalone statement guarded by `IF OBJECT_ID(...) IS NOT NULL AND COL_LENGTH(...) IS NOT NULL AND NOT EXISTS (sys.indexes ...)`. Creating indexes outside the `IF OBJECT_ID IS NULL` block also lets a pre-existing table *gain* a missing index on re-run, instead of skipping it. |
+| Idempotent `status`/`current_site` column `ALTER`s | Old tables missing the typed columns the indexes reference are upgraded with `IF COL_LENGTH(...) IS NULL ALTER TABLE ... ADD ...` (assets `status`/`current_site`, employees `status`, sim_cards `status`), mirroring the existing `ams_users`/`plan_name` pattern - in both the SQL script and `AmsDb.cs`. |
+| Why `plan` errors disappeared | The current script has zero bare `plan` references (only comments + `N'plan'` string literals in the `sp_rename` guard). The stale copy the user ran still had the unquoted `plan` column. |
+
+Result: the fixed script is now safe to run on a fresh DB **and** on any
+partially-created DB left by earlier failed runs. `dotnet build` 0/0, structure
+balanced (26 `CREATE TABLE`, 32 `BEGIN`/`END`, 72 `GO` batches).
+
+### 15.10.3 Bulk employee import: manager may be added later (two-pass import)
+
+The CSV import previously **skipped** any employee whose reporting manager was
+not already in the system, which broke bulk uploads of 200-400+ employees when a
+manager appeared later in the same file or joined the company later.
+
+| Change | Detail |
+|--------|--------|
+| Two-pass import | `amsImportEmployeesFile` (js/employees.js) now adds every valid row in PASS 1 (remembering unresolved manager references) and links managers in PASS 2 once all file employees exist - so a manager that appears *later in the same CSV* is linked. |
+| Deferred manager auto-linking | Employees whose manager is still absent keep a `pendingManagerRef` (manager's empId or AMS ID). `amsResolvePendingManagers()` (js/dummy-data.js) fills in `managerAmsId` automatically and is invoked after every employee add/update, after import, and on page init - so a manager that "joins later" links to their reports with no manual editing. |
+| No more false skip | Rows with an unknown manager are imported (status Added) with a report note instead of being Skipped/Error. |
+| Self-reference guard | An employee can never be linked as their own manager. |
+
+Verified: `node --check` clean on both files, API serves the updated JS, and a
+Node simulation confirmed both scenarios (manager later in same file; manager
+added next day) link correctly.
+
+### 15.10.4 Manager referenced by full name now resolves
+
+User report: a manager exists in the system, yet the employee "won't add" - e.g.
+employee 00757 Ravikumar Rajendra Tiparadi has reporting manager 00589 Rajkumar
+Mallikarjun Wagdari, and the CSV `reportsTo` cell holds the manager's **full
+name** rather than their empId/AMS ID.
+
+| Change | Detail |
+|--------|--------|
+| Root cause | `findEmployeeAny` (js/dummy-data.js) only matched `amsId`/`empId`, so a full-name `reportsTo` value never found the manager. |
+| Name-aware lookup | `findEmployeeAny` now also matches `getEmployeeFullName(e)` - case-insensitive with whitespace normalized (`replace(/\s+/g," ")`), so first/middle/last records resolve from a full-name reference. |
+| CSV template | `reportsTo` instructions now say the cell accepts the manager's empId, AMS ID, **or full name** (e.g. `Rajkumar Mallikarjun Wagdari`). |
+
+Only manager-resolution callers use `findEmployeeAny`, so broadening it to name
+matching is safe. Verified with a Node simulation of the exact reported case
+(manager 00589 stored as First/Middle/Last; employee 00757 references it by full
+name): PASS 1 finds the manager and links `managerAmsId` immediately.
+
+### 15.10.5 Single Full Name field + manager saved as-is on import
+
+User request: store the employee's name as ONE full name everywhere (no more
+First/Middle/Last split), and on bulk import save the reporting manager's name
+and ID **as typed** without requiring the manager to exist yet.
+
+| Change | Detail |
+|--------|--------|
+| Full Name everywhere | The Add/Edit Employee form (f-first/f-middle/f-last) and the Asset Master quick-add employee modal (qaEmpFirst/qaEmpLast) are now a single **Full Name** input. Employees store `name`; `getEmployeeFullName`/`getEmployeeInitials` handle both the new `name` and legacy first/middle/last. |
+| Auto-migration | `amsMigrateEmployeeNames()` (js/dummy-data.js) runs on load: any legacy record with first/middle/last but no `name` gets `name` built from them (idempotent). |
+| CSV single name column | `EMP_CSV_HEADERS` = `empId*, name*, dept*, designation*, reportsTo, managerId, contact, email, status`. Template, Export and Import all use one `name` column (e.g. `Ravikumar Rajendra Tiparadi`). |
+| Manager saved as-is | Import writes the manager's name + ID verbatim onto the employee (`managerName`/`managerId`) **without checking that the manager exists** - no row is skipped for a missing manager. If the manager is in the system (matched by empId / AMS ID / full name) `managerAmsId` links immediately; otherwise the raw reference is kept (`pendingManagerRef`) and `amsResolvePendingManagers()` links it once the manager is added. |
+| Server full_name | `AmsDb.cs` employees mapper prefers the new `name` field, falling back to first/middle/last, so the SQL `full_name` column stays populated for legacy records. |
+
+Verified: `node --check` clean on employees.js / dummy-data.js / assets.js, a Node
+simulation covered all four cases (manager saved as-is when absent, auto-linked
+when added later, legacy first/middle/last migration, full-name lookup), and
+`dotnet build` succeeds 0 warnings / 0 errors.
+
+---
 
 ## Theme reconciliation (already applied in Phase 1)
 

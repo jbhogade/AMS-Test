@@ -42,13 +42,14 @@ window.AMS_MASTER_CONFIG = {
                     AMS_DUMMY_ASSET_TYPES.push({ name: v.name, shortform: v.shortform.toUpperCase(), active: true });
                     return v.name;
                 } } },
-        { key: "category", label: "Category", required: true, type: "select", options: AMS_SPAREPART_CATEGORIES,
-            quickAdd: { fields: [{ key: "value", label: "New Category Name" }],
+        { key: "category", label: "Category", required: true, type: "select",
+            optionsFrom: () => amsGetActiveSparePartCategoryNames(),
+            quickAdd: { fields: [{ key: "name", label: "New Category Name" }, { key: "description", label: "Description (optional)" }],
                 onAdd: (v) => {
-                    if (!v.value) { alert("Enter a Category name."); return null; }
-                    if (AMS_SPAREPART_CATEGORIES.some(c => c.toLowerCase() === v.value.toLowerCase())) { alert("This Category already exists."); return null; }
-                    AMS_SPAREPART_CATEGORIES.push(v.value);
-                    return v.value;
+                    if (!v.name) { alert("Enter a Category name."); return null; }
+                    const added = amsQuickAddSparePartCategory(v.name, v.description);
+                    if (!added) { alert("This Category already exists."); return null; }
+                    return added;
                 } } },
         { key: "site", label: "Site", required: true, type: "select",
             optionsFrom: () => AMS_DUMMY_SITES.filter(s => s.active).map(s => s.name),

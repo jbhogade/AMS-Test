@@ -109,7 +109,7 @@ function amsGenerateReport(amsId, type, extraRemarks) {
 
     const infoBoxesHtml = isIssue ? `
         <div class="pf-box-grid cols-2">
-            ${infoBox("Employee ID", amsEsc(emp.empId))}
+            ${infoBox("Employee ID", amsEsc(amsGetEmployeeDisplayId(emp)))}
             ${infoBox("Full Name", amsEsc(getEmployeeFullName(emp)))}
             ${infoBox("Department", amsEsc(emp.department))}
             ${infoBox("Designation", amsEsc(emp.designation))}
@@ -122,7 +122,7 @@ function amsGenerateReport(amsId, type, extraRemarks) {
             ${infoBox("Issued By", "IT / Admin")}
         </div>` : `
         <div class="pf-box-grid cols-2">
-            ${infoBox("Employee ID", amsEsc(emp.empId))}
+            ${infoBox("Employee ID", amsEsc(amsGetEmployeeDisplayId(emp)))}
             ${infoBox("Full Name", amsEsc(getEmployeeFullName(emp)))}
             ${infoBox("Department", amsEsc(emp.department))}
             ${infoBox("Designation", amsEsc(emp.designation))}

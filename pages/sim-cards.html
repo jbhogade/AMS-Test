@@ -114,13 +114,19 @@
                         </div>
                         <div class="field">
                             <label>Operator</label>
-                            <input type="text" id="fSimOperator" class="input" list="simOperatorList" placeholder="e.g. Jio, Airtel...">
-                            <datalist id="simOperatorList"></datalist>
+                            <div class="select-with-add">
+                                <input type="text" id="fSimOperator" class="input" list="simOperatorList" placeholder="e.g. Jio, Airtel..." style="flex:1; min-width:0;">
+                                <datalist id="simOperatorList"></datalist>
+                                <button type="button" class="btn-quickadd" id="btnSimQaOperator" title="Add new Operator to the SIM Operator Master">+</button>
+                            </div>
                         </div>
                         <div class="field">
                             <label>Plan</label>
-                            <input type="text" id="fSimPlan" class="input" list="simPlanList" placeholder="e.g. Postpaid / Prepaid">
-                            <datalist id="simPlanList"></datalist>
+                            <div class="select-with-add">
+                                <input type="text" id="fSimPlan" class="input" list="simPlanList" placeholder="e.g. Postpaid / Prepaid" style="flex:1; min-width:0;">
+                                <datalist id="simPlanList"></datalist>
+                                <button type="button" class="btn-quickadd" id="btnSimQaPlan" title="Add new Plan to the SIM Plan Master">+</button>
+                            </div>
                         </div>
                         <div class="field">
                             <label>Status <span class="req">*</span></label>
@@ -152,6 +158,38 @@
                     <button type="submit" class="btn btn-primary">Save SIM Card</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- ====================================================================
+         MODAL : QUICK ADD OPERATOR / PLAN (added to their master with details)
+         ==================================================================== -->
+    <div class="modal-overlay" id="modalSimQuickAdd">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="simQuickAddTitle">Add SIM Operator</h3>
+                <button class="modal-close" data-close="modalSimQuickAdd">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-grid">
+                    <div class="field field-full">
+                        <label>Name <span class="req">*</span></label>
+                        <input type="text" id="simQaName" class="input" placeholder="e.g. Jio, Airtel...">
+                    </div>
+                    <div class="field field-full">
+                        <label id="simQaField2Label">Helpline / Customer Care</label>
+                        <input type="text" id="simQaField2" class="input">
+                    </div>
+                    <div class="field field-full">
+                        <label id="simQaField3Label">Website</label>
+                        <input type="text" id="simQaField3" class="input">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-close="modalSimQuickAdd">Cancel</button>
+                <button type="button" class="btn btn-primary" id="btnSimQaSave">Add</button>
+            </div>
         </div>
     </div>
 

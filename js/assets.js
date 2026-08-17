@@ -497,8 +497,7 @@ function amsOpenAddEmployeeModal(targetSelectId) {
     });
     document.getElementById("qaEmpDept").innerHTML = deptUnion.map(d => `<option value="${amsEsc(d.name)}">${amsEsc(d.name)}</option>`).join("");
     document.getElementById("qaEmpDesigList").innerHTML = desigUnion.map(d => `<option value="${amsEsc(d)}"></option>`).join("");
-    document.getElementById("qaEmpFirst").value = "";
-    document.getElementById("qaEmpLast").value = "";
+    document.getElementById("qaEmpName").value = "";
     document.getElementById("qaEmpDesig").value = "";
     hideFormError("quickadd-emp-error");
     amsOpenModal("modalQuickAddEmp");
@@ -507,14 +506,12 @@ function amsOpenAddEmployeeModal(targetSelectId) {
 function amsSaveQuickAddEmployee() {
     const data = {
         empId: "EMP-000001", /* placeholder - real IDs come from the Employee Master */
-        firstName: document.getElementById("qaEmpFirst").value.trim(),
-        middleName: "",
-        lastName: document.getElementById("qaEmpLast").value.trim(),
+        name: document.getElementById("qaEmpName").value.trim().replace(/\s+/g, " "),
         department: document.getElementById("qaEmpDept").value,
         designation: document.getElementById("qaEmpDesig").value.trim(),
     };
-    if (!data.firstName || !data.lastName || !data.designation) {
-        showFormError("quickadd-emp-error", "Please fill in First Name, Last Name and Designation (Department is pre-selected).");
+    if (!data.name || !data.designation) {
+        showFormError("quickadd-emp-error", "Please fill in Full Name and Designation (Department is pre-selected).");
         return;
     }
     const emp = addEmployee(data);
@@ -1110,7 +1107,7 @@ function amsGenerateAssetIssueFormPrint(key, extraRemarks) {
 
     const infoBoxesHtml = `
         <div class="pf-box-grid cols-2">
-            ${infoBox("Employee ID", amsEsc(emp.empId))}
+            ${infoBox("Employee ID", amsEsc(amsGetEmployeeDisplayId(emp)))}
             ${infoBox("Full Name", amsEsc(emp.name))}
             ${infoBox("Department", amsEsc(emp.dept))}
             ${infoBox("Designation", amsEsc(emp.designation))}
