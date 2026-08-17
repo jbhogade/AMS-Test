@@ -956,19 +956,19 @@
     ]
   },
   "packageFolders": {
-    "/root/.nuget/packages/": {}
+    "C:\\Users\\jairaj.b\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "/workspace/AMS-Test/server/AMS.API/AMS.API.csproj",
+      "projectUniqueName": "D:\\Jairaj Bhogade\\OneDrive - OC Specialities Pvt.Ltd\\Study and Practice\\VS_Code_Practice\\Asset_Management_System_v4-0\\AMS-Test\\server\\AMS.API\\AMS.API.csproj",
       "projectName": "AMS.API",
-      "projectPath": "/workspace/AMS-Test/server/AMS.API/AMS.API.csproj",
-      "packagesPath": "/root/.nuget/packages/",
-      "outputPath": "/workspace/AMS-Test/server/AMS.API/obj/",
+      "projectPath": "D:\\Jairaj Bhogade\\OneDrive - OC Specialities Pvt.Ltd\\Study and Practice\\VS_Code_Practice\\Asset_Management_System_v4-0\\AMS-Test\\server\\AMS.API\\AMS.API.csproj",
+      "packagesPath": "C:\\Users\\jairaj.b\\.nuget\\packages\\",
+      "outputPath": "D:\\Jairaj Bhogade\\OneDrive - OC Specialities Pvt.Ltd\\Study and Practice\\VS_Code_Practice\\Asset_Management_System_v4-0\\AMS-Test\\server\\AMS.API\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "/root/.nuget/NuGet/NuGet.Config"
+        "C:\\Users\\jairaj.b\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net10.0"
@@ -993,7 +993,7 @@
         "auditLevel": "low",
         "auditMode": "all"
       },
-      "SdkAnalysisLevel": "10.0.400"
+      "SdkAnalysisLevel": "10.0.300"
     },
     "frameworks": {
       "net10.0": {
@@ -1028,7 +1028,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "/tmp/opencode/dotnet10/sdk/10.0.400/PortableRuntimeIdentifierGraph.json",
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.303/PortableRuntimeIdentifierGraph.json",
         "packagesToPrune": {
           "Microsoft.AspNetCore": "(,10.0.32767]",
           "Microsoft.AspNetCore.Antiforgery": "(,10.0.32767]",
