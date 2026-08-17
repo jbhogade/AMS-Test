@@ -22,7 +22,8 @@ public class CollectionsController : ControllerBase
         "sites", "departments", "designations", "vendors", "consumables",
         "spareParts", "accessories", "company", "roleAccess", "accessRights",
         "reportPrefs", "users", "exitRecords", "consumableLog", "sparePartLog",
-        "simCards",
+        "simCards", "simOperators", "simPlans", "consumableCategories",
+        "consumableUnits", "sparePartCategories", "vendorCategories",
     };
 
     private readonly AmsDb _db;
