@@ -999,10 +999,16 @@ public class AmsDb
             using var doc = JsonDocument.Parse(dataJson);
             if (doc.RootElement.ValueKind == JsonValueKind.Array)
             {
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var rec in doc.RootElement.EnumerateArray())
                 {
                     if (rec.ValueKind != JsonValueKind.Object) continue;
                     var recordKey = ResolveRecordKey(rec, def);
+                    /* Detect duplicate natural keys BEFORE inserting so the whole
+                       transaction is not lost to a PK violation (500). Report the
+                       offending key so the frontend can tell the user what to fix. */
+                    if (!string.IsNullOrEmpty(def.KeyField) && !seen.Add(recordKey))
+                        throw new CollectionSaveException(key, def.KeyField!, recordKey);
                     await InsertRowAsync(conn, tx, def, recordKey, rec);
                 }
             }
@@ -1255,10 +1261,19 @@ public class AmsDb
     }
 }
 
+/// <summary>Raised when a wholesale collection save would violate the natural
+/// key (record_key) uniqueness - i.e. two records in the array share the same
+/// id / simId / amsId / name. Translated to a 409 by the controller so the
+/// frontend shows a real explanation instead of "API error 500".</summary>
+public class CollectionSaveException : Exception
+{
+    public CollectionSaveException(string collection, string keyField, string keyValue)
+        : base($"Duplicate {keyField} '{keyValue}' in collection '{collection}'.") { }
+}
+
 public class AmsUser
 {
-    public string Username { get; set; } = "";
-    public string PasswordHash { get; set; } = "";
+    public string Username { get; set; } = "";    public string PasswordHash { get; set; } = "";
     public string PasswordSalt { get; set; } = "";
     public string Role { get; set; } = "";
     public string? LinkedEmployee { get; set; }

@@ -68,7 +68,16 @@ public class CollectionsController : ControllerBase
         if (json.Length > 16_000_000) // 16 MB safety cap
             return BadRequest(new { error = "Payload too large." });
 
-        await _db.SaveCollectionAsync(key, json);
+        try
+        {
+            await _db.SaveCollectionAsync(key, json);
+        }
+        catch (CollectionSaveException ex)
+        {
+            /* Duplicate natural key (record_key) - report the offending key so
+               the user can fix the data instead of seeing a generic 500. */
+            return Conflict(new { error = ex.Message });
+        }
         return Ok(new { ok = true, collection = key });
     }
 
