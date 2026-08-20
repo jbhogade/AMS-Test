@@ -35,6 +35,7 @@ const NAV_ITEMS = [
     { page: "dashboard",   label: "Dashboard",   href: "../index.html",       icon: ICONS.dashboard,   section: "Main" },
     { page: "employees",   label: "Employees",   href: "../pages/employees.html",   icon: ICONS.people,  section: "People" },
     { page: "assets",      label: "Assets",      href: "../pages/assets.html",      icon: ICONS.assets,      section: "Inventory" },
+    { page: "asset-distribution", label: "Asset Distribution", href: "../pages/asset-distribution.html", icon: ICONS.assets, section: "Inventory" },
     { page: "consumables", label: "Consumables", href: "../pages/consumables.html", icon: ICONS.consumables, section: "Inventory" },
     { page: "spare-parts", label: "Spare Parts", href: "../pages/spare-parts.html", icon: ICONS.spareParts,  section: "Inventory" },
     { page: "accessories", label: "Accessories", href: "../pages/accessories.html", icon: ICONS.accessories, section: "Inventory" },

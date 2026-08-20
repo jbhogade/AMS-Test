@@ -85,6 +85,16 @@ function amsGenerateReport(amsId, type, extraRemarks) {
         ? exitRecord.directAssetsHeld
         : getEmployeeAssets(amsId);
 
+    /* Split the employee's assets into directly-held vs subordinate/team-held,
+       and derive the printed "Assignment Type" from that mix. */
+    const splitOwned = isIssue ? amsSplitDirectVsSubordinateAssets(owned) : null;
+    const directOwned = splitOwned ? splitOwned.direct : owned;
+    const subOwned = splitOwned ? splitOwned.subordinate : [];
+    const subAssets = isIssue ? amsSubordinateAssetsDetailed(amsId) : [];
+    const assignmentType = isIssue
+        ? amsAssignmentTypeLabel(directOwned.length, subOwned.length + subAssets.length)
+        : "";
+
     const title = isIssue ? "Asset Issue Form" : "Asset Handover Form";
     const formNo = amsGenerateFormNo(isIssue ? "AIF" : "AHF");
     const today = amsFormatDate(new Date().toISOString().slice(0, 10));
@@ -114,7 +124,7 @@ function amsGenerateReport(amsId, type, extraRemarks) {
             ${infoBox("Department", amsEsc(emp.department))}
             ${infoBox("Designation", amsEsc(emp.designation))}
             ${infoBox("Reporting Manager", amsEsc(managerName))}
-            ${infoBox("Assignment Type", "Direct (Personal Use)")}
+            ${infoBox("Assignment Type", amsEsc(assignmentType))}
         </div>
         <div class="pf-box-grid cols-3">
             ${infoBox("Date of Issue", today)}
@@ -143,14 +153,10 @@ function amsGenerateReport(amsId, type, extraRemarks) {
     const conditionRow = () => ["Good", "Needs Repair / Service", "Damaged"].map(o => `
         <label class="pf-check-inline"><input type="checkbox" disabled> ${o}</label>`).join("");
 
-    /* Assets issued directly to the employee (ALL assets assigned to them,
-       including ones whose actual user is a User MASTER record) stay in
-       "Assets Issued". Assets whose real user was typed as FREE TEXT
-       (assignedSubText, not in the User master) show in the "For Reference"
-       section instead, since they were never issued to the employee personally. */
-    const splitOwned = isIssue ? amsSplitDirectVsSubordinateAssets(owned) : null;
-    const directOwned = splitOwned ? splitOwned.direct : owned;
-    const subOwned = splitOwned ? splitOwned.subordinate : [];
+    /* Assets issued directly to the employee (ALL assets assigned to them)
+       stay in "Assets Issued". Assets whose actual user is a subordinate/team
+       member (User master record or free text) show in the "For Reference"
+       section instead. */
 
     const assetTableHtml = `
         <table class="pf-asset-table">
@@ -179,7 +185,6 @@ function amsGenerateReport(amsId, type, extraRemarks) {
             <label class="pf-check-block" style="grid-column:1 / -1;">Other: ________________________________</label>
         </div>`) : "";
 
-    const subAssets = isIssue ? amsSubordinateAssetsDetailed(amsId) : [];
     const subRows = subAssets.map(sa => ({
         id: amsPrintAssetId(sa), type: sa.type, makeModel: sa.makeModel,
         site: sa.currentSite || sa.site, holder: sa.subName, holderId: sa.subEmpId,
@@ -280,7 +285,7 @@ function amsGenerateReport(amsId, type, extraRemarks) {
 
             <div class="pf-footer">
                 <span>AMS v4 - Generated electronically</span>
-                <span>Internal Ref: ${formNo} &middot; ${directOwned.length} asset(s) ${isIssue ? "issued" : "returned"}</span>
+                <span>Internal Ref: ${formNo} &middot; ${directOwned.length} asset(s) ${isIssue ? "issued" : "returned"}${isIssue ? ` &middot; ${directOwned.length} direct, ${subOwned.length + subAssets.length} team` : ""}</span>
             </div>
         </div>
     `;

@@ -784,9 +784,12 @@ function amsGetEmployeesForPortal() {
 }
 
 /* FULL Smart Asset ID = Base Display ID + CurrentSite + Assignee's Dept, only
-   once the asset is Assigned. Unassigned assets stay on their base/short form. */
+   once the asset is Assigned. Unassigned assets stay on their base/short form.
+   LEGACY assets (manually-typed / imported display IDs, isLegacyId) keep their
+   original ID exactly - no site/department suffix is ever appended to them. */
 function amsComputeFullId(asset) {
     const base = amsBaseDisplayId(asset);
+    if (asset.isLegacyId) return base; /* legacy/custom IDs stay unchanged */
     if (!asset.assignedTo) return base; /* unassigned - base/short form only */
     const emp = amsGetEmployeeByAmsId(asset.assignedTo);
     const siteShort = amsSiteShort(asset.currentSite || asset.site);
@@ -1512,12 +1515,14 @@ function reassignAsset(assetId, toAmsId) {
        section instead of "Assets Issued".
    ===========================================================================*/
 
-/* True when the asset is NOT personally held by the custodian: its real user
-   was typed as free text (assignedSubText, not in the User master). Only these
-   assets are moved out of "Assets Issued" into the "For Reference" section of
-   the printed Asset Issue Form. */
+/* True when the asset is NOT personally held by the custodian: its actual user
+   is a subordinate/team member - either a record from the User master
+   (assignedToSubordinate) or free text typed into the Assign modal
+   (assignedSubText, not in the User master). Such assets are counted under the
+   employee's TEAM (not Owned) and are moved out of "Assets Issued" into the
+   "For Reference" section of the printed Asset Issue Form. */
 function amsAssetIsDeptOrSub(a) {
-    return !!(a && a.assignedSubText);
+    return !!(a && (a.assignedToSubordinate || a.assignedSubText));
 }
 
 /* Human-readable label for the actual holder (subordinate/free-text user) of
@@ -1533,10 +1538,9 @@ function amsAssetHolderLabel(a) {
 }
 
 /* Splits an employee's currently-held assets into (a) assets issued directly to
-   them - including those whose actual user is a User MASTER record - and (b)
-   assets whose real user was NOT the employee personally: free text holders
-   (assignedSubText). Only the latter feed the "For Reference" section of the
-   printed Asset Issue Form; the former stay in "Assets Issued". */
+   them and (b) assets whose actual user is a subordinate/team member (User
+   master record or free text). Only the latter feed the "For Reference" section
+   of the printed Asset Issue Form; the former stay in "Assets Issued". */
 function amsSplitDirectVsSubordinateAssets(assets) {
     const direct = [];
     const subordinate = [];
@@ -1545,6 +1549,29 @@ function amsSplitDirectVsSubordinateAssets(assets) {
         else direct.push(a);
     });
     return { direct, subordinate };
+}
+
+/* Assets an employee PERSONALLY holds (Owned): directly assigned to them with
+   no subordinate/team actual user recorded on the asset. */
+function amsOwnedEmployeeAssets(amsId) {
+    return getEmployeeAssets(amsId).filter(a => !amsAssetIsDeptOrSub(a));
+}
+
+/* Assets counted under the employee's TEAM: assets their direct subordinates
+   hold, PLUS assets the employee is custodian of but whose actual user is a
+   subordinate/team member (User master record or free-text holder). */
+function amsTeamEmployeeAssets(amsId) {
+    const team = getSubordinateAssets(amsId).slice();
+    getEmployeeAssets(amsId).forEach(a => { if (amsAssetIsDeptOrSub(a)) team.push(a); });
+    return team;
+}
+
+/* Printed "Assignment Type" label for an Asset Issue Form, based on the mix of
+   assets shown on the form. */
+function amsAssignmentTypeLabel(directCount, teamCount) {
+    if (directCount > 0 && teamCount > 0) return "Both (Direct + Team Use)";
+    if (teamCount > 0) return "Subordinate/Team Use";
+    return "Direct (Personal Use)";
 }
 
 /* Builds the "Accessories / Items Included" section of a printed form.

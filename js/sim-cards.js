@@ -43,7 +43,20 @@ function renderSimTable() {
         return [s.simId, s.mobileNumber, s.operator, s.plan, s.iccid].some(v => String(v || "").toLowerCase().includes(searchTerm));
     });
 
-    const rows = filtered.map(s => {
+    const getters = {
+        simId: s => s.simId,
+        mobile: s => s.mobileNumber || "",
+        operator: s => s.operator || "",
+        plan: s => s.plan || "",
+        status: s => s.status,
+        assigned: s => {
+            const e = s.assignedTo ? amsGetEmployeeByAmsId(s.assignedTo) : null;
+            return e ? e.name : "";
+        },
+    };
+    const sortedFiltered = amsSortRows("simTable", filtered, getters);
+
+    const rows = sortedFiltered.map(s => {
         const emp = s.assignedTo ? amsGetEmployeeByAmsId(s.assignedTo) : null;
         return `<tr>
             <td class="mono-cell"><a href="#" class="clickable-id" data-sim-view-key="${amsEsc(s.simId)}">${amsEsc(s.simId)}</a></td>
@@ -71,8 +84,13 @@ function renderSimTable() {
 
     document.getElementById("simTable").innerHTML = `
         <thead><tr>
-            <th>SIM ID</th><th>Mobile Number</th><th>Operator</th><th>Plan</th>
-            <th>Status</th><th>Assigned To</th><th></th>
+            ${amsSortableTh("simTable", "simId", "SIM ID")}
+            ${amsSortableTh("simTable", "mobile", "Mobile Number")}
+            ${amsSortableTh("simTable", "operator", "Operator")}
+            ${amsSortableTh("simTable", "plan", "Plan")}
+            ${amsSortableTh("simTable", "status", "Status")}
+            ${amsSortableTh("simTable", "assigned", "Assigned To")}
+            <th></th>
         </tr></thead>
         <tbody>${rows.join("") || `<tr><td colspan="7" class="empty-note" style="text-align:center;padding:28px;">No SIM cards found</td></tr>`}</tbody>`;
 
@@ -463,21 +481,31 @@ function amsSimRetire(key) {
 const SIM_CSV_HEADERS = ["simId", "iccid", "mobileNumber*", "operator", "plan", "status", "activationDate", "vendor", "cost", "remarks"];
 
 function amsDownloadSimTemplate() {
-    const instructionRow = ["# Fields marked with * are required: mobileNumber. simId blank = auto-generated. status = In Store, Issued, Blocked or Retired (default In Store). activationDate format dd-mm-yyyy."];
+    if (typeof XLSX === "undefined") {
+        alert("Excel export library not loaded. Check js/vendor/xlsx.full.min.js is present.");
+        return;
+    }
     const sample = ["", "8991XXXXX", "9876543210", "Jio", "Postpaid", "In Store", "13-07-2026", "", "", "Example row - delete before importing"];
-    const rows = [instructionRow, SIM_CSV_HEADERS, sample];
-    amsDownloadFile(rows.map(amsCsvRow).join("\r\n"), "SIM_Cards_import_template.csv", "text/csv");
+    const wb = XLSX.utils.book_new();
+    const instr = XLSX.utils.aoa_to_sheet([
+        ["SIM Card Import Template - Instructions"],
+        ["Fields marked with * are required: mobileNumber."],
+        ["simId blank = auto-generated."],
+        ["status = In Store, Issued, Blocked or Retired (default In Store)."],
+        ["activationDate format dd-mm-yyyy."],
+    ]);
+    instr["!cols"] = [{ wch: 90 }];
+    XLSX.utils.book_append_sheet(wb, instr, "Instructions");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([SIM_CSV_HEADERS, sample]), "Template");
+    XLSX.writeFile(wb, "SIM_Cards_import_template.xlsx");
 }
 
 function amsExportSims() {
-    const rows = [SIM_CSV_HEADERS];
-    SIM_STATE.sims.forEach(s => {
-        rows.push([
-            s.simId, s.iccid || "", s.mobileNumber || "", s.operator || "", s.plan || "",
-            s.status, amsFormatDate(s.activationDate), s.vendor || "", s.cost || "", s.remarks || "",
-        ]);
-    });
-    amsDownloadFile(rows.map(amsCsvRow).join("\r\n"), "SIM_Cards_export.csv", "text/csv");
+    const rows = SIM_STATE.sims.map(s => [
+        s.simId, s.iccid || "", s.mobileNumber || "", s.operator || "", s.plan || "",
+        s.status, amsFormatDate(s.activationDate), s.vendor || "", s.cost || "", s.remarks || "",
+    ]);
+    amsExportXlsx("SIM_Cards_export", SIM_CSV_HEADERS, rows);
 }
 
 function amsSimShowImportSummary(results) {
@@ -495,13 +523,12 @@ function amsSimShowImportSummary(results) {
 }
 
 function amsImportSimsFile(file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        let rows = amsParseCsv(String(e.target.result));
+    amsReadImportRows(file).then((rows) => {
         rows = rows.filter(r => !(r[0] || "").trim().startsWith("#")); /* drop instruction/comment lines */
         if (!rows.length) { alert("File is empty or unreadable."); return; }
         const headers = rows[0].map(h => h.trim().replace(/\*$/, "")); /* strip the required-marker * */
         const results = [];
+        const seenSimIds = new Set(); /* within-file duplicate detection (simId is the DB natural key) */
 
         for (let i = 1; i < rows.length; i++) {
             const raw = rows[i];
@@ -514,6 +541,16 @@ function amsImportSimsFile(file) {
             if (!obj.mobileNumber) {
                 results.push({ row: line, record, result: "error", reason: "Missing required field: mobileNumber" });
                 continue;
+            }
+
+            /* ---- Within-file duplicate detection on the identity field ---- */
+            if (obj.simId) {
+                const simKey = obj.simId.toLowerCase();
+                if (seenSimIds.has(simKey)) {
+                    results.push({ row: line, record, result: "error", reason: `Duplicate simId "${obj.simId}" already used earlier in this file` });
+                    continue;
+                }
+                seenSimIds.add(simKey);
             }
 
             const status = AMS_SIM_STATUS_OPTIONS.includes(obj.status) ? obj.status : "In Store";
@@ -550,11 +587,13 @@ function amsImportSimsFile(file) {
         }
 
         renderSimTable();
+        amsDbSaveAsync("simCards"); /* persist the imported/updated rows (wholesale PUT) */
         amsSimShowImportSummary(results);
         const fileInput = document.getElementById("simImportFileInput");
         if (fileInput) fileInput.value = "";
-    };
-    reader.readAsText(file);
+    }).catch((err) => {
+        alert("Could not read import file: " + (err && err.message ? err.message : err));
+    });
 }
 
 /* =============================================================================
@@ -562,6 +601,7 @@ function amsImportSimsFile(file) {
    ===========================================================================*/
 async function initSimCards() {
     if (typeof amsDbEnsureLoaded === "function") await amsDbEnsureLoaded();
+    amsSortRegisterRenderer("simTable", renderSimTable);
     amsPopulateSimFormSelects();
     renderSimTable();
 

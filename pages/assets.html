@@ -87,7 +87,7 @@
                         <button class="btn btn-secondary" id="btnAssetTemplate">Template</button>
                         <button class="btn btn-secondary" id="btnAssetExport">Export</button>
                         <button class="btn btn-secondary" id="btnAssetImport">Import</button>
-                        <input type="file" id="assetImportFileInput" accept=".csv" style="display:none;">
+                        <input type="file" id="assetImportFileInput" accept=".csv,.xlsx" style="display:none;">
                     </div>
                 </div>
 
@@ -491,6 +491,12 @@
                         <div class="field">
                             <label>Purchase Date <span class="req">*</span></label>
                             <input type="date" id="replPurchaseDate" class="input" required>
+                            <div class="form-hint">Pre-filled from the old asset so the replacement keeps its purchase date.</div>
+                        </div>
+                        <div class="field">
+                            <label>Issue Date</label>
+                            <input type="date" id="replIssueDate" class="input">
+                            <div class="form-hint">Defaults to today - when the replacement was handed over.</div>
                         </div>
                         <div class="field">
                             <label>Warranty End Date</label>
@@ -507,9 +513,21 @@
                             <label>Purchase Cost</label>
                             <input type="text" id="replCost" class="input" placeholder="Optional">
                         </div>
-                        <div class="field field-full">
-                            <label>Reason for Replacement / Remarks</label>
-                            <textarea id="replRemarks" class="textarea" rows="2" placeholder="e.g. Old unit damaged beyond repair"></textarea>
+                        <div class="field">
+                            <label>Reason for Replacement <span class="req">*</span></label>
+                            <select id="replReason" class="select" required>
+                                <option value="">(Select a reason)</option>
+                                <option value="Damaged / Faulty">Damaged / Faulty</option>
+                                <option value="Lost / Stolen">Lost / Stolen</option>
+                                <option value="Upgrade">Upgrade</option>
+                                <option value="End of Life">End of Life</option>
+                                <option value="Warranty Replacement">Warranty Replacement</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Replacement Note</label>
+                            <input type="text" id="replNote" class="input" placeholder="Optional - e.g. old unit damaged beyond repair">
                         </div>
                         <div class="field field-full">
                             <div class="accessories-header">
@@ -558,6 +576,9 @@
     <script src="../js/theme.js"></script>
     <script src="../js/app.js"></script>
     <script src="../js/layout.js"></script>
+    <script src="../js/sortable.js"></script>
+    <script src="../js/vendor/xlsx.full.min.js"></script>
+    <script src="../js/xlsx-helpers.js"></script>
     <script src="../js/print-docs.js"></script>
     <script src="../js/assets.js"></script>
     <script>

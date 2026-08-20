@@ -70,14 +70,43 @@ function getFilteredEmployees() {
 /* Renders the employee table body */
 function renderEmployeeTable() {
     const tbody = document.getElementById("employee-table-body");
+    const thead = document.getElementById("employee-table-head");
     const amsVisible = isAmsVisible();
     const employees = getFilteredEmployees();
+
+    /* Sortable header (shared js/sortable.js engine) */
+    const getters = {
+        amsId: emp => emp.amsId,
+        name: emp => getEmployeeFullName(emp),
+        dept: emp => emp.department,
+        designation: emp => emp.designation,
+        contact: emp => emp.contact || "",
+        email: emp => emp.email || "",
+        owned: emp => amsOwnedEmployeeAssets(emp.amsId).length,
+        team: emp => amsTeamEmployeeAssets(emp.amsId).length,
+        status: emp => emp.status,
+    };
+    const sorted = amsSortRows("employeeTable", employees, getters);
+    if (thead) {
+        thead.innerHTML = `<tr>
+            ${amsSortableTh("employeeTable", "amsId", "AMS ID", "ams-col")}
+            ${amsSortableTh("employeeTable", "name", "Employee")}
+            ${amsSortableTh("employeeTable", "dept", "Department")}
+            ${amsSortableTh("employeeTable", "designation", "Designation")}
+            ${amsSortableTh("employeeTable", "contact", "Contact")}
+            ${amsSortableTh("employeeTable", "email", "Email")}
+            ${amsSortableTh("employeeTable", "owned", "Owned")}
+            ${amsSortableTh("employeeTable", "team", "Team")}
+            ${amsSortableTh("employeeTable", "status", "Status")}
+            <th>Actions</th>
+        </tr>`;
+    }
 
     /* Show / hide the AMS Employee ID column based on credential level */
     document.getElementById("ams-col").style.display = amsVisible ? "" : "none";
     document.getElementById("ams-hint").style.display = amsVisible ? "none" : "";
 
-    if (employees.length === 0) {
+    if (sorted.length === 0) {
         tbody.innerHTML = `
             <tr>
                 <td colspan="9" class="empty-note" style="text-align:center;padding:28px;">
@@ -87,9 +116,9 @@ function renderEmployeeTable() {
         return;
     }
 
-    tbody.innerHTML = employees.map(emp => {
-        const owned = getEmployeeAssets(emp.amsId).length;
-        const team = getSubordinateAssets(emp.amsId).length;
+    tbody.innerHTML = sorted.map(emp => {
+        const owned = amsOwnedEmployeeAssets(emp.amsId).length;
+        const team = amsTeamEmployeeAssets(emp.amsId).length;
         const badge = badgeClassFor(emp.status);
         const amsCell = amsVisible
             ? `<td class="muted" title="Hidden from regular users">${escapeHtml(emp.amsId)}</td>`
@@ -274,9 +303,9 @@ function viewEmployee(amsId) {
     const emp = findEmployee(amsId);
     if (!emp) return;
 
-    const owned = getEmployeeAssets(amsId);
+    const owned = amsOwnedEmployeeAssets(amsId);
     const subordinates = getSubordinates(amsId);
-    const teamAssets = getSubordinateAssets(amsId);
+    const teamAssets = amsTeamEmployeeAssets(amsId);
     const manager = emp.managerAmsId ? findEmployee(emp.managerAmsId) : null;
 
     document.getElementById("view-avatar").textContent = getEmployeeInitials(emp);
@@ -309,15 +338,18 @@ function viewEmployee(amsId) {
             </li>`).join("")
         : `<div class="empty-note">No assets assigned directly.</div>`;
 
-    /* Subordinates' assets list */
+    /* Subordinates' assets list (team assets: subordinates' own + custodian-held
+       assets whose actual user is a subordinate/team member) */
     const teamList = document.getElementById("view-team-list");
     teamList.innerHTML = teamAssets.length
         ? teamAssets.map(a => {
-            const owner = findEmployee(a.assignedTo);
+            const holder = a.assignedTo === amsId
+                ? (amsAssetHolderLabel(a) || "team")
+                : (findEmployee(a.assignedTo) ? getEmployeeFullName(findEmployee(a.assignedTo)) : "team");
             return `
                 <li>
                     <span><strong>${escapeHtml(a.id)}</strong> - ${escapeHtml(a.makeModel)}
-                        <span class="muted">(with ${owner ? escapeHtml(getEmployeeFullName(owner)) : "team"})</span>
+                        <span class="muted">(with ${escapeHtml(holder)})</span>
                     </span>
                     <span class="badge ${badgeClassFor(a.status)}">${escapeHtml(a.status)}</span>
                 </li>`;
@@ -731,31 +763,39 @@ function saveQuickAddDesig() {
 const EMP_CSV_HEADERS = ["empId*", "name*", "dept*", "designation*", "reportsTo", "managerId", "contact", "email", "status"];
 
 function amsDownloadEmployeeTemplate() {
+    if (typeof XLSX === "undefined") {
+        alert("Excel export library not loaded. Check js/vendor/xlsx.full.min.js is present.");
+        return;
+    }
     const instructionRows = [
-        ["# Fields marked with * are required: empId, name, dept, designation."],
-        ["# AMS Employee ID is auto-generated - do not add it here. empId is the company ID (must be unique)."],
-        ["# name = the employee's FULL NAME in one column, e.g. Ravikumar Rajendra Tiparadi."],
-        ["# dept must match a Department in the Department Master. designation is auto-created if new."],
-        ["# reportsTo = the manager's full name (or company Employee ID / AMS ID). managerId = the manager's AMS ID (auto-filled on the form)."],
-        ["# The reporting manager's name and ID are saved AS IS - the manager does not have to exist in the system yet. The link is filled in automatically once that manager is added."],
-        ["# status = Active or Inactive (default Active)."],
+        ["Employee Master Import Template - Instructions"],
+        ["Fields marked with * are required: empId, name, dept, designation."],
+        ["AMS Employee ID is auto-generated - do not add it here. empId is the company ID (must be unique)."],
+        ["name = the employee's FULL NAME in one column, e.g. Ravikumar Rajendra Tiparadi."],
+        ["dept must match a Department in the Department Master. designation is auto-created if new."],
+        ["reportsTo = the manager's full name (or company Employee ID / AMS ID). managerId = the manager's AMS ID (auto-filled on the form)."],
+        ["The reporting manager's name and ID are saved AS IS - the manager does not have to exist in the system yet. The link is filled in automatically once that manager is added."],
+        ["status = Active or Inactive (default Active)."],
     ];
     const sample = ["EMP-000001", "Example Employee", "IT", "Engineer", "", "", "+91 99999 99999", "example@company.com", "Active"];
-    const rows = [...instructionRows, EMP_CSV_HEADERS, sample];
-    amsDownloadFile(rows.map(amsCsvRow).join("\r\n"), "Employee_Master_import_template.csv", "text/csv");
+    const wb = XLSX.utils.book_new();
+    const instr = XLSX.utils.aoa_to_sheet(instructionRows);
+    instr["!cols"] = [{ wch: 100 }];
+    XLSX.utils.book_append_sheet(wb, instr, "Instructions");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([EMP_CSV_HEADERS, sample]), "Template");
+    XLSX.writeFile(wb, "Employee_Master_import_template.xlsx");
 }
 
 function amsExportEmployees() {
-    const rows = [EMP_CSV_HEADERS];
-    getFilteredEmployees().forEach(e => {
+    const rows = getFilteredEmployees().map(e => {
         const mgr = e.managerAmsId ? findEmployee(e.managerAmsId) : null;
-        rows.push([
+        return [
             e.empId, getEmployeeFullName(e), e.department, e.designation,
             e.managerName || (mgr ? mgr.empId : ""), e.managerId || (mgr ? mgr.amsId : ""),
             e.contact || "", e.email || "", e.status,
-        ]);
+        ];
     });
-    amsDownloadFile(rows.map(amsCsvRow).join("\r\n"), "Employee_Master_export.csv", "text/csv");
+    amsExportXlsx("Employee_Master_export", EMP_CSV_HEADERS, rows);
 }
 
 function amsShowEmpImportSummary(results) {
@@ -774,9 +814,7 @@ function amsShowEmpImportSummary(results) {
 }
 
 function amsImportEmployeesFile(file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        let rows = amsParseCsv(String(e.target.result));
+    amsReadImportRows(file).then((rows) => {
         rows = rows.filter(r => !(r[0] || "").trim().startsWith("#")); /* drop instruction/comment lines */
         if (!rows.length) { alert("File is empty or unreadable."); return; }
         const headers = rows[0].map(h => h.trim().replace(/\*$/, "")); /* strip the required-marker * */
@@ -888,14 +926,16 @@ function amsImportEmployeesFile(file) {
         renderEmpStats();
         amsShowEmpImportSummary(results);
         document.getElementById("emp-import-file").value = "";
-    };
-    reader.readAsText(file);
+    }).catch((err) => {
+        alert("Could not read import file: " + (err && err.message ? err.message : err));
+    });
 }
 
 /* Initialises the whole page */
 async function initEmployees() {
     if (typeof amsDbEnsureLoaded === "function") await amsDbEnsureLoaded();
     amsResolvePendingManagers();
+    amsSortRegisterRenderer("employeeTable", renderEmployeeTable);
     populateSelects();
     renderEmpStats();
     renderEmployeeTable();

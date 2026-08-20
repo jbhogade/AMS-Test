@@ -96,6 +96,19 @@ function amsRenderAssetLifecycleReport() {
     if (toDate) entries = entries.filter(e => e.date <= toDate);
     entries = [...entries].sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
+    amsSortRegisterRenderer("alTable", amsRenderAssetLifecycleReport);
+    const getters = {
+        date: e => e.date,
+        type: e => amsClassifyEvent(e.action),
+        action: e => e.action,
+        asset: e => e.assetDisplayId,
+        assetType: e => e.assetType,
+        empName: e => e.empName || "",
+        empDept: e => e.empDept || "",
+        status: e => e.statusLabel,
+    };
+    entries = amsSortRows("alTable", entries, getters);
+
     const rows = entries.length ? entries.map(e => `<tr>
         <td class="mono">${amsFormatDate(e.date)}</td>
         <td><span class="badge badge-grey">${amsEsc(amsClassifyEvent(e.action))}</span></td>
@@ -108,7 +121,16 @@ function amsRenderAssetLifecycleReport() {
     </tr>`).join("") : `<tr><td colspan="8" style="color:var(--text-secondary)">No events match these filters</td></tr>`;
 
     document.getElementById("alTable").innerHTML = `
-        <thead><tr><th>Date</th><th>Type</th><th>Action</th><th>Asset ID</th><th>Asset Type</th><th>Employee</th><th>Department</th><th>Status</th></tr></thead>
+        <thead><tr>
+            ${amsSortableTh("alTable", "date", "Date")}
+            ${amsSortableTh("alTable", "type", "Type")}
+            ${amsSortableTh("alTable", "action", "Action")}
+            ${amsSortableTh("alTable", "asset", "Asset ID")}
+            ${amsSortableTh("alTable", "assetType", "Asset Type")}
+            ${amsSortableTh("alTable", "empName", "Employee")}
+            ${amsSortableTh("alTable", "empDept", "Department")}
+            ${amsSortableTh("alTable", "status", "Status")}
+        </tr></thead>
         <tbody>${rows}</tbody>`;
 }
 /*-------------- End of the code ------------------------------------------------*/
@@ -126,39 +148,64 @@ function amsRenderIssueHandoverTable(tableId, reportType, searchId, siteId, from
     /* One row per currently-assigned asset (Assigned or In Repair still counts as
        "currently held"). Issue Form -> only Active employees; Handover Form ->
        only Exited employees (that's the whole point of a handover). */
-    const rows = DUMMY_ASSETS
+    const rowData = [];
+    DUMMY_ASSETS
         .filter(a => a.assignedTo && (a.status === "Assigned" || a.status === "In Repair"))
-        .map(a => {
+        .forEach(a => {
             const emp = amsGetEmployeeByAmsId(a.assignedTo);
-            if (!emp) return "";
+            if (!emp) return;
             const isExited = emp.status === "Exited";
-            if (wantExited !== isExited) return "";
-            if (searchTerm && ![emp.name, emp.empIdCompany, emp.dept, a.id].some(v => String(v).toLowerCase().includes(searchTerm))) return "";
+            if (wantExited !== isExited) return;
+            if (searchTerm && ![emp.name, emp.empIdCompany, emp.dept, a.id].some(v => String(v).toLowerCase().includes(searchTerm))) return;
             const assetSite = a.currentSite || a.site;
-            if (site && assetSite !== site) return "";
-            if (dept && emp.dept !== dept) return "";
-            if (assetType && a.type !== assetType) return "";
+            if (site && assetSite !== site) return;
+            if (dept && emp.dept !== dept) return;
+            if (assetType && a.type !== assetType) return;
             /* "Last activity date" = this asset's most recent history entry - for
                Issue Form that's typically the last Assign/Reassign; for Handover
                it's whatever happened last (Assign, Transfer, etc.). */
             const lastDate = (a.history && a.history.length) ? a.history[a.history.length - 1].date : "";
-            if (fromDate && (!lastDate || lastDate < fromDate)) return "";
-            if (toDate && (!lastDate || lastDate > toDate)) return "";
-            const statusBadge = isExited ? `<span class="badge badge-red">Exited</span>` : `<span class="badge badge-green">Active</span>`;
-            const rowStyle = isExited ? ' style="background:color-mix(in srgb, var(--danger) 10%, transparent);"' : "";
-            return `<tr${rowStyle}>
-                <td class="mono">${amsEsc(emp.empIdCompany)}</td>
-                <td><a href="#" class="clickable-id" data-report-emp="${amsEsc(emp.amsId)}" data-report-type="${reportType}">${amsEsc(emp.name)}</a></td>
-                <td>${statusBadge}</td>
-                <td>${amsEsc(emp.dept)}</td>
-                <td class="mono"><a href="#" class="clickable-id" data-report-emp="${amsEsc(emp.amsId)}" data-report-type="${reportType}">${amsEsc(a.id)}</a></td>
-                <td>${amsEsc(a.type)}</td>
-                <td>${amsEsc(assetSite)}</td>
-            </tr>`;
-        }).join("");
+            if (fromDate && (!lastDate || lastDate < fromDate)) return;
+            if (toDate && (!lastDate || lastDate > toDate)) return;
+            rowData.push({ a, emp, isExited, assetSite });
+        });
+
+    amsSortRegisterRenderer(tableId, () => amsRenderIssueHandoverTable(tableId, reportType, searchId, siteId, fromId, toId, deptId, typeId));
+    const getters = {
+        empCode: r => r.emp.empIdCompany,
+        empName: r => r.emp.name,
+        status: r => r.isExited ? "Exited" : "Active",
+        dept: r => r.emp.dept,
+        assetId: r => r.a.id,
+        assetType: r => r.a.type,
+        site: r => r.assetSite,
+    };
+    const sorted = amsSortRows(tableId, rowData, getters);
+
+    const rows = sorted.map(r => {
+        const statusBadge = r.isExited ? `<span class="badge badge-red">Exited</span>` : `<span class="badge badge-green">Active</span>`;
+        const rowStyle = r.isExited ? ' style="background:color-mix(in srgb, var(--danger) 10%, transparent);"' : "";
+        return `<tr${rowStyle}>
+            <td class="mono">${amsEsc(r.emp.empIdCompany)}</td>
+            <td><a href="#" class="clickable-id" data-report-emp="${amsEsc(r.emp.amsId)}" data-report-type="${reportType}">${amsEsc(r.emp.name)}</a></td>
+            <td>${statusBadge}</td>
+            <td>${amsEsc(r.emp.dept)}</td>
+            <td class="mono"><a href="#" class="clickable-id" data-report-emp="${amsEsc(r.emp.amsId)}" data-report-type="${reportType}">${amsEsc(r.a.id)}</a></td>
+            <td>${amsEsc(r.a.type)}</td>
+            <td>${amsEsc(r.assetSite)}</td>
+        </tr>`;
+    }).join("");
 
     document.getElementById(tableId).innerHTML = `
-        <thead><tr><th>Emp Code</th><th>Employee Name</th><th>Status</th><th>Department</th><th>Asset ID</th><th>Asset Type</th><th>Site</th></tr></thead>
+        <thead><tr>
+            ${amsSortableTh(tableId, "empCode", "Emp Code")}
+            ${amsSortableTh(tableId, "empName", "Employee Name")}
+            ${amsSortableTh(tableId, "status", "Status")}
+            ${amsSortableTh(tableId, "dept", "Department")}
+            ${amsSortableTh(tableId, "assetId", "Asset ID")}
+            ${amsSortableTh(tableId, "assetType", "Asset Type")}
+            ${amsSortableTh(tableId, "site", "Site")}
+        </tr></thead>
         <tbody>${rows || `<tr><td colspan="7" style="color:var(--text-secondary)">No ${wantExited ? "exited" : "active"} employees with currently held assets match these filters</td></tr>`}</tbody>`;
 }
 /*-------------- End of the code ------------------------------------------------*/
@@ -176,6 +223,18 @@ function amsRenderStockLogReport(logArray, type, siteId, fromId, toId, tableId) 
     entries = [...entries].sort((a, b) => String(b.date).localeCompare(String(a.date)));
 
     const showAsset = type === "Used" && entries.some(l => "assetIdSnapshot" in l);
+    amsSortRegisterRenderer(tableId, () => amsRenderStockLogReport(logArray, type, siteId, fromId, toId, tableId));
+    const getters = {
+        date: l => l.date,
+        item: l => l.name,
+        site: l => l.site,
+        qty: l => l.qty,
+        by: l => l.by || "",
+        asset: l => l.assetIdSnapshot || "",
+        remarks: l => l.remarks || "",
+    };
+    entries = amsSortRows(tableId, entries, getters);
+
     const rows = entries.length ? entries.map(l => `<tr>
         <td class="mono">${amsFormatDate(l.date)}</td>
         <td>${amsEsc(l.name)}</td>
@@ -187,7 +246,15 @@ function amsRenderStockLogReport(logArray, type, siteId, fromId, toId, tableId) 
     </tr>`).join("") : `<tr><td colspan="${showAsset ? 7 : 6}" style="color:var(--text-secondary)">No records match these filters</td></tr>`;
 
     document.getElementById(tableId).innerHTML = `
-        <thead><tr><th>Date</th><th>Item</th><th>Site</th><th>Qty</th><th>${type === "Restocked" ? "Vendor" : "Used By"}</th>${showAsset ? "<th>Used For Asset</th>" : ""}<th>Remarks</th></tr></thead>
+        <thead><tr>
+            ${amsSortableTh(tableId, "date", "Date")}
+            ${amsSortableTh(tableId, "item", "Item")}
+            ${amsSortableTh(tableId, "site", "Site")}
+            ${amsSortableTh(tableId, "qty", "Qty")}
+            ${amsSortableTh(tableId, "by", type === "Restocked" ? "Vendor" : "Used By")}
+            ${showAsset ? amsSortableTh(tableId, "asset", "Used For Asset") : ""}
+            ${amsSortableTh(tableId, "remarks", "Remarks")}
+        </tr></thead>
         <tbody>${rows}</tbody>`;
 }
 /*-------------- End of the code ------------------------------------------------*/
@@ -203,17 +270,10 @@ function amsExportTableToCsv(filename, tableEl) {
     amsDownloadFile(rows.map(amsCsvRow).join("\r\n"), `${filename}.csv`, "text/csv");
 }
 
-/* Excel export via the "HTML table as .xls" trick - Excel opens this natively,
-   no external library needed (keeps the whole app dependency-free). */
+/* Excel export - real .xlsx via the shared SheetJS helper (js/xlsx-helpers.js).
+   Kept as a wrapper so every existing "Export Excel" button keeps working. */
 function amsExportTableToExcel(filename, tableEl) {
-    const html = `
-        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-        <head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
-        <x:Name>Report</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions>
-        </x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>
-        <body><table border="1">${tableEl.innerHTML}</table></body>
-        </html>`;
-    amsDownloadFile(html, `${filename}.xls`, "application/vnd.ms-excel");
+    amsExportTableToXlsx(filename, tableEl);
 }
 /*-------------- End of the code ------------------------------------------------*/
 
@@ -357,6 +417,12 @@ function amsWireReportButtons() {
     document.getElementById("btnSuCsv").addEventListener("click", () => amsExportTableToCsv("Spare_Parts_Used_Report", document.getElementById("suTable")));
     document.getElementById("btnSuXls").addEventListener("click", () => amsExportTableToExcel("Spare_Parts_Used_Report", document.getElementById("suTable")));
 
+    /* Asset Distribution report */
+    document.getElementById("btnDistReportFilter").addEventListener("click", amsRenderAssetDistributionReport);
+    document.getElementById("distReportSearch").addEventListener("input", amsRenderAssetDistributionReport);
+    document.getElementById("btnDistReportCsv").addEventListener("click", () => amsExportTableToCsv("Asset_Distribution_Report", document.getElementById("distReportTable")));
+    document.getElementById("btnDistReportXls").addEventListener("click", () => amsExportTableToXlsx("Asset_Distribution_Report", document.getElementById("distReportTable")));
+
     /* Click-to-print deep-links on Issue / Handover rows */
     document.addEventListener("click", (e) => {
         const link = e.target.closest("[data-report-emp]");
@@ -369,6 +435,70 @@ function amsWireReportButtons() {
 }
 /*-------------- End of the code ------------------------------------------------*/
 
+/*-------------- Start Code for ASSET DISTRIBUTION REPORT -----------------------*/
+function amsBuildDistReportRows() {
+    return (amsGetEmployeesForPortal() || []).map(emp => {
+        const direct = amsOwnedEmployeeAssets(emp.empId) || [];
+        const team = amsTeamEmployeeAssets(emp.empId) || [];
+        return {
+            empId: emp.empId, name: emp.name, dept: emp.dept || "", designation: emp.designation || "",
+            directCount: direct.length, teamCount: team.length, total: direct.length + team.length,
+        };
+    });
+}
+
+function amsDistReportFiltered() {
+    const search = (document.getElementById("distReportSearch").value || "").toLowerCase();
+    const dept = document.getElementById("distReportDept").value;
+    return amsBuildDistReportRows().filter(r => {
+        if (dept && r.dept !== dept) return false;
+        if (search) {
+            const hay = `${r.name} ${r.empId} ${r.dept}`.toLowerCase();
+            if (!hay.includes(search)) return false;
+        }
+        return true;
+    });
+}
+
+function amsPopulateDistReportDept() {
+    const depts = [];
+    amsBuildDistReportRows().forEach(r => { if (r.dept && !depts.includes(r.dept)) depts.push(r.dept); });
+    depts.sort((a, b) => a.localeCompare(b));
+    document.getElementById("distReportDept").innerHTML = `<option value="">All</option>` + depts.map(d => `<option value="${amsEsc(d)}">${amsEsc(d)}</option>`).join("");
+}
+
+function amsRenderAssetDistributionReport() {
+    const getters = {
+        empId: r => r.empId, name: r => r.name, dept: r => r.dept, designation: r => r.designation,
+        direct: r => r.directCount, team: r => r.teamCount, total: r => r.total,
+    };
+    const rows = amsSortRows("distReportTable", amsDistReportFiltered(), getters);
+    const body = rows.length
+        ? rows.map(r => `<tr>
+            <td class="mono">${amsEsc(r.empId)}</td>
+            <td>${amsEsc(r.name)}</td>
+            <td>${amsEsc(r.dept)}</td>
+            <td>${amsEsc(r.designation) || "-"}</td>
+            <td class="mono">${r.directCount}</td>
+            <td class="mono">${r.teamCount}</td>
+            <td class="mono"><strong>${r.total}</strong></td>
+        </tr>`).join("")
+        : `<tr><td colspan="7" style="color:var(--text-muted);text-align:center;">No employees match the current filters</td></tr>`;
+
+    document.getElementById("distReportTable").innerHTML = `
+        <thead><tr>
+            ${amsSortableTh("distReportTable", "empId", "Emp ID")}
+            ${amsSortableTh("distReportTable", "name", "Employee Name")}
+            ${amsSortableTh("distReportTable", "dept", "Department")}
+            ${amsSortableTh("distReportTable", "designation", "Designation")}
+            ${amsSortableTh("distReportTable", "direct", "Direct")}
+            ${amsSortableTh("distReportTable", "team", "Team")}
+            ${amsSortableTh("distReportTable", "total", "Total")}
+        </tr></thead>
+        <tbody>${body}</tbody>`;
+}
+/*-------------- End of the code ------------------------------------------------*/
+
 /*-------------- Start Code for PAGE INIT ---------------------------------------*/
 document.addEventListener("DOMContentLoaded", () => {
     if (typeof initLayout === "function") initLayout("reports");
@@ -378,6 +508,7 @@ document.addEventListener("DOMContentLoaded", () => {
     (typeof amsDbEnsureLoaded === "function" ? amsDbEnsureLoaded() : Promise.resolve()).then(() => {
         amsPopulateSiteFilters();
         amsPopulateIssueHandoverExtraFilters();
+        amsPopulateDistReportDept();
         amsRenderAssetLifecycleReport();
         amsRenderIssueHandoverTable("issueTable", "assign", "issueSearch", "issueSite", "issueFromDate", "issueToDate", "issueDept", "issueAssetType");
         amsRenderIssueHandoverTable("handoverTable", "exit", "handoverSearch", "handoverSite", "handoverFromDate", "handoverToDate", "handoverDept", "handoverAssetType");
@@ -385,6 +516,7 @@ document.addEventListener("DOMContentLoaded", () => {
         amsRenderStockLogReport(AMS_DUMMY_CONSUMABLE_LOG, "Used", "cuSite", "cuFromDate", "cuToDate", "cuTable");
         amsRenderStockLogReport(AMS_DUMMY_SPAREPART_LOG, "Restocked", "srSite", "srFromDate", "srToDate", "srTable");
         amsRenderStockLogReport(AMS_DUMMY_SPAREPART_LOG, "Used", "suSite", "suFromDate", "suToDate", "suTable");
+        amsRenderAssetDistributionReport();
     });
 });
 /*-------------- End of the code ------------------------------------------------*/

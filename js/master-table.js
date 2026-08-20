@@ -44,33 +44,43 @@ function amsEsc(str) {
  */
 const AMS_MT_STATE = { editingKey: null };
 
-/* ---- EXPORT: current records ------------------------------------------------ */
-function amsExportCsv() {
+/* ---- EXPORT: current records as real .xlsx --------------------------------- */
+function amsExportMaster() {
     const cfg = AMS_MASTER_CONFIG;
     const headers = [...cfg.fields.map(f => f.key), ...(cfg.autoIdField ? [cfg.autoIdField] : []), "active"];
-    const rows = [headers, ...cfg.dataArray.map(item => [
+    const rows = cfg.dataArray.map(item => [
         ...cfg.fields.map(f => f.type === "date" ? amsFormatDate(item[f.key]) : item[f.key]),
         ...(cfg.autoIdField ? [item[cfg.autoIdField]] : []), item.active ? "true" : "false",
-    ])];
-    amsDownloadFile(rows.map(amsCsvRow).join("\r\n"), `${cfg.pageTitle.replace(/\s+/g, "_")}_export.csv`, "text/csv");
+    ]);
+    amsExportXlsx(`${cfg.pageTitle.replace(/\s+/g, "_")}_export`, headers, rows);
 }
 
-/* ---- TEMPLATE: blank import template with header + example row -------------- */
+/* ---- TEMPLATE: .xlsx workbook with Instructions + header/example sheet ----- */
 function amsDownloadTemplate() {
     const cfg = AMS_MASTER_CONFIG;
+    if (typeof XLSX === "undefined") {
+        amsToast("Excel export library not loaded. Check js/vendor/xlsx.full.min.js is present.", "warning");
+        return;
+    }
     const headers = [...cfg.fields.map(f => f.key + (f.required ? "*" : "")), "active"];
     const sample = cfg.fields.map(f => f.upper ? "EX" : f.type === "date" ? "13-07-2026" : `Example ${f.label}`);
-    const instructionRow = [`# Fields marked with * are required. Do not delete the header row (row 2). "active" = true/false.`];
-    const rows = [instructionRow, headers, [...sample, "true"]];
-    amsDownloadFile(rows.map(amsCsvRow).join("\r\n"), `${cfg.pageTitle.replace(/\s+/g, "_")}_import_template.csv`, "text/csv");
+    const wb = XLSX.utils.book_new();
+    const instr = XLSX.utils.aoa_to_sheet([
+        [`${cfg.pageTitle} Import Template - Instructions`],
+        ["Fields marked with * are required."],
+        ["Do not delete the header row (row 2)."],
+        ['"active" = true/false.'],
+    ]);
+    instr["!cols"] = [{ wch: 80 }];
+    XLSX.utils.book_append_sheet(wb, instr, "Instructions");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers, [...sample, "true"]]), "Template");
+    XLSX.writeFile(wb, `${cfg.pageTitle.replace(/\s+/g, "_")}_import_template.xlsx`);
 }
 
 /* ---- IMPORT: bulk upload (upserts by idKey - existing update, new get added) */
 function amsHandleImportFile(file) {
     const cfg = AMS_MASTER_CONFIG;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        let rows = amsParseCsv(String(e.target.result));
+    amsReadImportRows(file).then((rows) => {
         rows = rows.filter(r => !(r[0] || "").trim().startsWith("#")); // drop instruction lines
         if (!rows.length) { amsToast("File is empty or unreadable.", "warning"); return; }
         const headers = rows[0].map(h => h.trim().replace(/\*$/, "")); // strip required-marker *
@@ -138,8 +148,9 @@ function amsHandleImportFile(file) {
         amsToast(`Import complete: ${added} added, ${updated} updated, ${skipped} skipped, ${errors} error(s). See report for details.`, added > 0 ? "success" : "info");
         amsShowImportReport(results);
         document.getElementById("importFileInput").value = "";
-    };
-    reader.readAsText(file);
+    }).catch((err) => {
+        amsToast("Could not read import file: " + (err && err.message ? err.message : err), "danger");
+    });
 }
 
 /* ---- RENDER: the master table ---------------------------------------------- */
@@ -148,8 +159,20 @@ async function amsRenderMasterTable() {
     const cfg = AMS_MASTER_CONFIG;
     const searchTerm = (document.getElementById("searchBox").value || "").toLowerCase();
 
-    const rows = cfg.dataArray
-        .filter(item => !searchTerm || cfg.fields.some(f => String(item[f.key] || "").toLowerCase().includes(searchTerm)))
+    const filtered = cfg.dataArray
+        .filter(item => !searchTerm || cfg.fields.some(f => String(item[f.key] || "").toLowerCase().includes(searchTerm)));
+
+    /* Sortable headers (shared js/sortable.js engine) */
+    const getterMap = {};
+    cfg.fields.forEach(f => {
+        if (f.hideInTable) return;
+        getterMap[f.key] = item => f.type === "date" ? amsFormatDate(item[f.key]) : item[f.key];
+    });
+    if (cfg.usageCount) getterMap["__usage"] = item => cfg.usageCount(item);
+    getterMap["__active"] = item => item.active ? "Active" : "Inactive";
+    const sorted = amsSortRows("masterTable", filtered, getterMap);
+
+    const rows = sorted
         .map(item => {
             const usage = cfg.usageCount ? cfg.usageCount(item) : 0;
             const guard = cfg.deleteGuard ? cfg.deleteGuard(item) : null;
@@ -185,10 +208,10 @@ async function amsRenderMasterTable() {
         }).join("");
 
     const visibleFields = cfg.fields.filter(f => !f.hideInTable);
-    const headCells = visibleFields.map(f => `<th>${amsEsc(f.label)}</th>`).join("");
+    const headCells = visibleFields.map(f => amsSortableTh("masterTable", f.key, f.label)).join("");
     const extraColCount = (cfg.rowBadge ? 1 : 0) + (cfg.usageCount ? 1 : 0);
     document.getElementById("masterTable").innerHTML = `
-        <thead><tr>${headCells}${cfg.rowBadge ? `<th>${amsEsc(cfg.rowBadgeLabel || "Flag")}</th>` : ""}${cfg.usageCount ? "<th>Used By</th>" : ""}<th>Status</th><th></th></tr></thead>
+        <thead><tr>${headCells}${cfg.rowBadge ? `<th>${amsEsc(cfg.rowBadgeLabel || "Flag")}</th>` : ""}${cfg.usageCount ? amsSortableTh("masterTable", "__usage", "Used By") : ""}${amsSortableTh("masterTable", "__active", "Status")}<th></th></tr></thead>
         <tbody>${rows || `<tr><td colspan="${visibleFields.length + extraColCount + 2}" style="color:var(--text-muted)">No records found</td></tr>`}</tbody>`;
 }
 
@@ -471,11 +494,12 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("pageSub").textContent = AMS_MASTER_CONFIG.pageSub;
     document.getElementById("btnAddMaster").textContent = `+ Add ${AMS_MASTER_CONFIG.pageTitle.replace(" Master", "")}`;
 
+    amsSortRegisterRenderer("masterTable", amsRenderMasterTable);
     amsRenderMasterTable();
     document.getElementById("searchBox").addEventListener("input", amsRenderMasterTable);
     document.getElementById("btnAddMaster").addEventListener("click", amsMtOpenAdd);
 
-    document.getElementById("btnExport").addEventListener("click", amsExportCsv);
+    document.getElementById("btnExport").addEventListener("click", amsExportMaster);
     document.getElementById("btnTemplate").addEventListener("click", amsDownloadTemplate);
     document.getElementById("btnImport").addEventListener("click", () => document.getElementById("importFileInput").click());
     document.getElementById("importFileInput").addEventListener("change", (e) => {

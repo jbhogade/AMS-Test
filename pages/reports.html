@@ -88,6 +88,7 @@
                     <button class="report-tab" data-report="consumableUsed">Consumable Used</button>
                     <button class="report-tab" data-report="sparePartsRestock">Spare Parts Restock</button>
                     <button class="report-tab" data-report="sparePartsUsed">Spare Parts Used</button>
+                    <button class="report-tab" data-report="assetDistribution">Asset Distribution</button>
                 </div>
 
                 <!-- ==================== ASSET LIFECYCLE PANEL ==================== -->
@@ -271,6 +272,29 @@
                         <div class="table-wrap"><table class="table" id="suTable"></table></div>
                     </div>
                 </div>
+
+                <!-- ==================== ASSET DISTRIBUTION PANEL ==================== -->
+                <div class="report-panel" id="panel-assetDistribution">
+                    <div class="report-filters">
+                        <div class="form-field">
+                            <label>Search</label>
+                            <input type="text" id="distReportSearch" placeholder="Employee name, code, department...">
+                        </div>
+                        <div class="form-field">
+                            <label>Department</label>
+                            <select id="distReportDept"><option value="">All</option></select>
+                        </div>
+                        <button class="btn btn-primary" id="btnDistReportFilter">Apply</button>
+                        <button class="btn" id="btnDistReportCsv">Export CSV</button>
+                        <button class="btn" id="btnDistReportXls">Export Excel</button>
+                    </div>
+                    <p class="form-hint" style="margin-bottom:10px;">Per-employee asset holdings: Direct = personally held (no subordinate/team holder recorded); Team = held by the employee's subordinates, or assigned to the employee with a subordinate/team member as the actual user.</p>
+                    <div class="card">
+                        <div class="table-wrap">
+                            <table class="table" id="distReportTable"></table>
+                        </div>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
@@ -279,6 +303,9 @@
     <script src="../js/theme.js"></script>
     <script src="../js/app.js"></script>
     <script src="../js/layout.js"></script>
+    <script src="../js/sortable.js"></script>
+    <script src="../js/vendor/xlsx.full.min.js"></script>
+    <script src="../js/xlsx-helpers.js"></script>
     <script src="../js/print-docs.js"></script>
     <script src="../js/print-forms.js"></script>
     <script src="../js/reports.js"></script>

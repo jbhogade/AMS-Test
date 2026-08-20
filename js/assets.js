@@ -49,8 +49,18 @@ function amsGenerateAmsAssetId(typeShort) {
 }
 
 function amsGenerateDisplayId(typeShort) {
-    const seq = AST_STATE.assets.filter(a => a.type && amsTypeShort(a.type) === typeShort).length + 1;
-    return `${typeShort}${String(seq).padStart(5, "0")}`;
+    /* max+1 (not count+1): after assets are deleted/retired a count-based
+       sequence would reuse an existing ID and collide on the server's natural
+       key (record_key), turning every later save into a 500. */
+    let maxSeq = 0;
+    AST_STATE.assets.forEach(a => {
+        if (!a || !a.type || amsTypeShort(a.type) !== typeShort) return;
+        const id = String(a.displayId || a.id || "");
+        if (id.slice(0, typeShort.length) !== typeShort) return;
+        const suffix = id.slice(typeShort.length);
+        if (/^\d+$/.test(suffix)) maxSeq = Math.max(maxSeq, parseInt(suffix, 10));
+    });
+    return `${typeShort}${String(maxSeq + 1).padStart(5, "0")}`;
 }
 
 /* =============================================================================
@@ -73,7 +83,22 @@ function renderAssetTable() {
             return [a.id, a.type, a.make, a.model, a.serialNumber].some(v => String(v || "").toLowerCase().includes(searchTerm));
         });
 
-    const rows = filtered
+    const getters = {
+        amsAssetId: a => a.amsAssetId || "",
+        id: a => amsComputeFullId(a),
+        type: a => a.type,
+        make: a => `${a.make} ${a.model || ""}`,
+        site: a => a.currentSite || a.site,
+        status: a => a.status,
+        assigned: a => {
+            const e = a.assignedTo ? amsGetEmployeeByAmsId(a.assignedTo) : null;
+            return e ? e.name : (a.assignedSubText || "");
+        },
+        warranty: a => a.warrantyEnd || "",
+    };
+    const sortedFiltered = amsSortRows("assetTable", filtered, getters);
+
+    const rows = sortedFiltered
         .map(a => {
             const fullId = amsComputeFullId(a);
             if (a.id !== fullId) a.id = fullId; /* keep the canonical id in sync with what's displayed - a stale seed id (e.g. from a department shortform that's since changed) would otherwise show one ID in the table but respond to handlers under a different one */
@@ -117,14 +142,20 @@ function renderAssetTable() {
             </tr>`;
         });
 
-    const headExtra = showAmsId ? "<th>AMS Asset ID</th>" : "";
+    const headExtra = showAmsId ? amsSortableTh("assetTable", "amsAssetId", "AMS Asset ID") : "";
     const totalMatches = filtered.length;
     const visible = rows.slice(0, AST_TABLE_SHOW_LIMIT);
     document.getElementById("assetTable").innerHTML = `
         <thead><tr>
             ${headExtra}
-            <th>Asset ID</th><th>Type</th><th>Make / Model</th><th>Current Site</th>
-            <th>Status</th><th>Assigned To</th><th>Warranty End</th><th></th>
+            ${amsSortableTh("assetTable", "id", "Asset ID")}
+            ${amsSortableTh("assetTable", "type", "Type")}
+            ${amsSortableTh("assetTable", "make", "Make / Model")}
+            ${amsSortableTh("assetTable", "site", "Current Site")}
+            ${amsSortableTh("assetTable", "status", "Status")}
+            ${amsSortableTh("assetTable", "assigned", "Assigned To")}
+            ${amsSortableTh("assetTable", "warranty", "Warranty End")}
+            <th></th>
         </tr></thead>
         <tbody>${visible.join("") || `<tr><td colspan="9" class="empty-note" style="text-align:center;padding:28px;">No assets found</td></tr>`}</tbody>`;
 
@@ -648,6 +679,7 @@ function amsOpenViewModal(key) {
         <div class="detail-row"><span class="detail-label">Purchase Site</span><span class="detail-value">${amsEsc(a.purchaseSite)}</span></div>
         <div class="detail-row"><span class="detail-label">Current Site</span><span class="detail-value">${amsEsc(a.currentSite || a.site)}</span></div>
         <div class="detail-row"><span class="detail-label">Purchase Date</span><span class="detail-value">${amsFormatDate(a.purchaseDate) || "-"}</span></div>
+        <div class="detail-row"><span class="detail-label">Issue Date</span><span class="detail-value">${amsFormatDate(a.issueDate) || "-"}</span></div>
         <div class="detail-row"><span class="detail-label">Warranty End</span><span class="detail-value">${amsFormatDate(a.warrantyEnd) || "-"}</span></div>
         <div class="detail-row"><span class="detail-label">Status</span><span class="detail-value">${amsEsc(a.status)}</span></div>
         <div class="detail-row"><span class="detail-label">Assigned To (Direct)</span><span class="detail-value">${directEmp ? amsEsc(directEmp.name) + " (" + amsEsc(directEmp.empId) + ")" : "-"}</span></div>
@@ -655,6 +687,8 @@ function amsOpenViewModal(key) {
         <div class="detail-row"><span class="detail-label">Vendor</span><span class="detail-value">${amsEsc(a.vendor) || "-"}</span></div>
         <div class="detail-row"><span class="detail-label">Purchase Cost</span><span class="detail-value">${a.purchaseCost ? formatCurrency(a.purchaseCost) : "-"}</span></div>
         <div class="detail-row"><span class="detail-label">Remarks</span><span class="detail-value">${amsEsc(a.remarks) || "-"}</span></div>
+        ${a.replacesReason ? `<div class="detail-row"><span class="detail-label">Replacement Reason</span><span class="detail-value">${amsEsc(a.replacesReason)}${a.replacesNote ? ` - ${amsEsc(a.replacesNote)}` : ""}</span></div>` : ""}
+        ${a.replacesPurchaseDate ? `<div class="detail-row"><span class="detail-label">Old Asset Purchase Date</span><span class="detail-value">${amsFormatDate(a.replacesPurchaseDate)}</span></div>` : ""}
         <div class="detail-row"><span class="detail-label">Accessories Issued</span><span class="detail-value">${(a.accessories && a.accessories.length) ? amsEsc(a.accessories.join(", ")) : "-"}</span></div>
         ${a.replacesAssetId ? `<div class="detail-row"><span class="detail-label">Replaces (Old Asset)</span><span class="detail-value mono-cell">${amsEsc(a.replacesAssetId)}</span></div>` : ""}
         ${a.replacedByAssetId ? `<div class="detail-row"><span class="detail-label">Replaced By (New Asset)</span><span class="detail-value mono-cell">${amsEsc(a.replacedByAssetId)}</span></div>` : ""}
@@ -891,11 +925,13 @@ function amsOpenReplaceModal(key) {
     document.getElementById("replSerial").value = "";
     document.getElementById("replPurchaseSite").value = old.currentSite || old.site;
     document.getElementById("replCurrentSite").value = old.currentSite || old.site;
-    document.getElementById("replPurchaseDate").value = new Date().toISOString().slice(0, 10);
+    document.getElementById("replPurchaseDate").value = old.purchaseDate || new Date().toISOString().slice(0, 10);
+    document.getElementById("replIssueDate").value = new Date().toISOString().slice(0, 10);
     document.getElementById("replWarrantyEnd").value = "";
     amsSetVendorSelectValue("replVendor", old.vendor || "");
     document.getElementById("replCost").value = "";
-    document.getElementById("replRemarks").value = "";
+    document.getElementById("replReason").value = "";
+    document.getElementById("replNote").value = "";
     amsRenderAccessoriesChecklist("replAccessories", document.getElementById("replType").value);
 
     amsOpenModal("modalReplace");
@@ -912,6 +948,11 @@ function amsSubmitReplaceForm(e) {
     const isLegacyId = !!newDisplayId;
     if (!newDisplayId) newDisplayId = amsGenerateDisplayId(typeShort);
 
+    const replacesReason = document.getElementById("replReason").value;
+    const replacesNote = document.getElementById("replNote").value.trim();
+    const issueDate = document.getElementById("replIssueDate").value || today;
+    const replacesPurchaseDate = old.purchaseDate || "";
+
     /* ---- Create the new (replacement) asset - inherits old asset's assignment ---- */
     const newAsset = {
         amsAssetId: amsGenerateAmsAssetId(typeShort), displayId: newDisplayId, isLegacyId, id: newDisplayId,
@@ -922,7 +963,7 @@ function amsSubmitReplaceForm(e) {
         site: document.getElementById("replCurrentSite").value,
         purchaseDate: document.getElementById("replPurchaseDate").value, warrantyEnd: document.getElementById("replWarrantyEnd").value,
         vendor: document.getElementById("replVendor").value.trim(), purchaseCost: document.getElementById("replCost").value.trim(),
-        remarks: document.getElementById("replRemarks").value.trim(),
+        replacesReason, replacesNote, replacesPurchaseDate, issueDate,
         status: old.assignedTo ? "Assigned" : "In Store",
         dept: old.dept || "", assignedTo: old.assignedTo || null, assignedToSubordinate: old.assignedToSubordinate || null,
         assignedSubText: old.assignedSubText || null,
@@ -935,10 +976,12 @@ function amsSubmitReplaceForm(e) {
     const replAccessories = amsGetCheckedAccessories("replAccessories");
     newAsset.accessories = replAccessories;
     const oldEmp = old.assignedTo ? amsGetEmployeeByAmsId(old.assignedTo) : null;
+    const replDetail = `Reason: ${replacesReason}${replacesNote ? ` - ${replacesNote}` : ""}`;
     newAsset.history.push({
-        date: today, action: `Added to Inventory (Replacement for ${amsBaseDisplayId(old)})`,
+        date: issueDate, action: `Added to Inventory (Replacement for ${amsBaseDisplayId(old)})`,
         empId: old.assignedTo || "", empName: oldEmp ? oldEmp.name : "", empDept: old.dept || "", assetIdFull: newAsset.id, statusLabel: newAsset.status,
         accessories: replAccessories.length ? replAccessories.join(", ") : "",
+        note: replDetail,
     });
     AST_STATE.assets.push(newAsset);
 
@@ -949,7 +992,7 @@ function amsSubmitReplaceForm(e) {
     old.replacedByAssetId = newDisplayId;
     old.id = amsComputeFullId(old);
     old.history.push({
-        date: today, action: `Replaced by ${newDisplayId}`,
+        date: today, action: `Replaced by ${newDisplayId}`, note: replDetail,
         empId: oldPrevEmp ? oldPrevEmp.empId : "", empName: oldPrevEmp ? oldPrevEmp.name : "", empDept: oldPrevEmp ? oldPrevEmp.dept : "",
         assetIdFull: old.id, statusLabel: "Replaced",
     });
@@ -983,7 +1026,7 @@ function amsOpenHistoryModal(key) {
             return `<tr>
                 <td class="mono-cell">${amsFormatDate(h.date)}</td>
                 <td><span class="badge ${evt.cls}">${evt.label}</span></td>
-                <td>${amsEsc(h.action)}</td>
+                <td>${amsEsc(h.action)}${h.note ? `<div class="form-hint" style="font-size:12px;margin-top:2px;">${amsEsc(h.note)}</div>` : ""}</td>
                 <td class="mono-cell">${amsEsc(h.empId) || "-"}</td>
                 <td>${amsEsc(h.empName) || "-"}</td>
                 <td>${amsEsc(h.empDept) || "-"}</td>
@@ -1078,14 +1121,15 @@ function amsGenerateAssetIssueFormPrint(key, extraRemarks) {
     const owned = amsOwnedAssetsForEmp(emp.empId);
     const subAssets = amsSubordinateAssetsForEmpDetailed(emp.empId);
 
-    /* Assets issued directly to the employee (ALL assets assigned to them,
-       including ones whose actual user is a User MASTER record) stay in
-       "Assets Issued". Assets whose real user was typed as FREE TEXT
-       (assignedSubText, not in the User master) show in the "For Reference"
-       section instead, since they were never issued to the employee personally. */
+    /* Assets issued directly to the employee (assigned to them with no
+       subordinate/team actual user) stay in "Assets Issued". Assets whose actual
+       user is a subordinate/team member (User master record or free text) show
+       in the "For Reference" section instead, since they are not personally held
+       by the employee. */
     const splitOwned = amsSplitDirectVsSubordinateAssets(owned);
     const directOwned = splitOwned.direct;
     const subOwned = splitOwned.subordinate;
+    const assignmentType = amsAssignmentTypeLabel(directOwned.length, subOwned.length + subAssets.length);
 
     const title = "Asset Issue Form";
     const formNo = amsGenerateAssetFormNo();
@@ -1112,7 +1156,7 @@ function amsGenerateAssetIssueFormPrint(key, extraRemarks) {
             ${infoBox("Department", amsEsc(emp.dept))}
             ${infoBox("Designation", amsEsc(emp.designation))}
             ${infoBox("Reporting Manager", amsEsc(managerName))}
-            ${infoBox("Assignment Type", "Direct (Personal Use)")}
+            ${infoBox("Assignment Type", amsEsc(assignmentType))}
         </div>
         <div class="pf-box-grid cols-3">
             ${infoBox("Date of Issue", today)}
@@ -1213,7 +1257,7 @@ function amsGenerateAssetIssueFormPrint(key, extraRemarks) {
 
             <div class="pf-footer">
                 <span>AMS v4 - Generated electronically</span>
-                <span>Internal Ref: ${formNo} &middot; ${directOwned.length} asset(s) issued</span>
+                <span>Internal Ref: ${formNo} &middot; ${directOwned.length} asset(s) issued &middot; ${directOwned.length} direct, ${subOwned.length + subAssets.length} team</span>
             </div>
         </div>
     `;
@@ -1241,27 +1285,38 @@ const AST_IMPORT_HEADERS = [
 ];
 
 function amsExportAssets() {
-    const rows = [AST_EXPORT_HEADERS];
-    AST_STATE.assets.forEach(a => {
-        rows.push([
-            amsBaseDisplayId(a), a.amsAssetId, a.type, a.category || "", a.make, a.model || "", a.name || "", a.serialNumber || "",
-            a.purchaseSite, a.currentSite || a.site, amsFormatDate(a.purchaseDate), amsFormatDate(a.warrantyEnd), a.status,
-            a.assignedTo || "", a.assignedToSubordinate || "", a.vendor || "", a.purchaseCost || "", a.remarks || "",
-            a.replacesAssetId || "", a.replacedByAssetId || "", amsComputeFullId(a),
-        ]);
-    });
-    amsDownloadFile(rows.map(amsCsvRow).join("\r\n"), "Asset_Master_export.csv", "text/csv");
+    const rows = AST_STATE.assets.map(a => [
+        amsBaseDisplayId(a), a.amsAssetId, a.type, a.category || "", a.make, a.model || "", a.name || "", a.serialNumber || "",
+        a.purchaseSite, a.currentSite || a.site, amsFormatDate(a.purchaseDate), amsFormatDate(a.warrantyEnd), a.status,
+        a.assignedTo || "", a.assignedToSubordinate || "", a.vendor || "", a.purchaseCost || "", a.remarks || "",
+        a.replacesAssetId || "", a.replacedByAssetId || "", amsComputeFullId(a),
+    ]);
+    amsExportXlsx("Asset_Master_export", AST_EXPORT_HEADERS, rows);
 }
 
 function amsDownloadAssetTemplate() {
-    const instructionRow = ["# Fields marked with * are required. AMS Asset ID is auto-generated - do not add it here. displayId blank = auto-generated, or type an existing legacy ID."];
+    if (typeof XLSX === "undefined") {
+        alert("Excel export library not loaded. Check js/vendor/xlsx.full.min.js is present.");
+        return;
+    }
     const sample = [
         "LT00099", "Laptop", "IT Hardware", "Dell", "Latitude 5430", "", "SN-EXAMPLE-001",
         "Mumbai HO", "Mumbai HO", "13-07-2026", "13-07-2028", "In Store",
         "", "", "Dell India Pvt Ltd", "65000", "Example row - delete before importing",
     ];
-    const rows = [instructionRow, AST_IMPORT_HEADERS, sample];
-    amsDownloadFile(rows.map(amsCsvRow).join("\r\n"), "Asset_Master_import_template.csv", "text/csv");
+    const wb = XLSX.utils.book_new();
+    const instr = XLSX.utils.aoa_to_sheet([
+        ["Asset Master Import Template - Instructions"],
+        ["Fields marked with * are required."],
+        ["AMS Asset ID and Full Asset ID are always auto-generated - do not add them."],
+        ["displayId blank = auto-generated, or type an existing legacy ID."],
+        ["Dates use DD-MM-YYYY format."],
+    ]);
+    instr["!cols"] = [{ wch: 90 }];
+    XLSX.utils.book_append_sheet(wb, instr, "Instructions");
+    const tpl = XLSX.utils.aoa_to_sheet([AST_IMPORT_HEADERS, sample]);
+    XLSX.utils.book_append_sheet(wb, tpl, "Template");
+    XLSX.writeFile(wb, "Asset_Master_import_template.xlsx");
 }
 
 function amsShowImportSummary(results) {
@@ -1277,9 +1332,7 @@ function amsShowImportSummary(results) {
 }
 
 function amsImportAssetsFile(file) {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        let rows = amsParseCsv(String(e.target.result));
+    amsReadImportRows(file).then((rows) => {
         rows = rows.filter(r => !(r[0] || "").trim().startsWith("#")); /* drop instruction/comment lines */
         if (!rows.length) { alert("File is empty or unreadable."); return; }
         const headers = rows[0].map(h => h.trim().replace(/\*$/, "")); /* strip the required-marker * before matching */
@@ -1349,11 +1402,13 @@ function amsImportAssetsFile(file) {
         }
 
         renderAssetTable();
+        amsDbSaveAsync("assets"); /* persist the imported/updated rows (wholesale PUT) */
         amsShowImportSummary(results);
         const fileInput = document.getElementById("assetImportFileInput");
         if (fileInput) fileInput.value = "";
-    };
-    reader.readAsText(file);
+    }).catch((err) => {
+        alert("Could not read import file: " + (err && err.message ? err.message : err));
+    });
 }
 
 /* =============================================================================
@@ -1377,6 +1432,7 @@ function hideFormError(id) {
 async function initAssets() {
     /* Initial render (waits for the DB-backed collections to load first) */
     if (typeof amsDbEnsureLoaded === "function") await amsDbEnsureLoaded();
+    amsSortRegisterRenderer("assetTable", renderAssetTable);
     renderAssetTable();
 
     /* Toolbar */
