@@ -290,7 +290,9 @@ function amsGenerateReport(amsId, type, extraRemarks) {
         </div>
     `;
 
-    amsPrintDocument(printContent, title);
+    /* Landscape orientation suits the multi-column asset table on both the
+       Assign Report (Asset Issue Form) and the Exit Report (Handover Form). */
+    amsPrintDocument(printContent, title, "landscape");
 }
 
 /*------------------------------------------------------------------------------

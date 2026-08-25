@@ -392,21 +392,44 @@ async function amsMtDelete(key) {
 }
 
 /* ---- ROW ACTION delegation --------------------------------------------------- */
-function amsMtCloseAllRowMenus() {
+/* Row-menu helpers - prefer the shared viewport-anchored helpers from
+   js/layout.js, but fall back to the classic open/close so the menus still
+   work even if an older (cached) layout.js is loaded. */
+function amsOpenRowMenu(trigger, menu) {
+    if (typeof amsDropdownOpen === "function") { amsDropdownOpen(trigger, menu); return; }
     document.querySelectorAll(".actions-menu.open").forEach(m => m.classList.remove("open"));
-    document.querySelectorAll(".table-wrap.mt-menu-open").forEach(w => w.classList.remove("mt-menu-open"));
+    menu.classList.add("open");
+    /* Viewport-anchored fallback (mirrors amsDropdownOpen): even with a stale
+       cached layout.js the menu opens right under its trigger instead of
+       floating absolute inside (and being clipped by) the table's scroll
+       container. */
+    const r = trigger.getBoundingClientRect();
+    const mw = menu.offsetWidth || 200;
+    const mh = menu.offsetHeight || 320;
+    menu.style.position = "fixed";
+    menu.style.right = "auto";
+    menu.style.top = "auto";
+    menu.style.zIndex = "500";
+    let left = r.right - mw;
+    if (left < 8) left = Math.max(8, r.left);
+    if (left + mw > window.innerWidth - 8) left = window.innerWidth - mw - 8;
+    let top = r.bottom + 6;
+    if (top + mh > window.innerHeight - 8) { top = r.top - mh - 6; if (top < 8) top = 8; }
+    menu.style.left = left + "px";
+    menu.style.top = top + "px";
+    menu.style.width = mw + "px";
+}
+function amsCloseRowMenus() {
+    if (typeof amsDropdownClose === "function") { amsDropdownClose(); return; }
+    document.querySelectorAll(".actions-menu.open").forEach(m => {
+        m.classList.remove("open");
+        m.style.position = ""; m.style.left = ""; m.style.top = "";
+        m.style.right = ""; m.style.width = ""; m.style.zIndex = "";
+    });
 }
 
-/* While a row menu is open the .table-wrap must stop clipping it (its
-   overflow-x:auto would otherwise turn overflow-y into auto too, cutting the
-   dropdown off or spawning a scrollbar). We lift the wrap to overflow:visible
-   for the duration, so the menu overlays the frame instead of expanding it. */
-function amsMtSyncWrapOverflow() {
-    const anyOpen = document.querySelector(".actions-menu.open");
-    document.querySelectorAll(".table-wrap").forEach(w => {
-        const inside = w.contains(anyOpen);
-        w.classList.toggle("mt-menu-open", !!inside);
-    });
+function amsMtCloseAllRowMenus() {
+    amsCloseRowMenus();
 }
 
 document.addEventListener("click", (e) => {
@@ -415,8 +438,7 @@ document.addEventListener("click", (e) => {
         const menu = document.getElementById(`menu-${trigger.getAttribute("data-actions-for")}`);
         const wasOpen = menu.classList.contains("open");
         amsMtCloseAllRowMenus();
-        if (!wasOpen) menu.classList.add("open");
-        amsMtSyncWrapOverflow();
+        if (!wasOpen) amsOpenRowMenu(trigger, menu);
         return;
     }
     if (!e.target.closest(".actions-menu")) amsMtCloseAllRowMenus();

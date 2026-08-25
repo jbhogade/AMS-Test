@@ -229,6 +229,86 @@ function initLayout(currentPage) {
     if (typeof amsInitBell === "function") amsInitBell();
 }
 
+/* =============================================================================
+   SHARED ROW-ACTIONS DROPDOWN (viewport-anchored)
+   -----------------------------------------------------------------------------
+   The old pattern lifted a row menu's scroll container from overflow:auto to
+   overflow:visible while the menu was open. That made the scrollbar vanish
+   (the whole table reflowed a few px wider) and - on capped-height wraps like
+   the Assets list - let every row spill out over the footer/summary below, a
+   sudden, jarring change in appearance. Instead, menus are now anchored to the
+   trigger with position:fixed and clamped to the viewport, so opening one never
+   touches the table's layout at all.
+   ----------------------------------------------------------------------------*/
+function amsDropdownOpen(trigger, menu) {
+    amsDropdownClose();
+    const r = trigger.getBoundingClientRect();
+    menu.classList.add("open");
+    menu.style.position = "fixed";
+    menu.style.right = "auto";
+    menu.style.top = "auto";
+    menu.style.zIndex = "500";
+    menu.style.left = "-9999px";                 /* measure off-screen first   */
+    const mw = menu.offsetWidth || 200;
+    const mh = menu.offsetHeight || 320;
+    let left = r.right - mw;                     /* keep the menu right-aligned */
+    if (left < 8) left = Math.max(8, r.left);
+    if (left + mw > window.innerWidth - 8) left = window.innerWidth - mw - 8;
+    let top = r.bottom + 6;
+    if (top + mh > window.innerHeight - 8) {     /* flip upward when it would  */
+        top = r.top - mh - 6;                    /* overflow the bottom edge   */
+        if (top < 8) top = 8;
+    }
+    menu.style.left = left + "px";
+    menu.style.top = top + "px";
+    menu.style.width = mw + "px";
+}
+
+/* Closes every open actions menu and restores its inline overrides so the next
+   open measures the natural size again. */
+function amsDropdownClose() {
+    document.querySelectorAll(".actions-menu.open").forEach(m => {
+        m.classList.remove("open");
+        m.style.position = ""; m.style.left = ""; m.style.top = "";
+        m.style.right = ""; m.style.width = ""; m.style.zIndex = "";
+    });
+    document.querySelectorAll(".row-actions.open").forEach(el => el.classList.remove("open"));
+}
+
+/* A fixed-position menu would float detached if the PAGE scrolls or the window
+   resizes while it is open, so close it whenever either happens. (Deliberately
+   non-capturing: scrolling the table wrap itself does NOT dismiss the menu.) */
+["scroll", "resize"].forEach(evt =>
+    window.addEventListener(evt, () => amsDropdownClose(), { passive: true }));
+
+/* =============================================================================
+   SHARED MODAL HELPERS
+   -----------------------------------------------------------------------------
+   Generic modal open/close used by every page. Previously amsOpenModal lived
+   only in js/assets.js, so pages that did NOT load assets.js (e.g. Asset
+   Distribution) threw ReferenceError when a button tried to open a modal.
+   Keeping them here, loaded on every page, makes modal open/close work
+   everywhere. Pages may still bind their own [data-close] handlers for extra
+   behaviour; this shared delegation guarantees basic open/close always work.
+   ============================================================================*/
+
+function amsOpenModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.add("open");
+}
+
+function amsCloseModal(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove("open");
+}
+
+document.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-close]");
+    if (!btn) return;
+    const id = btn.getAttribute("data-close");
+    if (id) amsCloseModal(id);
+});
+
 /*------------------------------------------------------------------------------
 #-------------- End of the code : SHARED LAYOUT -------------------------------
 #------------------------------------------------------------------------------*/

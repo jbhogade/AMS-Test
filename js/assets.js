@@ -24,13 +24,16 @@ const AST_STATE = {
     editingId: null,      /* asset.id currently being edited/acted on (Add modal = null) */
     assignMode: null,     /* "assign" | "reassign" - which action opened modalAssign */
     formCounters: {},     /* per-form sequence counters for generated form numbers */
+    viewKey: null,        /* asset.id whose details are open in modalView */
+    historyKey: null,     /* asset.id whose ID record is open in modalHistory */
+    replAwaitingAdd: false, /* true while the Add Asset modal is open from the Replace modal */
+    replOldKey: null,       /* asset.id of the asset being replaced while adding from Replace */
+    replNewKey: null,       /* asset.id of the asset just added from the Replace modal */
 };
 
-/* Asset list paging - rows shown by default (Settings > General > Default list
-   page size, default 20), "Show More" reveals more inside the scrollable table
-   container. */
-let AST_TABLE_PAGE_SIZE = (typeof amsGetDefaultPageSize === "function") ? amsGetDefaultPageSize() : 20;
-var AST_TABLE_SHOW_LIMIT = AST_TABLE_PAGE_SIZE;
+/* Asset list renders EVERY matching row at once (like the Employees master) -
+   no pagination, no inner scroll frame. The page itself scrolls and the
+   footer shows the record count ("Showing X of Y assets"). */
 
 /* Employee view-model (shared with dummy-data.js) - read-only list, resolved by
    AMS ID so asset records link to employees consistently across the portal. */
@@ -144,7 +147,6 @@ function renderAssetTable() {
 
     const headExtra = showAmsId ? amsSortableTh("assetTable", "amsAssetId", "AMS Asset ID") : "";
     const totalMatches = filtered.length;
-    const visible = rows.slice(0, AST_TABLE_SHOW_LIMIT);
     document.getElementById("assetTable").innerHTML = `
         <thead><tr>
             ${headExtra}
@@ -157,29 +159,13 @@ function renderAssetTable() {
             ${amsSortableTh("assetTable", "warranty", "Warranty End")}
             <th></th>
         </tr></thead>
-        <tbody>${visible.join("") || `<tr><td colspan="9" class="empty-note" style="text-align:center;padding:28px;">No assets found</td></tr>`}</tbody>`;
+        <tbody>${rows.join("") || `<tr><td colspan="9" class="empty-note" style="text-align:center;padding:28px;">No assets found</td></tr>`}</tbody>`;
 
     const footer = document.getElementById("assetTableFooter");
     if (footer) {
-        const hasHidden = totalMatches > AST_TABLE_SHOW_LIMIT;
-        const expanded = AST_TABLE_SHOW_LIMIT > AST_TABLE_PAGE_SIZE;
-        if (totalMatches > 0 && (hasHidden || expanded)) {
-            footer.innerHTML = `
-                <span>Showing ${Math.min(AST_TABLE_SHOW_LIMIT, totalMatches)} of ${totalMatches} assets</span>
-                <div class="flex items-center gap-8">
-                    <button class="btn btn-secondary" id="btnAssetShowMore">${hasHidden ? "Show More" : "Show Less"}</button>
-                </div>`;
-            document.getElementById("btnAssetShowMore").addEventListener("click", () => {
-                if (hasHidden) {
-                    AST_TABLE_SHOW_LIMIT = Math.min(AST_TABLE_SHOW_LIMIT + AST_TABLE_PAGE_SIZE, totalMatches);
-                } else {
-                    AST_TABLE_SHOW_LIMIT = AST_TABLE_PAGE_SIZE;
-                }
-                renderAssetTable();
-            });
-        } else {
-            footer.innerHTML = "";
-        }
+        footer.innerHTML = totalMatches > 0
+            ? `<span>Showing ${totalMatches} of ${totalMatches} assets</span>`
+            : "";
     }
 
     renderAssetStockSummary();
@@ -245,18 +231,44 @@ function renderAssetStockSummary() {
 /* =============================================================================
    5) ACTIONS DROPDOWN OPEN/CLOSE + ROW ACTION DELEGATION
    ===========================================================================*/
-function amsCloseAllMenus() {
+/* Row-menu helpers - prefer the shared viewport-anchored helpers from
+   js/layout.js, but fall back to the classic open/close so the menus still
+   work even if an older (cached) layout.js is loaded. */
+function amsOpenRowMenu(trigger, menu) {
+    if (typeof amsDropdownOpen === "function") { amsDropdownOpen(trigger, menu); return; }
     document.querySelectorAll(".actions-menu.open").forEach(m => m.classList.remove("open"));
-    amsSyncWrapOverflow();
+    menu.classList.add("open");
+    /* Viewport-anchored fallback (mirrors amsDropdownOpen): even with a stale
+       cached layout.js the menu opens right under its trigger instead of
+       floating absolute inside (and being clipped by) the table's scroll
+       container. */
+    const r = trigger.getBoundingClientRect();
+    const mw = menu.offsetWidth || 200;
+    const mh = menu.offsetHeight || 320;
+    menu.style.position = "fixed";
+    menu.style.right = "auto";
+    menu.style.top = "auto";
+    menu.style.zIndex = "500";
+    let left = r.right - mw;
+    if (left < 8) left = Math.max(8, r.left);
+    if (left + mw > window.innerWidth - 8) left = window.innerWidth - mw - 8;
+    let top = r.bottom + 6;
+    if (top + mh > window.innerHeight - 8) { top = r.top - mh - 6; if (top < 8) top = 8; }
+    menu.style.left = left + "px";
+    menu.style.top = top + "px";
+    menu.style.width = mw + "px";
+}
+function amsCloseRowMenus() {
+    if (typeof amsDropdownClose === "function") { amsDropdownClose(); return; }
+    document.querySelectorAll(".actions-menu.open").forEach(m => {
+        m.classList.remove("open");
+        m.style.position = ""; m.style.left = ""; m.style.top = "";
+        m.style.right = ""; m.style.width = ""; m.style.zIndex = "";
+    });
 }
 
-/* While a row menu is open, #assetTableWrap (overflow:auto) would clip the
-   dropdown or spawn scrollbars. Lift it to overflow:visible for the duration so
-   the menu overlays the table frame instead of expanding it. */
-function amsSyncWrapOverflow() {
-    const anyOpen = document.querySelector(".actions-menu.open");
-    const wrap = document.getElementById("assetTableWrap");
-    if (wrap) wrap.classList.toggle("mt-menu-open", !!(anyOpen && wrap.contains(anyOpen)));
+function amsCloseAllMenus() {
+    amsCloseRowMenus();
 }
 
 function amsCloseAllQuickAdd() {
@@ -272,8 +284,7 @@ function amsWireRowActions() {
             const wasOpen = menu.classList.contains("open");
             amsCloseAllMenus();
             if (!wasOpen) {
-                menu.classList.add("open");
-                amsSyncWrapOverflow();
+                amsOpenRowMenu(trigger, menu);
             }
             return;
         }
@@ -340,7 +351,6 @@ function amsUpdateAssetIdPreview() {
    ===========================================================================*/
 const AMS_QA_POPOVER_ID = {
     type: "qaPopoverType", category: "qaPopoverCategory", make: "qaPopoverMake", purchaseSite: "qaPopoverPurchaseSite", currentSite: "qaPopoverCurrentSite",
-    replMake: "qaPopoverReplMake", replPurchaseSite: "qaPopoverReplPurchaseSite", replCurrentSite: "qaPopoverReplCurrentSite",
 };
 
 function amsWireQuickAddPopovers() {
@@ -420,40 +430,6 @@ function amsWireQuickAddPopovers() {
     if (qaPurchaseSave) qaPurchaseSave.addEventListener("click", () => amsQuickAddSite("fPurchaseSite", "qaPurchaseSiteName", "qaPurchaseSiteShort"));
     const qaCurrentSave = document.querySelector('[data-qa-save="currentSite"]');
     if (qaCurrentSave) qaCurrentSave.addEventListener("click", () => amsQuickAddSite("fCurrentSite", "qaCurrentSiteName", "qaCurrentSiteShort"));
-
-    /* ---- Save: new Make from the Replace modal ---- */
-    const qaReplMakeSave = document.querySelector('[data-qa-save="replMake"]');
-    if (qaReplMakeSave) qaReplMakeSave.addEventListener("click", () => {
-        const name = document.getElementById("qaReplMakeName").value.trim();
-        if (!name) { alert("Enter a Make/Brand name."); return; }
-        if (AMS_DUMMY_ASSET_MAKES.some(m => m.name.toLowerCase() === name.toLowerCase())) { alert("This Make already exists."); return; }
-        AMS_DUMMY_ASSET_MAKES.push({ name, active: true });
-        amsDbSaveAsync("assetMakes");
-        document.getElementById("replMake").innerHTML = AMS_DUMMY_ASSET_MAKES.filter(m => m.active).map(m => `<option value="${amsEsc(m.name)}">${amsEsc(m.name)}</option>`).join("");
-        document.getElementById("replMake").value = name;
-        document.getElementById("qaReplMakeName").value = "";
-        amsCloseAllQuickAdd();
-    });
-
-    /* ---- Save: new Site from the Replace modal (Purchase/Current, shared master) ---- */
-    function amsQuickAddReplSite(targetFieldId, nameInputId, shortInputId) {
-        const name = document.getElementById(nameInputId).value.trim();
-        const shortform = document.getElementById(shortInputId).value.trim().toUpperCase();
-        if (!name || !shortform) { alert("Enter both Site Name and Shortform."); return; }
-        if (AMS_DUMMY_SITES.some(s => s.name.toLowerCase() === name.toLowerCase())) { alert("This Site already exists."); return; }
-        AMS_DUMMY_SITES.push({ name, shortform, address: "", active: true });
-        amsDbSaveAsync("sites");
-        const siteOptions = AMS_DUMMY_SITES.filter(s => s.active).map(s => `<option value="${amsEsc(s.name)}">${amsEsc(s.name)}</option>`).join("");
-        document.getElementById("replPurchaseSite").innerHTML = siteOptions;
-        document.getElementById("replCurrentSite").innerHTML = siteOptions;
-        document.getElementById(targetFieldId).value = name;
-        document.getElementById(nameInputId).value = ""; document.getElementById(shortInputId).value = "";
-        amsCloseAllQuickAdd();
-    }
-    const qaReplPurchaseSave = document.querySelector('[data-qa-save="replPurchaseSite"]');
-    if (qaReplPurchaseSave) qaReplPurchaseSave.addEventListener("click", () => amsQuickAddReplSite("replPurchaseSite", "qaReplPurchaseSiteName", "qaReplPurchaseSiteShort"));
-    const qaReplCurrentSave = document.querySelector('[data-qa-save="replCurrentSite"]');
-    if (qaReplCurrentSave) qaReplCurrentSave.addEventListener("click", () => amsQuickAddReplSite("replCurrentSite", "qaReplCurrentSiteName", "qaReplCurrentSiteShort"));
 }
 
 /* =============================================================================
@@ -505,7 +481,6 @@ function amsWireAccessoryAndDeptQuickAdds() {
         const a = AST_STATE.assets.find(x => x.id === AST_STATE.editingId);
         return a ? a.type : "";
     });
-    amsWireAccessoryQuickAdd("replAccessories", () => document.getElementById("replType").value);
 }
 
 /* =============================================================================
@@ -651,12 +626,14 @@ function amsSubmitAssetForm(e) {
             history: [{ date: new Date().toISOString().slice(0, 10), action: "Added to Inventory", empId: "", empName: "", empDept: "", assetIdFull: displayId, statusLabel: statusVal }],
         };
         AST_STATE.assets.push(asset);
+        if (AST_STATE.replAwaitingAdd) AST_STATE.replNewKey = asset.id;
         amsNotify(`Asset added: ${displayId} (${asset.type})`, "success");
     }
 
     amsCloseModal("modalForm");
     amsDbSaveAsync("assets");
     renderAssetTable();
+    if (AST_STATE.replAwaitingAdd) amsResumeReplaceAfterAdd();
 }
 
 /* =============================================================================
@@ -665,6 +642,7 @@ function amsSubmitAssetForm(e) {
 function amsOpenViewModal(key) {
     const a = AST_STATE.assets.find(x => x.id === key);
     if (!a) return;
+    AST_STATE.viewKey = key;
     const showAmsId = document.getElementById("superRootToggle").checked;
     const directEmp = a.assignedTo ? amsGetEmployeeByAmsId(a.assignedTo) : null;
     const subEmp = a.assignedToSubordinate ? amsGetEmployeeByAmsId(a.assignedToSubordinate) : null;
@@ -710,6 +688,56 @@ function amsSparePartsUsedHtml(a) {
             <div class="card-title">Spare Parts Used on This Asset</div>
             <div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Part</th><th>Qty</th><th>By</th></tr></thead><tbody>${rows}</tbody></table></div>
         </div>`;
+}
+
+/* Downloads the asset details currently shown in the "View" modal as CSV. */
+function amsDownloadAssetView() {
+    const a = AST_STATE.assets.find(x => x.id === AST_STATE.viewKey);
+    if (!a) return;
+    const directEmp = a.assignedTo ? amsGetEmployeeByAmsId(a.assignedTo) : null;
+    const subEmp = a.assignedToSubordinate ? amsGetEmployeeByAmsId(a.assignedToSubordinate) : null;
+    const rows = [
+        ["Field", "Value"],
+        ["AMS Asset ID", a.amsAssetId || "-"],
+        ["Asset ID (Full)", amsComputeFullId(a)],
+        ["Type / Make / Model", `${a.type} - ${a.make} ${a.model || ""}`.trim()],
+        ["Category", a.category || "-"],
+        ["Asset Name", a.name || "-"],
+        ["Serial Number", a.serialNumber || "-"],
+        ["Purchase Site", a.purchaseSite || "-"],
+        ["Current Site", a.currentSite || a.site || "-"],
+        ["Purchase Date", amsFormatDate(a.purchaseDate) || "-"],
+        ["Issue Date", amsFormatDate(a.issueDate) || "-"],
+        ["Warranty End", amsFormatDate(a.warrantyEnd) || "-"],
+        ["Status", a.status || "-"],
+        ["Assigned To (Direct)", directEmp ? `${directEmp.name} (${directEmp.empId})` : "-"],
+        ["Assigned To (Subordinate)", subEmp ? `${subEmp.name} (${subEmp.empId})` : (a.assignedSubText || "-")],
+        ["Vendor", a.vendor || "-"],
+        ["Purchase Cost", a.purchaseCost ? formatCurrency(a.purchaseCost) : "-"],
+        ["Remarks", a.remarks || "-"],
+    ];
+    const csv = rows.map(amsCsvRow).join("\r\n");
+    amsDownloadFile(csv, `Asset_${a.id}.csv`, "text/csv;charset=utf-8;");
+}
+
+/* Downloads the "Asset ID Record" (lifecycle history) currently shown as CSV. */
+function amsDownloadAssetHistory() {
+    const a = AST_STATE.assets.find(x => x.id === AST_STATE.historyKey);
+    if (!a) return;
+    const headers = ["Date", "Type", "Action", "Emp Code", "Emp Name", "Department", "Asset ID (Full)", "Status", "Accessories"];
+    const rows = a.history.map(h => [
+        amsFormatDate(h.date) || "-",
+        amsHistoryEventType(h.action).label,
+        h.action,
+        h.empId || "-",
+        h.empName || "-",
+        h.empDept || "-",
+        h.assetIdFull || "-",
+        h.statusLabel || "-",
+        h.accessories || "-",
+    ]);
+    const csv = [amsCsvRow(headers)].concat(rows.map(r => amsCsvRow(r))).join("\r\n");
+    amsDownloadFile(csv, `Asset_ID_Record_${a.id}.csv`, "text/csv;charset=utf-8;");
 }
 
 /* =============================================================================
@@ -767,6 +795,8 @@ function amsConfirmAssign() {
     if (!directId) { alert("Select a Direct Employee to assign this asset to."); return; }
 
     const directEmp = amsGetEmployeeByAmsId(directId);
+    const prevHolderId = a.assignedTo;
+    const prevHolder = prevHolderId ? amsGetEmployeeByAmsId(prevHolderId) : null;
     a.assignedTo = directId;
     a.assignedToSubordinate = subId && subId !== "__other__" ? subId : null;
     a.assignedSubText = subText || null;
@@ -776,6 +806,18 @@ function amsConfirmAssign() {
 
     const accessories = amsGetCheckedAccessories("assignAccessories");
     a.accessories = accessories;
+
+    /* On a REASSIGN the previous holder also gets a record, so the asset's
+       lifecycle (and Asset Distribution) keeps the reassigned-away employee's
+       history instead of silently dropping it. */
+    if (AST_STATE.assignMode === "reassign" && prevHolderId && prevHolderId !== directId) {
+        a.history.push({
+            date: assignDate,
+            action: `Reassigned from ${prevHolder ? prevHolder.name : prevHolderId}`,
+            empId: prevHolderId, empName: prevHolder ? prevHolder.name : "", empDept: prevHolder ? prevHolder.dept : "",
+            assetIdFull: a.id, statusLabel: "Assigned",
+        });
+    }
 
     a.history.push({
         date: assignDate,
@@ -903,100 +945,148 @@ function amsOpenReplaceModal(key) {
     const old = AST_STATE.assets.find(x => x.id === key);
     if (!old) return;
     AST_STATE.editingId = key;
+    AST_STATE.replAwaitingAdd = false;
+    AST_STATE.replOldKey = null;
+    AST_STATE.replNewKey = null;
     document.getElementById("replaceOldAssetLabel").textContent = `${amsComputeFullId(old)} (${old.type} - ${old.make} ${old.model || ""})`;
 
     document.getElementById("replType").innerHTML = AMS_DUMMY_ASSET_TYPES.filter(t => t.active).map(t => `<option value="${amsEsc(t.name)}">${amsEsc(t.name)}</option>`).join("");
-    document.getElementById("replMake").innerHTML = AMS_DUMMY_ASSET_MAKES.filter(m => m.active).map(m => `<option value="${amsEsc(m.name)}">${amsEsc(m.name)}</option>`).join("");
-    const siteOptions = AMS_DUMMY_SITES.filter(s => s.active).map(s => `<option value="${amsEsc(s.name)}">${amsEsc(s.name)}</option>`).join("");
-    document.getElementById("replPurchaseSite").innerHTML = siteOptions;
-    document.getElementById("replCurrentSite").innerHTML = siteOptions;
+    document.getElementById("replType").value = old.type; /* same type by default - switchable if unavailable */
+    document.getElementById("replTypeHint").textContent = "Only In-Store (unassigned) assets of this type are listed below. Change the type to browse other In-Store assets.";
 
-    document.getElementById("replAssetId").value = "";
-    document.getElementById("replType").value = old.type; /* same type by default - editable if the replacement differs */
-    const AMS_PHONE_TYPES = ["Smartphone", "Basic Keypad Phone"];
-    const typeLocked = !AMS_PHONE_TYPES.includes(old.type);
-    document.getElementById("replType").disabled = typeLocked;
-    document.getElementById("replTypeHint").textContent = typeLocked
-        ? "Locked to the old asset's type - replacements must match, except phones (Smartphone/Basic Keypad Phone)"
-        : "Phone category - you may switch between Smartphone and Basic Keypad Phone";
-    document.getElementById("replMake").value = old.make;
-    document.getElementById("replName").value = "";
-    document.getElementById("replModel").value = "";
-    document.getElementById("replSerial").value = "";
-    document.getElementById("replPurchaseSite").value = old.currentSite || old.site;
-    document.getElementById("replCurrentSite").value = old.currentSite || old.site;
-    document.getElementById("replPurchaseDate").value = old.purchaseDate || new Date().toISOString().slice(0, 10);
+    amsPopulateReplaceSource();
+
     document.getElementById("replIssueDate").value = new Date().toISOString().slice(0, 10);
-    document.getElementById("replWarrantyEnd").value = "";
-    amsSetVendorSelectValue("replVendor", old.vendor || "");
-    document.getElementById("replCost").value = "";
     document.getElementById("replReason").value = "";
     document.getElementById("replNote").value = "";
-    amsRenderAccessoriesChecklist("replAccessories", document.getElementById("replType").value);
 
     amsOpenModal("modalReplace");
+}
+
+/* Lists In-Store (unassigned) assets of the currently selected type for the
+   Replace modal. The old asset being replaced is never offered as its own
+   replacement. */
+function amsPopulateReplaceSource() {
+    const sel = document.getElementById("replSourceAsset");
+    if (!sel) return;
+    const type = document.getElementById("replType").value;
+    const prev = sel.value;
+    const candidates = AST_STATE.assets.filter(a =>
+        a.id !== AST_STATE.editingId &&
+        !a.assignedTo &&
+        a.status === "In Store" &&
+        a.type === type
+    ).sort((x, y) => String(amsComputeFullId(x)).localeCompare(String(amsComputeFullId(y))));
+    sel.innerHTML = candidates.length
+        ? candidates.map(a => {
+            const detail = [a.make, a.model].filter(Boolean).join(" ");
+            const serial = a.serialNumber ? ` - ${a.serialNumber}` : "";
+            return `<option value="${amsEsc(a.id)}">${amsEsc(amsComputeFullId(a))} - ${amsEsc(detail)}${amsEsc(serial)}</option>`;
+        }).join("")
+        : `<option value="">(No In-Store assets of this type - change type or add a new asset)</option>`;
+    if (candidates.some(a => a.id === prev)) sel.value = prev;
+    amsUpdateReplaceSelected();
+}
+
+/* Refreshes the read-only summary box showing the currently selected
+   replacement asset's details. */
+function amsUpdateReplaceSelected() {
+    const info = document.getElementById("replSelectedInfo");
+    if (!info) return;
+    const id = document.getElementById("replSourceAsset").value;
+    const a = id ? AST_STATE.assets.find(x => x.id === id) : null;
+    if (!a) {
+        info.innerHTML = `<div class="selected-asset-box"><span class="form-hint">No replacement asset selected yet.</span></div>`;
+        return;
+    }
+    const acc = (a.accessories && a.accessories.length) ? a.accessories.join(", ") : "-";
+    info.innerHTML = `<div class="selected-asset-box">
+        <strong>${amsEsc(amsComputeFullId(a))}</strong> &mdash; ${amsEsc(a.type)} ${amsEsc(a.make)} ${amsEsc(a.model) || ""}
+        <div class="form-hint">Serial: ${amsEsc(a.serialNumber) || "-"} &middot; Site: ${amsEsc(a.currentSite || a.site)} &middot;
+        Purchase: ${amsFormatDate(a.purchaseDate) || "-"} &middot; Accessories: ${amsEsc(acc)}</div>
+    </div>`;
+}
+
+/* Opens the standard Add Asset modal from inside the Replace modal. When the new
+   asset is saved it is re-selected in the Replace modal so the user can complete
+   the replacement. */
+function amsOpenReplaceAddAsset() {
+    AST_STATE.replOldKey = AST_STATE.editingId;
+    AST_STATE.replAwaitingAdd = true;
+    amsOpenAddModal();
+}
+
+/* After a new asset is added from the Replace modal, re-opens the Replace modal
+   with the freshly added asset pre-selected as the replacement. */
+function amsResumeReplaceAfterAdd() {
+    const oldKey = AST_STATE.replOldKey;
+    const newKey = AST_STATE.replNewKey;
+    AST_STATE.replAwaitingAdd = false;
+    AST_STATE.replOldKey = null;
+    AST_STATE.replNewKey = null;
+    if (!oldKey) return;
+    amsOpenReplaceModal(oldKey);
+    const sel = document.getElementById("replSourceAsset");
+    if (sel && newKey) { sel.value = newKey; amsUpdateReplaceSelected(); }
+    amsNotify("Asset added - select it to complete the replacement.", "info");
 }
 
 function amsSubmitReplaceForm(e) {
     e.preventDefault();
     const old = AST_STATE.assets.find(x => x.id === AST_STATE.editingId);
     if (!old) return;
+    const srcId = document.getElementById("replSourceAsset").value;
+    if (!srcId) {
+        alert("Select an In-Store asset to use as the replacement - or click + (Add Asset) to create one first.");
+        return;
+    }
+    const newAsset = AST_STATE.assets.find(x => x.id === srcId);
+    if (!newAsset || newAsset.assignedTo || newAsset.status !== "In Store") {
+        alert("That asset is no longer In-Store. Pick another In-Store asset (or add one).");
+        return;
+    }
+
     const today = new Date().toISOString().slice(0, 10);
-    const typeShort = amsTypeShort(document.getElementById("replType").value);
-
-    let newDisplayId = document.getElementById("replAssetId").value.trim();
-    const isLegacyId = !!newDisplayId;
-    if (!newDisplayId) newDisplayId = amsGenerateDisplayId(typeShort);
-
+    const issueDate = document.getElementById("replIssueDate").value || today;
     const replacesReason = document.getElementById("replReason").value;
     const replacesNote = document.getElementById("replNote").value.trim();
-    const issueDate = document.getElementById("replIssueDate").value || today;
-    const replacesPurchaseDate = old.purchaseDate || "";
-
-    /* ---- Create the new (replacement) asset - inherits old asset's assignment ---- */
-    const newAsset = {
-        amsAssetId: amsGenerateAmsAssetId(typeShort), displayId: newDisplayId, isLegacyId, id: newDisplayId,
-        type: document.getElementById("replType").value, category: old.category, make: document.getElementById("replMake").value,
-        name: document.getElementById("replName").value.trim(), model: document.getElementById("replModel").value.trim(),
-        serialNumber: document.getElementById("replSerial").value.trim(),
-        purchaseSite: document.getElementById("replPurchaseSite").value, currentSite: document.getElementById("replCurrentSite").value,
-        site: document.getElementById("replCurrentSite").value,
-        purchaseDate: document.getElementById("replPurchaseDate").value, warrantyEnd: document.getElementById("replWarrantyEnd").value,
-        vendor: document.getElementById("replVendor").value.trim(), purchaseCost: document.getElementById("replCost").value.trim(),
-        replacesReason, replacesNote, replacesPurchaseDate, issueDate,
-        status: old.assignedTo ? "Assigned" : "In Store",
-        dept: old.dept || "", assignedTo: old.assignedTo || null, assignedToSubordinate: old.assignedToSubordinate || null,
-        assignedSubText: old.assignedSubText || null,
-        assignedDepartment: old.assignedDepartment || null, assignedDeptText: old.assignedDeptText || null,
-        usageNote: old.usageNote || null,
-        replacesAssetId: amsBaseDisplayId(old), replacedByAssetId: null,
-        history: [],
-    };
-    newAsset.id = amsComputeFullId(newAsset);
-    const replAccessories = amsGetCheckedAccessories("replAccessories");
-    newAsset.accessories = replAccessories;
-    const oldEmp = old.assignedTo ? amsGetEmployeeByAmsId(old.assignedTo) : null;
     const replDetail = `Reason: ${replacesReason}${replacesNote ? ` - ${replacesNote}` : ""}`;
+    const oldEmp = old.assignedTo ? amsGetEmployeeByAmsId(old.assignedTo) : null;
+
+    /* ---- The selected In-Store asset takes over the old asset's assignment ---- */
+    newAsset.assignedTo = old.assignedTo || null;
+    newAsset.assignedToSubordinate = old.assignedToSubordinate || null;
+    newAsset.assignedSubText = old.assignedSubText || null;
+    newAsset.assignedDepartment = old.assignedDepartment || null;
+    newAsset.assignedDeptText = old.assignedDeptText || null;
+    newAsset.usageNote = old.usageNote || null;
+    newAsset.dept = old.dept || "";
+    newAsset.status = old.assignedTo ? "Assigned" : "In Store";
+    newAsset.replacesAssetId = amsBaseDisplayId(old);
+    newAsset.replacesReason = replacesReason;
+    newAsset.replacesNote = replacesNote;
+    newAsset.replacesPurchaseDate = old.purchaseDate || "";
+    newAsset.id = amsComputeFullId(newAsset);
+
     newAsset.history.push({
-        date: issueDate, action: `Added to Inventory (Replacement for ${amsBaseDisplayId(old)})`,
+        date: issueDate, action: `Assigned (Replacement for ${amsBaseDisplayId(old)})`,
         empId: old.assignedTo || "", empName: oldEmp ? oldEmp.name : "", empDept: old.dept || "", assetIdFull: newAsset.id, statusLabel: newAsset.status,
-        accessories: replAccessories.length ? replAccessories.join(", ") : "",
+        accessories: (newAsset.accessories && newAsset.accessories.length) ? newAsset.accessories.join(", ") : "",
         note: replDetail,
     });
-    AST_STATE.assets.push(newAsset);
 
     /* ---- Mark the old asset Replaced, clear its assignment, link to the new asset ---- */
     const oldPrevEmp = old.assignedTo ? amsGetEmployeeByAmsId(old.assignedTo) : null;
     old.status = "Replaced";
-    old.assignedTo = null; old.assignedToSubordinate = null; old.assignedDepartment = null; old.usageNote = null; old.dept = "";
-    old.replacedByAssetId = newDisplayId;
+    old.assignedTo = null; old.assignedToSubordinate = null; old.assignedDepartment = null; old.assignedDeptText = null; old.usageNote = null; old.dept = "";
+    old.replacedByAssetId = amsBaseDisplayId(newAsset);
     old.id = amsComputeFullId(old);
     old.history.push({
-        date: today, action: `Replaced by ${newDisplayId}`, note: replDetail,
+        date: today, action: `Replaced by ${amsBaseDisplayId(newAsset)}`, note: replDetail,
         empId: oldPrevEmp ? oldPrevEmp.empId : "", empName: oldPrevEmp ? oldPrevEmp.name : "", empDept: oldPrevEmp ? oldPrevEmp.dept : "",
         assetIdFull: old.id, statusLabel: "Replaced",
     });
-    amsNotify(`Asset replaced: ${amsBaseDisplayId(old)} \u2192 ${newAsset.id}`, "warning");
+    amsNotify(`Asset replaced: ${amsBaseDisplayId(old)} \u2192 ${amsComputeFullId(newAsset)}`, "warning");
 
     amsCloseModal("modalReplace");
     amsDbSaveAsync("assets");
@@ -1007,11 +1097,11 @@ function amsSubmitReplaceForm(e) {
    19) ASSET ID RECORD (lifecycle history popup)
    ===========================================================================*/
 function amsHistoryEventType(action) {
-    if (action.startsWith("Transferred")) return { label: "Transfer", cls: "badge-transfer" };
-    if (action === "Reassigned") return { label: "Reassign", cls: "badge-amber" };
+    if (action.indexOf("Transferred") === 0) return { label: "Transfer", cls: "badge-transfer" };
+    if (action.indexOf("Reassigned") === 0) return { label: "Reassign", cls: "badge-amber" };
     if (action === "Assigned - New") return { label: "Assign", cls: "badge-green" };
     if (action === "Returned") return { label: "Return", cls: "badge-grey" };
-    if (action.startsWith("Replaced by") || action.startsWith("Added to Inventory (Replacement")) return { label: "Replace", cls: "badge-transfer" };
+    if (action.indexOf("Replaced by") === 0 || action.indexOf("Replacement") !== -1) return { label: "Replace", cls: "badge-transfer" };
     if (action === "Retired / Scrapped") return { label: "Retire", cls: "badge-red" };
     if (action === "Not Working") return { label: "Fault", cls: "badge-red" };
     return { label: "Other", cls: "badge-grey" };
@@ -1020,6 +1110,7 @@ function amsHistoryEventType(action) {
 function amsOpenHistoryModal(key) {
     const a = AST_STATE.assets.find(x => x.id === key);
     if (!a) return;
+    AST_STATE.historyKey = key;
     const rows = a.history.length
         ? a.history.map(h => {
             const evt = amsHistoryEventType(h.action);
@@ -1262,8 +1353,9 @@ function amsGenerateAssetIssueFormPrint(key, extraRemarks) {
         </div>
     `;
 
-    /* ---- Open the print window directly (shared engine from js/print-docs.js) ---- */
-    amsPrintDocument(printContent, title);
+    /* ---- Open the print window directly (shared engine from js/print-docs.js) ----
+       Landscape orientation gives the multi-column asset table room to breathe. */
+    amsPrintDocument(printContent, title, "landscape");
 }
 
 /* =============================================================================
@@ -1436,9 +1528,9 @@ async function initAssets() {
     renderAssetTable();
 
     /* Toolbar */
-    document.getElementById("searchBox").addEventListener("input", () => { AST_TABLE_SHOW_LIMIT = AST_TABLE_PAGE_SIZE; renderAssetTable(); });
-    document.getElementById("statusFilter").addEventListener("change", () => { AST_TABLE_SHOW_LIMIT = AST_TABLE_PAGE_SIZE; renderAssetTable(); });
-    document.getElementById("superRootToggle").addEventListener("change", () => { AST_TABLE_SHOW_LIMIT = AST_TABLE_PAGE_SIZE; renderAssetTable(); });
+    document.getElementById("searchBox").addEventListener("input", renderAssetTable);
+    document.getElementById("statusFilter").addEventListener("change", renderAssetTable);
+    document.getElementById("superRootToggle").addEventListener("change", renderAssetTable);
 
     document.getElementById("btnAddAsset").addEventListener("click", amsOpenAddModal);
     document.getElementById("btnAssetExport").addEventListener("click", amsExportAssets);
@@ -1447,6 +1539,10 @@ async function initAssets() {
     document.getElementById("assetImportFileInput").addEventListener("change", (e) => {
         if (e.target.files[0]) amsImportAssetsFile(e.target.files[0]);
     });
+
+    /* Detail report downloads (View + Asset ID Record modals) */
+    document.getElementById("btnViewCsv").addEventListener("click", amsDownloadAssetView);
+    document.getElementById("btnHistoryCsv").addEventListener("click", amsDownloadAssetHistory);
 
     /* Row actions + dropdowns */
     amsWireRowActions();
@@ -1465,9 +1561,9 @@ async function initAssets() {
     document.getElementById("btnConfirmTransfer").addEventListener("click", amsConfirmTransfer);
 
     /* Replace */
-    document.getElementById("replType").addEventListener("change", () => {
-        amsRenderAccessoriesChecklist("replAccessories", document.getElementById("replType").value);
-    });
+    document.getElementById("replType").addEventListener("change", amsPopulateReplaceSource);
+    document.getElementById("replSourceAsset").addEventListener("change", amsUpdateReplaceSelected);
+    document.getElementById("btnReplaceAddAsset").addEventListener("click", amsOpenReplaceAddAsset);
     document.getElementById("replaceForm").addEventListener("submit", amsSubmitReplaceForm);
 
     /* Quick-add employee (inline, from the Assign modal) */

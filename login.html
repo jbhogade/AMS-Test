@@ -34,13 +34,13 @@
             align-items: center;
             justify-content: center;
             padding: 24px;
-            background: var(--bg, #0f1115);
+            background: var(--bg-body, #17181c);
         }
         .login-card {
             width: 100%;
             max-width: 400px;
-            background: var(--card-bg, #181b22);
-            border: 1px solid var(--border, #2a2f3a);
+            background: var(--bg-card, #212226);
+            border: 1px solid var(--border, #33343a);
             border-radius: 12px;
             padding: 32px;
             box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
@@ -69,7 +69,7 @@
         }
         .login-brand-sub {
             font-size: 12px;
-            color: var(--text-muted, #9aa3b2);
+            color: var(--text-muted, #6b7280);
         }
         .login-form .field {
             margin-bottom: 16px;
@@ -78,15 +78,15 @@
             display: block;
             font-size: 13px;
             margin-bottom: 6px;
-            color: var(--text-muted, #9aa3b2);
+            color: var(--text-muted, #6b7280);
         }
         .login-form input {
             width: 100%;
             padding: 10px 12px;
             border-radius: 8px;
-            border: 1px solid var(--border, #2a2f3a);
-            background: var(--input-bg, #10131a);
-            color: var(--text, #e6e9ef);
+            border: 1px solid var(--border, #33343a);
+            background: var(--bg-input, #17181c);
+            color: var(--text-primary, #e5e7eb);
             font-size: 14px;
             box-sizing: border-box;
         }
@@ -115,7 +115,7 @@
         .login-hint {
             margin-top: 18px;
             font-size: 12px;
-            color: var(--text-muted, #9aa3b2);
+            color: var(--text-muted, #6b7280);
             text-align: center;
             line-height: 1.6;
         }
@@ -153,6 +153,13 @@
     </div>
 
     <script src="js/dummy-data.js"></script>
+    <script src="js/theme.js"></script>
+    <script>
+        /* Respect the Appearance prefs chosen in Settings, even on the login
+           page: apply the saved theme + font size before anything renders. */
+        initTheme();
+        if (typeof amsApplyPortalPrefs === "function") amsApplyPortalPrefs();
+    </script>
     <script src="js/login.js"></script>
 </body>
 </html>

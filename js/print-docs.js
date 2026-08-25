@@ -76,12 +76,23 @@ function amsBuildPrintHeader(title, metaHtml, fallbackSubtitle) {
 /* ---- Opens the standalone A4 print window with the shared .pf-* stylesheet ----
  *  printContent : the inner body HTML of the form (built by the calling page)
  *  pageTitle    : text shown in the browser tab
+ *  orientation  : optional - "landscape" adjusts the content padding for wide
+ *                 (A4 landscape) layouts; anything else uses portrait padding.
+ *                 The @page rule deliberately does NOT force a paper size, so
+ *                 the browser's Print Setup keeps the Layout (Portrait /
+ *                 Landscape) and paper-size controls enabled for the user.
  * ----------------------------------------------------------------------------*/
-function amsPrintDocument(printContent, pageTitle) {    const win = window.open("", "_blank");
+function amsPrintDocument(printContent, pageTitle, orientation) {
+    const landscape = orientation === "landscape";
+    const win = window.open("", "_blank");
     if (!win) {
         alert("Popup blocked. Please allow popups for this site to use the print view.");
         return;
     }
+    /* Margin-only @page rule. A `size` keyword here (e.g. A4 landscape) makes
+       Chrome grey out / hide the Layout (orientation) and paper-size options in
+       the print dialog - so we never set one. */
+    const pageRule = "@page { margin: 10mm 12mm; }";
     win.document.write(`
         <html>
         <head>
@@ -176,7 +187,8 @@ function amsPrintDocument(printContent, pageTitle) {    const win = window.open(
                     border-top: 1px solid #ccc; margin-top: 20px; padding-top: 8px; }
 
                 .mono { font-family: 'Consolas', monospace; }
-                @media print { body { padding: 8mm 12mm; } }
+                ${pageRule}
+                @media print { body { padding: ${landscape ? "10mm 14mm" : "8mm 12mm"}; } }
                 /*-------------- End of the code --------------------------------*/
             </style>
         </head>

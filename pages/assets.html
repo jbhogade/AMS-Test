@@ -267,6 +267,7 @@
             </div>
             <div class="modal-body" id="viewModalBody"></div>
             <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="btnViewCsv" title="Download this asset's details as a CSV report">Download Report</button>
                 <button type="button" class="btn btn-secondary" data-close="modalView">Close</button>
             </div>
         </div>
@@ -413,105 +414,32 @@
             <form id="replaceForm">
                 <div class="modal-body">
                     <p class="form-hint" style="margin-bottom:12px;">
-                        Replacing <strong id="replaceOldAssetLabel"></strong>. Enter the details of the NEW asset below -
-                        it will inherit the old asset's current assignment automatically. The old asset will be marked
-                        "Replaced" and both records will be cross-linked in their Asset ID Record.
+                        Replacing <strong id="replaceOldAssetLabel"></strong>. Pick an <strong>In-Store (unassigned)</strong>
+                        asset to take over this asset's current assignment. The old asset is marked "Replaced" and both
+                        records stay cross-linked in their Asset ID Record. If no suitable In-Store asset exists, use
+                        <strong>+</strong> to add a new asset first, then select it here.
                     </p>
                     <div class="form-grid">
-                        <div class="field field-full">
-                            <label>New Asset Display ID (optional - blank auto-generates)</label>
-                            <input type="text" id="replAssetId" class="input" placeholder="Leave blank to auto-generate">
-                        </div>
                         <div class="field">
-                            <label>Asset Type <span class="req">*</span></label>
-                            <select id="replType" class="select" required></select>
+                            <label>Asset Type</label>
+                            <select id="replType" class="select"></select>
                             <div class="form-hint" id="replTypeHint"></div>
                         </div>
                         <div class="field">
-                            <label>Asset Make <span class="req">*</span></label>
+                            <label>Replacement Asset <span class="req">*</span></label>
                             <div class="select-with-add">
-                                <select id="replMake" class="select" required></select>
-                                <button type="button" class="btn-quickadd" data-quickadd="replMake" title="Add new Asset Make">+</button>
-                                <div class="quickadd-popover" id="qaPopoverReplMake">
-                                    <label class="qa-label">New Make / Brand Name</label>
-                                    <input type="text" id="qaReplMakeName" placeholder="e.g. Asus">
-                                    <div class="qa-actions">
-                                        <button type="button" class="btn btn-secondary" data-qa-cancel="replMake">Cancel</button>
-                                        <button type="button" class="btn btn-primary" data-qa-save="replMake">Add</button>
-                                    </div>
-                                </div>
+                                <select id="replSourceAsset" class="select" required></select>
+                                <button type="button" class="btn-quickadd" id="btnReplaceAddAsset" title="Add a new asset first, then select it here">+</button>
                             </div>
+                            <div class="form-hint">Only In-Store (unassigned) assets of the selected type are listed. The + button opens the Add Asset form.</div>
                         </div>
-                        <div class="field">
-                            <label>Asset Name</label>
-                            <input type="text" id="replName" class="input" placeholder="Optional">
-                        </div>
-                        <div class="field">
-                            <label>Asset Model</label>
-                            <input type="text" id="replModel" class="input" placeholder="Optional">
-                        </div>
-                        <div class="field">
-                            <label>Serial Number</label>
-                            <input type="text" id="replSerial" class="input" placeholder="Optional">
-                        </div>
-                        <div class="field">
-                            <label>Purchase Site <span class="req">*</span></label>
-                            <div class="select-with-add">
-                                <select id="replPurchaseSite" class="select" required></select>
-                                <button type="button" class="btn-quickadd" data-quickadd="replPurchaseSite" title="Add new Site">+</button>
-                                <div class="quickadd-popover" id="qaPopoverReplPurchaseSite">
-                                    <label class="qa-label">New Site Name</label>
-                                    <input type="text" id="qaReplPurchaseSiteName" placeholder="e.g. Nagpur">
-                                    <label class="qa-label">Shortform (for Asset ID)</label>
-                                    <input type="text" id="qaReplPurchaseSiteShort" placeholder="e.g. NG" maxlength="4" style="text-transform:uppercase;">
-                                    <div class="qa-actions">
-                                        <button type="button" class="btn btn-secondary" data-qa-cancel="replPurchaseSite">Cancel</button>
-                                        <button type="button" class="btn btn-primary" data-qa-save="replPurchaseSite">Add</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="field">
-                            <label>Current Site <span class="req">*</span></label>
-                            <div class="select-with-add">
-                                <select id="replCurrentSite" class="select" required></select>
-                                <button type="button" class="btn-quickadd" data-quickadd="replCurrentSite" title="Add new Site">+</button>
-                                <div class="quickadd-popover" id="qaPopoverReplCurrentSite">
-                                    <label class="qa-label">New Site Name</label>
-                                    <input type="text" id="qaReplCurrentSiteName" placeholder="e.g. Nagpur">
-                                    <label class="qa-label">Shortform (for Asset ID)</label>
-                                    <input type="text" id="qaReplCurrentSiteShort" placeholder="e.g. NG" maxlength="4" style="text-transform:uppercase;">
-                                    <div class="qa-actions">
-                                        <button type="button" class="btn btn-secondary" data-qa-cancel="replCurrentSite">Cancel</button>
-                                        <button type="button" class="btn btn-primary" data-qa-save="replCurrentSite">Add</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="field">
-                            <label>Purchase Date <span class="req">*</span></label>
-                            <input type="date" id="replPurchaseDate" class="input" required>
-                            <div class="form-hint">Pre-filled from the old asset so the replacement keeps its purchase date.</div>
+                        <div class="field field-full">
+                            <div id="replSelectedInfo"></div>
                         </div>
                         <div class="field">
                             <label>Issue Date</label>
                             <input type="date" id="replIssueDate" class="input">
                             <div class="form-hint">Defaults to today - when the replacement was handed over.</div>
-                        </div>
-                        <div class="field">
-                            <label>Warranty End Date</label>
-                            <input type="date" id="replWarrantyEnd" class="input">
-                        </div>
-                        <div class="field">
-                            <label>Vendor</label>
-                            <div class="select-with-add">
-                                <select id="replVendor" class="input ams-vendor-select"><option value="">(None - optional)</option></select>
-                                <button type="button" class="btn-quickadd" data-quickadd-vendor="replVendor" title="Add new Vendor">+</button>
-                            </div>
-                        </div>
-                        <div class="field">
-                            <label>Purchase Cost</label>
-                            <input type="text" id="replCost" class="input" placeholder="Optional">
                         </div>
                         <div class="field">
                             <label>Reason for Replacement <span class="req">*</span></label>
@@ -528,23 +456,6 @@
                         <div class="field">
                             <label>Replacement Note</label>
                             <input type="text" id="replNote" class="input" placeholder="Optional - e.g. old unit damaged beyond repair">
-                        </div>
-                        <div class="field field-full">
-                            <div class="accessories-header">
-                                <label>Common / Supportive Accessories (optional)</label>
-                                <div class="quickadd-inline">
-                                    <button type="button" class="btn-quickadd" data-acc-quickadd="replAccessories" title="Add a missing accessory">+</button>
-                                    <div class="quickadd-popover" id="accQaPopover-replAccessories">
-                                        <label class="qa-label">New Accessory Name</label>
-                                        <input type="text" id="accQaInput-replAccessories" placeholder="e.g. Docking Station">
-                                        <div class="qa-actions">
-                                            <button type="button" class="btn btn-secondary" data-acc-qa-cancel="replAccessories">Cancel</button>
-                                            <button type="button" class="btn btn-primary" data-acc-qa-save="replAccessories">Add</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="accessories-checklist" id="replAccessories"></div>
                         </div>
                     </div>
                 </div>
@@ -567,6 +478,7 @@
             </div>
             <div class="modal-body" id="historyModalBody"></div>
             <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="btnHistoryCsv" title="Download the asset ID record (lifecycle history) as a CSV report">Download Report</button>
                 <button type="button" class="btn btn-secondary" data-close="modalHistory">Close</button>
             </div>
         </div>

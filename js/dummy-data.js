@@ -399,7 +399,7 @@ function amsShowImportReport(results) {
                     ${chip("Errors", errors, "badge-red")}
                 </div>
                 ${lookupsHtml}
-                <div style="max-height: 300px; overflow:auto; border:1px solid var(--border); border-radius:8px;">
+                <div style="border:1px solid var(--border); border-radius:8px;">
                     <table class="table" style="margin:0;">
                         <thead>
                             <tr><th style="width:56px;">Row</th><th>Record</th><th style="width:110px;">Result</th><th>Reason</th></tr>

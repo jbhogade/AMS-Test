@@ -20,6 +20,7 @@ const SIM_STATE = {
     editingId: null,           /* simId currently being edited/acted on (Add modal = null) */
     assignMode: null,          /* "assign" | "reassign" - which action opened modalSimAssign */
     qaKind: null,              /* "operator" | "plan" - which quick-add modal is open */
+    viewKey: null,             /* simId whose details are open in modalSimView */
 };
 
 const SIM_STATUS_BADGE = {
@@ -131,15 +132,44 @@ function renderSimStockSummary() {
 /* =============================================================================
    4) ACTIONS DROPDOWN OPEN/CLOSE + ROW ACTION DELEGATION
    ===========================================================================*/
-function amsSimCloseAllMenus() {
+/* Row-menu helpers - prefer the shared viewport-anchored helpers from
+   js/layout.js, but fall back to the classic open/close so the menus still
+   work even if an older (cached) layout.js is loaded. */
+function amsOpenRowMenu(trigger, menu) {
+    if (typeof amsDropdownOpen === "function") { amsDropdownOpen(trigger, menu); return; }
     document.querySelectorAll(".actions-menu.open").forEach(m => m.classList.remove("open"));
-    amsSimSyncWrapOverflow();
+    menu.classList.add("open");
+    /* Viewport-anchored fallback (mirrors amsDropdownOpen): even with a stale
+       cached layout.js the menu opens right under its trigger instead of
+       floating absolute inside (and being clipped by) the table's scroll
+       container. */
+    const r = trigger.getBoundingClientRect();
+    const mw = menu.offsetWidth || 200;
+    const mh = menu.offsetHeight || 320;
+    menu.style.position = "fixed";
+    menu.style.right = "auto";
+    menu.style.top = "auto";
+    menu.style.zIndex = "500";
+    let left = r.right - mw;
+    if (left < 8) left = Math.max(8, r.left);
+    if (left + mw > window.innerWidth - 8) left = window.innerWidth - mw - 8;
+    let top = r.bottom + 6;
+    if (top + mh > window.innerHeight - 8) { top = r.top - mh - 6; if (top < 8) top = 8; }
+    menu.style.left = left + "px";
+    menu.style.top = top + "px";
+    menu.style.width = mw + "px";
+}
+function amsCloseRowMenus() {
+    if (typeof amsDropdownClose === "function") { amsDropdownClose(); return; }
+    document.querySelectorAll(".actions-menu.open").forEach(m => {
+        m.classList.remove("open");
+        m.style.position = ""; m.style.left = ""; m.style.top = "";
+        m.style.right = ""; m.style.width = ""; m.style.zIndex = "";
+    });
 }
 
-function amsSimSyncWrapOverflow() {
-    const anyOpen = document.querySelector(".actions-menu.open");
-    const wrap = document.getElementById("simTableWrap");
-    if (wrap) wrap.classList.toggle("mt-menu-open", !!(anyOpen && wrap.contains(anyOpen)));
+function amsSimCloseAllMenus() {
+    amsCloseRowMenus();
 }
 
 function amsSimWireRowActions() {
@@ -151,8 +181,7 @@ function amsSimWireRowActions() {
             const wasOpen = menu.classList.contains("open");
             amsSimCloseAllMenus();
             if (!wasOpen) {
-                menu.classList.add("open");
-                amsSimSyncWrapOverflow();
+                amsOpenRowMenu(trigger, menu);
             }
             return;
         }
@@ -330,6 +359,7 @@ function simHistoryEventType(action) {
 function amsSimOpenViewModal(key) {
     const s = SIM_STATE.sims.find(x => x.simId === key);
     if (!s) return;
+    SIM_STATE.viewKey = key;
     const emp = s.assignedTo ? amsGetEmployeeByAmsId(s.assignedTo) : null;
 
     const historyRows = (s.history && s.history.length)
@@ -369,6 +399,44 @@ function amsSimOpenViewModal(key) {
             </table></div>
         </div>`;
     amsSimOpenModal("modalSimView");
+}
+
+/* Downloads the SIM card details + lifecycle history shown in the View modal
+   as a CSV report (uses the shared amsCsvRow / amsDownloadFile helpers). */
+function amsSimDownloadView() {
+    const s = SIM_STATE.sims.find(x => x.simId === SIM_STATE.viewKey);
+    if (!s) return;
+    const emp = s.assignedTo ? amsGetEmployeeByAmsId(s.assignedTo) : null;
+
+    const rows = [["Field", "Value"]];
+    const p = (label, value) => rows.push([label, value == null || value === "" ? "-" : value]);
+    p("SIM ID", s.simId);
+    p("SIM Serial / ICCID", s.iccid);
+    p("Mobile Number", s.mobileNumber);
+    p("Operator", s.operator);
+    p("Plan", s.plan);
+    p("Status", s.status);
+    p("Activation Date", amsFormatDate(s.activationDate));
+    p("Assigned To", emp ? `${emp.name} (${emp.empId})` : "-");
+    p("Assignment Date", amsFormatDate(s.assignedDate));
+    p("Vendor", s.vendor);
+    p("Cost", s.cost ? formatCurrency(s.cost) : "-");
+    p("Remarks", s.remarks);
+
+    rows.push([]);
+    rows.push(["Date", "Type", "Action", "Emp Name", "Department", "Status", "Remarks"]);
+    (s.history || []).forEach(h => rows.push([
+        amsFormatDate(h.date) || "-",
+        simHistoryEventType(h.action).label,
+        h.action,
+        h.empName || "-",
+        h.empDept || "-",
+        h.statusLabel || "-",
+        h.remarks || "-",
+    ]));
+
+    const csv = rows.map(amsCsvRow).join("\r\n");
+    amsDownloadFile(csv, `SIM_${s.simId}.csv`, "text/csv;charset=utf-8;");
 }
 
 /* =============================================================================
@@ -629,6 +697,9 @@ async function initSimCards() {
 
     /* Assign/Reassign */
     document.getElementById("btnSimConfirmAssign").addEventListener("click", amsSimConfirmAssign);
+
+    /* Detail report download (View modal) */
+    document.getElementById("btnSimViewCsv").addEventListener("click", amsSimDownloadView);
 
     /* Close buttons inside modals + clicking the dark overlay */
     document.querySelectorAll("[data-close]").forEach(btn => btn.addEventListener("click", () => amsSimCloseModal(btn.getAttribute("data-close"))));

@@ -111,7 +111,8 @@
     padding: 6px;
 }
 
-.row-actions.open .actions-menu { display: block; }
+.row-actions.open .actions-menu,
+.row-actions .actions-menu.open { display: block; }
 
 /* Each action item inside the menu */
 .actions-menu a {

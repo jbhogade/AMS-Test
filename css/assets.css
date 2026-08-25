@@ -83,16 +83,11 @@
 .legend-dot.used { background: var(--warning); }
 .legend-dot.off  { background: var(--danger); }
 
-/* ---- Asset list: scrollable container + show-more footer ---- */
-#assetTableWrap { max-height: 560px; overflow: auto; }
-
-/* While a row menu is open, let the wrap overflow visibly so the dropdown
-   overlays the table frame instead of being clipped / creating scrollbars. */
-#assetTableWrap.mt-menu-open {
-    overflow: visible;
-    position: relative;
-    z-index: 140;
-}
+/* ---- Asset list: shows EVERY matching row (no inner scroll frame) ----
+   The table grows with the page and the page itself scrolls - identical to
+   the Employees master. A nested max-height/overflow frame here caused a
+   second scrollbar and clipped the row Actions menus, so it is removed.
+   Only the horizontal overflow-x from .table-wrap remains. */
 
 .asset-table-footer {
     display: flex;
@@ -375,6 +370,19 @@
 .detail-row .detail-label { color: var(--text-muted); flex-shrink: 0; }
 .detail-row .detail-value { text-align: right; word-break: break-word; }
 .detail-row:last-child { border-bottom: none; }
+
+/* =============================================================================
+   9) REPLACE MODAL - SELECTED ASSET SUMMARY
+   ===========================================================================*/
+.selected-asset-box {
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--primary, #2b6de8);
+    border-radius: 6px;
+    padding: 8px 10px;
+    background: var(--bg-soft, rgba(0, 0, 0, 0.02));
+    font-size: 13px;
+}
+.selected-asset-box .form-hint { margin-top: 3px; font-size: 12px; }
 
 /* -----------------------------------------------------------------------------
 #-------------- End of the code : ASSET MASTER PAGE STYLES ----------------------

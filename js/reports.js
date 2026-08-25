@@ -287,7 +287,8 @@ function amsPrintReport(title, tableEl) {
         ${headerHtml}
         <table class="pf-asset-table">${tableEl.innerHTML}</table>
         <div class="pf-footer"><span>AMS v4 - Generated electronically from Report Master</span></div>`;
-    amsPrintDocument(content, title);
+    /* Hard-copy records for filing are printed on A4 portrait. */
+    amsPrintDocument(content, title, "portrait");
 }
 /*-------------- End of the code ------------------------------------------------*/
 

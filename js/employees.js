@@ -171,31 +171,53 @@ function buildActionsMenu(emp) {
     `;
 }
 
-/* Toggles the row actions dropdown open/closed */
-function toggleRowActions(btn) {
-    document.querySelectorAll(".row-actions.open").forEach(el => el.classList.remove("open"));
-    const wasOpen = btn.closest(".row-actions").classList.contains("open");
-    btn.closest(".row-actions").classList.toggle("open", !wasOpen);
-    amsSyncEmpMenuOverflow();
+/* Row-menu helpers - prefer the shared viewport-anchored helpers from
+   js/layout.js, but fall back to the classic open/close so the menus still
+   work even if an older (cached) layout.js is loaded. */
+function amsOpenRowMenu(trigger, menu) {
+    if (typeof amsDropdownOpen === "function") { amsDropdownOpen(trigger, menu); return; }
+    document.querySelectorAll(".actions-menu.open").forEach(m => m.classList.remove("open"));
+    menu.classList.add("open");
+    /* Viewport-anchored fallback (mirrors amsDropdownOpen): even with a stale
+       cached layout.js the menu opens right under its trigger instead of
+       floating absolute inside (and being clipped by) the table's scroll
+       container. */
+    const r = trigger.getBoundingClientRect();
+    const mw = menu.offsetWidth || 200;
+    const mh = menu.offsetHeight || 320;
+    menu.style.position = "fixed";
+    menu.style.right = "auto";
+    menu.style.top = "auto";
+    menu.style.zIndex = "500";
+    let left = r.right - mw;
+    if (left < 8) left = Math.max(8, r.left);
+    if (left + mw > window.innerWidth - 8) left = window.innerWidth - mw - 8;
+    let top = r.bottom + 6;
+    if (top + mh > window.innerHeight - 8) { top = r.top - mh - 6; if (top < 8) top = 8; }
+    menu.style.left = left + "px";
+    menu.style.top = top + "px";
+    menu.style.width = mw + "px";
+}
+function amsCloseRowMenus() {
+    if (typeof amsDropdownClose === "function") { amsDropdownClose(); return; }
+    document.querySelectorAll(".actions-menu.open").forEach(m => {
+        m.classList.remove("open");
+        m.style.position = ""; m.style.left = ""; m.style.top = "";
+        m.style.right = ""; m.style.width = ""; m.style.zIndex = "";
+    });
 }
 
-/* While a row menu is open, the .table-wrap (overflow-x:auto) would clip the
-   dropdown or spawn scrollbars. Lift the wrap that contains the open menu to
-   overflow:visible so the menu overlays the table frame instead. */
-function amsSyncEmpMenuOverflow() {
-    const anyOpen = document.querySelector(".row-actions.open .actions-menu");
-    document.querySelectorAll("main .table-wrap, .content .table-wrap, .table-wrap").forEach(w => {
-        const inside = w.contains(anyOpen);
-        w.classList.toggle("mt-menu-open", !!inside);
-    });
+/* Toggles the row actions dropdown open/closed (viewport-anchored) */
+function toggleRowActions(btn) {
+    const menu = btn.parentElement.querySelector(".actions-menu");
+    const wasOpen = menu.classList.contains("open");
+    amsCloseRowMenus();
+    if (!wasOpen) amsOpenRowMenu(btn, menu);
 }
 
 /* Clicking anywhere else closes all open action menus */
 document.addEventListener("click", function (e) {
-    if (!e.target.closest(".row-actions")) {
-        document.querySelectorAll(".row-actions.open").forEach(el => el.classList.remove("open"));
-        amsSyncEmpMenuOverflow();
-    }
+    if (!e.target.closest(".row-actions")) amsCloseRowMenus();
 });
 
 /* =============================================================================
@@ -361,6 +383,36 @@ function viewEmployee(amsId) {
 
     currentEmployeeAmsId = amsId;
     showModal("modal-view");
+}
+
+/* Downloads the employee profile + asset holdings shown in the View modal as a
+   CSV report (uses the shared amsCsvRow / amsDownloadFile helpers). */
+function amsDownloadEmployeeView() {
+    if (!currentEmployeeAmsId) return;
+    const emp = findEmployee(currentEmployeeAmsId);
+    if (!emp) return;
+    const owned = amsOwnedEmployeeAssets(emp.amsId) || [];
+    const team = amsTeamEmployeeAssets(emp.amsId) || [];
+    const manager = emp.managerAmsId ? findEmployee(emp.managerAmsId) : null;
+
+    const rows = [["Field", "Value", "", "Kind", "Asset ID", "Make / Model", "Status", "Holder"]];
+    const p = (label, value) => rows.push([label, value == null || value === "" ? "-" : value, "", "", "", "", "", ""]);
+    p("AMS Employee ID", emp.amsId);
+    p("Employee ID", emp.empId);
+    p("Name", getEmployeeFullName(emp));
+    p("Department", emp.department);
+    p("Designation", emp.designation);
+    p("Manager", manager ? getEmployeeFullName(manager) : (emp.managerName || emp.managerId || "-"));
+    p("Contact", emp.contact);
+    p("Email", emp.email);
+    p("Status", emp.status);
+    p("Exit Date", emp.exitDate || "-");
+
+    owned.forEach(a => rows.push(["", "", "", "Owned", a.id, a.makeModel || "-", a.status || "-", (typeof amsAssetHolderLabel === "function" && amsAssetHolderLabel(a)) || "-"]));
+    team.forEach(a => rows.push(["", "", "", "Team", a.id, a.makeModel || "-", a.status || "-", "-"]));
+
+    const csv = rows.map(amsCsvRow).join("\r\n");
+    amsDownloadFile(csv, `Employee_${emp.empId}.csv`, "text/csv;charset=utf-8;");
 }
 
 /* =============================================================================
@@ -967,6 +1019,9 @@ async function initEmployees() {
     document.getElementById("emp-import-file").addEventListener("change", (e) => {
         if (e.target.files[0]) amsImportEmployeesFile(e.target.files[0]);
     });
+
+    /* Detail report download (View profile modal) */
+    document.getElementById("btnEmpViewCsv").addEventListener("click", amsDownloadEmployeeView);
 
     /* Assign / reassign events */
     document.getElementById("assign-confirm").addEventListener("click", confirmAssign);

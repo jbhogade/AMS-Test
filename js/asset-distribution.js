@@ -19,24 +19,89 @@ const DIST_STATE = {
     loaded: false,
 };
 
+/* The employee currently open in the "View Assets" detail modal (for the
+   Download Report button). */
+let distDetailEmpId = null;
+
 /* =============================================================================
    1) DATA
    ===========================================================================*/
+/* Badge/event classification for a lifecycle record - mirrors the Asset ID
+   Record modal, duplicated here because assets.js is not loaded on this page. */
+function distHistoryEventType(action) {
+    action = String(action || "");
+    if (action.indexOf("Transferred") === 0) return { label: "Transfer", cls: "badge-transfer" };
+    if (action.indexOf("Reassigned") === 0) return { label: "Reassign", cls: "badge-amber" };
+    if (action === "Assigned - New") return { label: "Assign", cls: "badge-green" };
+    if (action === "Returned") return { label: "Return", cls: "badge-grey" };
+    if (action.indexOf("Replaced by") === 0 || action.indexOf("Replacement") !== -1) return { label: "Replace", cls: "badge-transfer" };
+    if (action === "Retired / Scrapped") return { label: "Retire", cls: "badge-red" };
+    if (action === "Not Working") return { label: "Fault", cls: "badge-red" };
+    return { label: "Other", cls: "badge-grey" };
+}
+
+/* The COMPLETE per-employee asset lifecycle: every lifecycle record across all
+   assets that references this employee (Assigned / Returned / Reassigned /
+   Replaced / Transferred / Retired ...), plus the assets they currently hold
+   when no lifecycle entry exists for them (seed/imported data). This is what
+   makes Asset Distribution the place where every record is kept. */
+function distEmployeeLifecycle(amsId) {
+    const records = [];
+    const seen = {}; /* assetIdFull -> true, so a currently-held asset is not added twice */
+    DUMMY_ASSETS.forEach(a => {
+        (a.history || []).forEach(h => {
+            if (h.empId !== amsId) return;
+            const evt = distHistoryEventType(h.action);
+            records.push({
+                date: h.date || "",
+                action: h.action,
+                label: evt.label,
+                cls: evt.cls,
+                assetIdFull: h.assetIdFull || amsBaseDisplayId(a),
+                statusLabel: h.statusLabel || a.status || "",
+                note: h.note || "",
+            });
+            seen[h.assetIdFull || a.id] = true;
+        });
+    });
+    const current = [];
+    amsOwnedEmployeeAssets(amsId).forEach(a => current.push({ a, kind: "Direct" }));
+    amsTeamEmployeeAssets(amsId).forEach(a => current.push({ a, kind: "Team" }));
+    current.forEach(({ a, kind }) => {
+        if (seen[a.id]) return;
+        records.push({
+            date: "",
+            action: "Currently held",
+            label: kind === "Direct" ? "Direct" : "Team",
+            cls: kind === "Direct" ? "badge-green" : "badge-transfer",
+            assetIdFull: amsComputeFullId(a),
+            statusLabel: a.status || "",
+            note: "",
+        });
+    });
+    records.sort((x, y) => String(y.date).localeCompare(String(x.date))); /* newest first */
+    return records;
+}
+
 function distBuildRows() {
     const employees = amsGetEmployeesForPortal();
     return employees.map(emp => {
         const direct = amsOwnedEmployeeAssets(emp.empId) || [];
         const team = amsTeamEmployeeAssets(emp.empId) || [];
+        const records = distEmployeeLifecycle(emp.empId);
         return {
-            empId: emp.empId,
+            empId: emp.empId,              /* internal key = AMS ID (assets link to it) */
+            displayId: amsGetEmployeeDisplayId(emp), /* company-issued display ID, shown in UI + exports */
             name: emp.name,
             dept: emp.dept || "",
             designation: emp.designation || "",
             directCount: direct.length,
             teamCount: team.length,
             total: direct.length + team.length,
+            recordCount: records.length,
             direct,
             team,
+            records,
         };
     });
 }
@@ -49,7 +114,7 @@ function distFilteredRows() {
         if (dept && r.dept !== dept) return false;
         if (onlyWithAssets && r.total === 0) return false;
         if (search) {
-            const hay = `${r.name} ${r.empId} ${r.dept} ${r.designation}`.toLowerCase();
+            const hay = `${r.name} ${r.displayId} ${r.empId} ${r.dept} ${r.designation}`.toLowerCase();
             if (!hay.includes(search)) return false;
         }
         return true;
@@ -79,30 +144,32 @@ function distRenderTable() {
     const rows = distFilteredRows();
 
     const getters = {
-        empId: r => r.empId,
+        empId: r => r.displayId,
         name: r => r.name,
         dept: r => r.dept,
         designation: r => r.designation,
         direct: r => r.directCount,
         team: r => r.teamCount,
         total: r => r.total,
+        records: r => r.recordCount,
     };
     const sorted = amsSortRows("distTable", rows, getters);
 
     const body = sorted.length
         ? sorted.map(r => `<tr>
-            <td class="mono-cell">${amsEsc(r.empId)}</td>
+            <td class="mono-cell">${amsEsc(r.displayId)}</td>
             <td>${amsEsc(r.name)}</td>
             <td>${amsEsc(r.dept)}</td>
             <td>${amsEsc(r.designation) || "-"}</td>
             <td class="mono-cell">${r.directCount}</td>
             <td class="mono-cell">${r.teamCount}</td>
             <td class="mono-cell"><strong>${r.total}</strong></td>
+            <td class="mono-cell">${r.recordCount}</td>
             <td class="actions-cell">
                 <button class="btn btn-secondary" onclick="distOpenDetail('${amsEsc(r.empId)}')">View Assets</button>
             </td>
         </tr>`).join("")
-        : `<tr><td colspan="8" style="color:var(--text-muted);text-align:center;">No employees match the current filters</td></tr>`;
+        : `<tr><td colspan="9" style="color:var(--text-muted);text-align:center;">No employees match the current filters</td></tr>`;
 
     document.getElementById("distTable").innerHTML = `
         <thead><tr>
@@ -113,13 +180,15 @@ function distRenderTable() {
             ${amsSortableTh("distTable", "direct", "Direct")}
             ${amsSortableTh("distTable", "team", "Team")}
             ${amsSortableTh("distTable", "total", "Total")}
+            ${amsSortableTh("distTable", "records", "Records")}
             <th></th>
         </tr></thead>
         <tbody>${body}</tbody>`;
 
     const shownTotal = sorted.reduce((n, r) => n + r.total, 0);
+    const shownRecords = sorted.reduce((n, r) => n + r.recordCount, 0);
     document.getElementById("distTableFooter").innerHTML =
-        `<span>${sorted.length} employee${sorted.length === 1 ? "" : "s"} &middot; ${shownTotal} asset(s) shown</span>`;
+        `<span>${sorted.length} employee${sorted.length === 1 ? "" : "s"} &middot; ${shownTotal} asset(s) currently held &middot; ${shownRecords} lifecycle record(s)</span>`;
 }
 
 /* =============================================================================
@@ -128,7 +197,8 @@ function distRenderTable() {
 function distOpenDetail(empId) {
     const r = DIST_STATE.rows.find(x => x.empId === empId);
     if (!r) return;
-    document.getElementById("distDetailTitle").textContent = `${r.name} (${r.empId}) - Asset Detail`;
+    distDetailEmpId = empId;
+    document.getElementById("distDetailTitle").textContent = `${r.name} (${r.displayId}) - Asset Detail`;
 
     const row = (a, kindCls, kindLabel) => `<tr>
         <td class="mono-cell">${amsEsc(amsComputeFullId(a))}</td>
@@ -147,11 +217,22 @@ function distOpenDetail(empId) {
         ? r.team.map(a => row(a, "badge-transfer", "Team")).join("")
         : `<tr><td colspan="6" style="color:var(--text-muted);text-align:center;">No team / subordinate assets</td></tr>`;
 
+    const recRows = r.records.length
+        ? r.records.map(rec => `<tr>
+            <td class="mono-cell">${rec.date ? amsFormatDate(rec.date) : "-"}</td>
+            <td><span class="badge ${rec.cls}">${rec.label}</span></td>
+            <td>${amsEsc(rec.action)}${rec.note ? `<div class="form-hint" style="font-size:12px;margin-top:2px;">${amsEsc(rec.note)}</div>` : ""}</td>
+            <td class="mono-cell">${amsEsc(rec.assetIdFull) || "-"}</td>
+            <td>${amsEsc(rec.statusLabel) || "-"}</td>
+        </tr>`).join("")
+        : `<tr><td colspan="5" style="color:var(--text-muted);text-align:center;">No lifecycle records for this employee</td></tr>`;
+
     document.getElementById("distDetailBody").innerHTML = `
         <p class="form-hint" style="margin-bottom:10px;">
             Direct = personally held by the employee. Team = held by the employee's subordinates, or assigned
-            to the employee with a subordinate/team member recorded as the actual user.
-            Direct: <strong>${r.directCount}</strong> &middot; Team: <strong>${r.teamCount}</strong> &middot; Total: <strong>${r.total}</strong>
+            to the employee with a subordinate/team member recorded as the actual user. The records below are the
+            employee's complete lifecycle - every Assign / Return / Reassign / Replace / Transfer event on record.
+            Direct: <strong>${r.directCount}</strong> &middot; Team: <strong>${r.teamCount}</strong> &middot; Held: <strong>${r.total}</strong> &middot; Records: <strong>${r.recordCount}</strong>
         </p>
         <div class="card" style="margin-bottom:14px;">
             <div class="card-title">Direct (Personal Use) - ${r.directCount}</div>
@@ -160,11 +241,18 @@ function distOpenDetail(empId) {
                 <tbody>${directRows}</tbody>
             </table></div>
         </div>
-        <div class="card">
+        <div class="card" style="margin-bottom:14px;">
             <div class="card-title">Team / Subordinate Use - ${r.teamCount}</div>
             <div class="table-wrap"><table class="table">
                 <thead><tr><th>Asset ID (Full)</th><th>Type</th><th>Make / Model</th><th>Serial</th><th>Status</th><th>Kind</th></tr></thead>
                 <tbody>${teamRows}</tbody>
+            </table></div>
+        </div>
+        <div class="card">
+            <div class="card-title">Complete Lifecycle - All Records (Assign / Return / Reassign / Replace) - ${r.recordCount}</div>
+            <div class="table-wrap"><table class="table">
+                <thead><tr><th>Date</th><th>Event</th><th>Detail</th><th>Asset ID</th><th>Status</th></tr></thead>
+                <tbody>${recRows}</tbody>
             </table></div>
         </div>`;
     amsOpenModal("modalDistDetail");
@@ -174,21 +262,47 @@ function distOpenDetail(empId) {
    5) EXPORT
    ===========================================================================*/
 function distExportCsv() {
-    const headers = ["Emp ID", "Employee Name", "Department", "Designation", "Direct Assets", "Team Assets", "Total Assets"];
-    const rows = distFilteredRows().map(r => [r.empId, r.name, r.dept, r.designation, r.directCount, r.teamCount, r.total]);
+    const headers = ["Emp ID", "Employee Name", "Department", "Designation", "Direct Assets", "Team Assets", "Total Assets", "Lifecycle Records"];
+    const rows = distFilteredRows().map(r => [r.displayId, r.name, r.dept, r.designation, r.directCount, r.teamCount, r.total, r.recordCount]);
     const csv = [headers.map(amsCsvCell).join(",")].concat(rows.map(r => r.map(amsCsvCell).join(","))).join("\r\n");
     amsDownloadFile(csv, "Asset_Distribution.csv", "text/csv;charset=utf-8;");
 }
 
 function distExportXlsx() {
-    const headers = ["Emp ID", "Employee Name", "Department", "Designation", "Direct Assets", "Team Assets", "Total Assets"];
-    const rows = distFilteredRows().map(r => [r.empId, r.name, r.dept, r.designation, r.directCount, r.teamCount, r.total]);
+    const headers = ["Emp ID", "Employee Name", "Department", "Designation", "Direct Assets", "Team Assets", "Total Assets", "Lifecycle Records"];
+    const rows = distFilteredRows().map(r => [r.displayId, r.name, r.dept, r.designation, r.directCount, r.teamCount, r.total, r.recordCount]);
     amsExportXlsx("Asset_Distribution", headers, rows);
 }
 
 function amsCsvCell(v) {
     const s = v == null ? "" : String(v);
     return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/* Downloads the detail currently shown in the "View Assets" modal as a CSV
+   report. Includes the employee's DISPLAY ID, their current Direct + Team
+   holdings, and their complete lifecycle records (assign / return / reassign /
+   replace). */
+function distExportDetail() {
+    const r = DIST_STATE.rows.find(x => x.empId === distDetailEmpId);
+    if (!r) return;
+    const headers = ["Emp ID", "Kind / Event", "Asset ID (Full)", "Make / Model", "Serial Number", "Date", "Status", "Note"];
+    const holdingRow = (a, kind) => [
+        r.displayId, kind, amsComputeFullId(a), `${a.make || ""} ${a.model || ""}`.trim() || "-", a.serialNumber || "-",
+        "(currently held)", a.status || "-", "",
+    ];
+    const recordRow = (rec) => [
+        r.displayId, rec.label, rec.assetIdFull || "-", rec.action, "-",
+        rec.date ? amsFormatDate(rec.date) : "-", rec.statusLabel || "-", rec.note || "",
+    ];
+    const rows = [
+        ...r.direct.map(a => holdingRow(a, "Direct")),
+        ...r.team.map(a => holdingRow(a, "Team")),
+        ...r.records.map(recordRow),
+    ];
+    if (!rows.length) rows.push([r.displayId, "", "", "", "", "", "", "No assets"]);
+    const csv = [headers, ...rows].map(row => row.map(amsCsvCell).join(",")).join("\r\n");
+    amsDownloadFile(csv, `Asset_Distribution_${r.displayId}.csv`, "text/csv;charset=utf-8;");
 }
 
 /* =============================================================================
@@ -211,6 +325,7 @@ function initAssetDistribution() {
         document.getElementById("distOnlyWithAssets").addEventListener("change", distRenderTable);
         document.getElementById("btnDistCsv").addEventListener("click", distExportCsv);
         document.getElementById("btnDistXlsx").addEventListener("click", distExportXlsx);
+        document.getElementById("btnDistDetailCsv").addEventListener("click", distExportDetail);
 
         distRenderSummary();
         distRenderTable();

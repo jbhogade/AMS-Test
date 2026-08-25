@@ -267,14 +267,6 @@
 
 .actions-cell { position: relative; text-align: right; }
 
-/* While a row menu is open, let the wrap overflow visibly so the dropdown
-   overlays the table frame instead of being clipped / creating scrollbars. */
-.table-wrap.mt-menu-open {
-    overflow: visible;
-    position: relative;
-    z-index: 140;
-}
-
 .actions-trigger {
     background: var(--bg-elevated);
     border: 1px solid var(--border);
