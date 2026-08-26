@@ -1,7 +1,9 @@
 using System.Text;
 using AMS.API.Data;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 
@@ -44,6 +46,26 @@ builder.Services.Configure<Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServe
     o.Limits.MaxRequestBodySize = 32_000_000);
 
 var app = builder.Build();
+
+// A down/unreachable SQL Server surfaces as a bare HTTP 500 today, which the
+// frontend shows as "API error 500" with no explanation. Turn SqlExceptions
+// into a clear 503 + JSON message so the UI can explain what went wrong.
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        var ex = context.Features.Get<IExceptionHandlerFeature>()?.Error;
+        if (ex is SqlException)
+        {
+            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+            context.Response.ContentType = "application/json; charset=utf-8";
+            await context.Response.WriteAsJsonAsync(new
+            {
+                error = "Database unavailable. Check that SQL Server is running and run database/Setup-AMS-TEST.bat, then restart the API.",
+            });
+        }
+    });
+});
 
 // Create the database, schema and seeded Supreme Root login (all idempotent).
 using (var scope = app.Services.CreateScope())

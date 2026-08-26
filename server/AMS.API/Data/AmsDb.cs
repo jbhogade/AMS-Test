@@ -135,6 +135,11 @@ public class AmsDb
                 username     NVARCHAR(100) NULL,
                 role         NVARCHAR(50)  NULL,
                 display_name NVARCHAR(200) NULL,
+                email        NVARCHAR(200) NULL,
+                contact_no   NVARCHAR(50)  NULL,
+                address      NVARCHAR(500) NULL,
+                dob          NVARCHAR(20)  NULL,
+                gender       NVARCHAR(20)  NULL,
                 active       BIT           NOT NULL DEFAULT 1,
                 data_json    NVARCHAR(MAX) NOT NULL,
                 updated_at   DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
@@ -543,6 +548,21 @@ public class AmsDb
                 ALTER TABLE dbo.ams_users ADD dob NVARCHAR(20) NULL;
             IF COL_LENGTH(N'dbo.ams_users', N'gender') IS NULL
                 ALTER TABLE dbo.ams_users ADD gender NVARCHAR(20) NULL;
+            IF OBJECT_ID(N'dbo.ams_user_profiles', N'U') IS NOT NULL
+                AND COL_LENGTH(N'dbo.ams_user_profiles', N'email') IS NULL
+                ALTER TABLE dbo.ams_user_profiles ADD email NVARCHAR(200) NULL;
+            IF OBJECT_ID(N'dbo.ams_user_profiles', N'U') IS NOT NULL
+                AND COL_LENGTH(N'dbo.ams_user_profiles', N'contact_no') IS NULL
+                ALTER TABLE dbo.ams_user_profiles ADD contact_no NVARCHAR(50) NULL;
+            IF OBJECT_ID(N'dbo.ams_user_profiles', N'U') IS NOT NULL
+                AND COL_LENGTH(N'dbo.ams_user_profiles', N'address') IS NULL
+                ALTER TABLE dbo.ams_user_profiles ADD address NVARCHAR(500) NULL;
+            IF OBJECT_ID(N'dbo.ams_user_profiles', N'U') IS NOT NULL
+                AND COL_LENGTH(N'dbo.ams_user_profiles', N'dob') IS NULL
+                ALTER TABLE dbo.ams_user_profiles ADD dob NVARCHAR(20) NULL;
+            IF OBJECT_ID(N'dbo.ams_user_profiles', N'U') IS NOT NULL
+                AND COL_LENGTH(N'dbo.ams_user_profiles', N'gender') IS NULL
+                ALTER TABLE dbo.ams_user_profiles ADD gender NVARCHAR(20) NULL;
             IF OBJECT_ID(N'dbo.ams_assets', N'U') IS NOT NULL
                 AND COL_LENGTH(N'dbo.ams_assets', N'status') IS NULL
                 ALTER TABLE dbo.ams_assets ADD status NVARCHAR(100) NULL;
@@ -804,7 +824,9 @@ public class AmsDb
         defs.Add(new TableDef
         {
             Key = "users", Table = "ams_user_profiles", KeyField = "username",
-            Columns = { C("username", "username"), C("role", "role"), C("display_name", "displayName"), C("active", "active", "bit") },
+            Columns = { C("username", "username"), C("role", "role"), C("display_name", "displayName"),
+                        C("email", "email"), C("contact_no", "contactNo"), C("address", "address"),
+                        C("dob", "dob"), C("gender", "gender"), C("active", "active", "bit") },
         });
         defs.Add(new TableDef
         {
@@ -1188,7 +1210,7 @@ public class AmsDb
 
         var sql = new List<string> {
             "role = ISNULL(@r, role)",
-            "linked_employee = @le",
+            "linked_employee = ISNULL(@le, linked_employee)",
             "email = @e",
             "remarks = @m",
             "active = ISNULL(@a, active)",
