@@ -95,6 +95,11 @@ BEGIN
         username     NVARCHAR(100) NULL,
         role         NVARCHAR(50)  NULL,
         display_name NVARCHAR(200) NULL,
+        email        NVARCHAR(200) NULL,
+        contact_no   NVARCHAR(50)  NULL,
+        address      NVARCHAR(500) NULL,
+        dob          NVARCHAR(20)  NULL,
+        gender       NVARCHAR(20)  NULL,
         active       BIT           NOT NULL DEFAULT 1,
         data_json    NVARCHAR(MAX) NOT NULL,
         updated_at   DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
@@ -582,6 +587,30 @@ GO
 IF OBJECT_ID(N'dbo.ams_users', N'U') IS NOT NULL
    AND COL_LENGTH(N'dbo.ams_users', N'gender') IS NULL
    ALTER TABLE dbo.ams_users ADD gender NVARCHAR(20) NULL;
+GO
+
+/* Profile columns for the dbo.ams_user_profiles mirror too, so the User Master
+   copy exposes the same profile fields as dbo.ams_users. Idempotent + safe on
+   a fresh or existing database. */
+IF OBJECT_ID(N'dbo.ams_user_profiles', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_user_profiles', N'email') IS NULL
+   ALTER TABLE dbo.ams_user_profiles ADD email NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_user_profiles', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_user_profiles', N'contact_no') IS NULL
+   ALTER TABLE dbo.ams_user_profiles ADD contact_no NVARCHAR(50) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_user_profiles', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_user_profiles', N'address') IS NULL
+   ALTER TABLE dbo.ams_user_profiles ADD address NVARCHAR(500) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_user_profiles', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_user_profiles', N'dob') IS NULL
+   ALTER TABLE dbo.ams_user_profiles ADD dob NVARCHAR(20) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_user_profiles', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_user_profiles', N'gender') IS NULL
+   ALTER TABLE dbo.ams_user_profiles ADD gender NVARCHAR(20) NULL;
 GO
 
 /* ---- Exit Records (handover snapshots) --------------------------------------- */

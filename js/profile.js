@@ -72,21 +72,27 @@
         };
         status.textContent = "Saving...";
         status.style.color = "var(--text-muted)";
+        let updated = null;
+        let savedLocally = false;
         try {
-            const updated = await amsApiFetch("/api/auth/me", { method: "PUT", body: payload });
-            amsUpdateSession({
-                displayName: (updated && updated.displayName) || payload.displayName || null,
-                name: (updated && updated.displayName) || payload.displayName || null,
-                email: payload.email, contactNo: payload.contactNo,
-                address: payload.address, dob: payload.dob, gender: payload.gender,
-            });
-            renderSummary(updated || {});
-            status.textContent = "Profile saved.";
-            status.style.color = "var(--success)";
+            updated = await amsApiFetch("/api/auth/me", { method: "PUT", body: payload });
         } catch (e) {
-            status.textContent = e.message || "Save failed.";
-            status.style.color = "var(--danger)";
+            /* API / database unreachable (static preview, DB down, ...). Keep
+               demo mode working by persisting the fields to the local session,
+               and say clearly that the change is preview-only. */
+            savedLocally = true;
         }
+        amsUpdateSession({
+            displayName: (updated && updated.displayName) || payload.displayName || null,
+            name: (updated && updated.displayName) || payload.displayName || null,
+            email: payload.email, contactNo: payload.contactNo,
+            address: payload.address, dob: payload.dob, gender: payload.gender,
+        });
+        renderSummary(updated || amsGetSession() || {});
+        status.textContent = savedLocally
+            ? "Profile saved locally (database unavailable - changes are preview-only)."
+            : "Profile saved.";
+        status.style.color = savedLocally ? "var(--warning)" : "var(--success)";
     }
 
     async function changePassword() {
@@ -107,7 +113,12 @@
             document.getElementById("pw-new").value = "";
             document.getElementById("pw-confirm").value = "";
         } catch (e) {
-            status.textContent = e.message || "Password change failed.";
+            /* A raw transport/HTTP failure (API or database unreachable) is not
+               a "wrong password" answer - say so instead of "API error 501". */
+            const msg = (e && e.message) || "";
+            status.textContent = (/^API error/.test(msg) || /Cannot reach/.test(msg))
+                ? "Password change requires the AMS-Test API and database to be reachable."
+                : (msg || "Password change failed.");
             status.style.color = "var(--danger)";
         }
     }
