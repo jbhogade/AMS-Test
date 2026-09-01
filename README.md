@@ -139,6 +139,9 @@ python manage.py migrate
 
 # 5. Run the local development server
 python manage.py runserver
+
+# 6. Stop virtual environment
+deactivate
 ```
 
 Then open your browser to: **http://127.0.0.1:8000/**
