@@ -291,6 +291,28 @@ BEGIN
     );
 END;
 
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ams_mobiles (
+        row_id         BIGINT IDENTITY(1,1) NOT NULL,
+        record_key     NVARCHAR(200) NOT NULL,
+        asset_id       NVARCHAR(200) NULL,
+        ams_asset_id   NVARCHAR(200) NULL,
+        display_id     NVARCHAR(200) NULL,
+        name           NVARCHAR(300) NULL,
+        status         NVARCHAR(100) NULL,
+        asset_type     NVARCHAR(200) NULL,
+        category       NVARCHAR(200) NULL,
+        make           NVARCHAR(200) NULL,
+        site           NVARCHAR(200) NULL,
+        current_site   NVARCHAR(200) NULL,
+        assigned_to    NVARCHAR(200) NULL,
+        data_json      NVARCHAR(MAX) NOT NULL,
+        updated_at     DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT PK_ams_mobiles PRIMARY KEY (record_key)
+    );
+END;
+
 IF OBJECT_ID(N'dbo.ams_employees', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.ams_employees (
@@ -602,6 +624,14 @@ def _build_table_defs():
 
     defs = [
         TableDef("assets", "ams_assets", key_field="id", columns=[
+            c("asset_id", "id"), c("ams_asset_id", "amsAssetId"),
+            c("display_id", "displayId"), c("name", "name"),
+            c("status", "status"), c("asset_type", "type"),
+            c("category", "category"), c("make", "make"),
+            c("site", "site"), c("current_site", "currentSite"),
+            c("assigned_to", "assignedTo"),
+        ]),
+        TableDef("mobiles", "ams_mobiles", key_field="id", columns=[
             c("asset_id", "id"), c("ams_asset_id", "amsAssetId"),
             c("display_id", "displayId"), c("name", "name"),
             c("status", "status"), c("asset_type", "type"),

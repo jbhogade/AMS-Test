@@ -23,7 +23,7 @@ class RegistryTests(unittest.TestCase):
         expected = {
             "assets", "employees", "assetTypes", "assetMakes", "assetCategories",
             "sites", "departments", "designations", "vendors", "consumables",
-            "spareParts", "accessories", "company", "roleAccess", "accessRights",
+            "spareParts", "accessories", "mobiles", "company", "roleAccess", "accessRights",
             "reportPrefs", "users", "exitRecords", "consumableLog", "sparePartLog",
             "simCards", "simOperators", "simPlans", "consumableCategories",
             "consumableUnits", "sparePartCategories", "vendorCategories",
