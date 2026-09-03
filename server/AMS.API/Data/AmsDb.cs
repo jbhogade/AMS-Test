@@ -368,6 +368,28 @@ public class AmsDb
             );
         END;
 
+        IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NULL
+        BEGIN
+            CREATE TABLE dbo.ams_mobiles (
+                row_id         BIGINT IDENTITY(1,1) NOT NULL,
+                record_key     NVARCHAR(200) NOT NULL,
+                asset_id       NVARCHAR(200) NULL,
+                ams_asset_id   NVARCHAR(200) NULL,
+                display_id     NVARCHAR(200) NULL,
+                name           NVARCHAR(300) NULL,
+                status         NVARCHAR(100) NULL,
+                asset_type     NVARCHAR(200) NULL,
+                category       NVARCHAR(200) NULL,
+                make           NVARCHAR(200) NULL,
+                site           NVARCHAR(200) NULL,
+                current_site   NVARCHAR(200) NULL,
+                assigned_to    NVARCHAR(200) NULL,
+                data_json      NVARCHAR(MAX) NOT NULL,
+                updated_at     DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
+                CONSTRAINT PK_ams_mobiles PRIMARY KEY (record_key)
+            );
+        END;
+
         IF OBJECT_ID(N'dbo.ams_employees', N'U') IS NULL
         BEGIN
             CREATE TABLE dbo.ams_employees (
@@ -675,6 +697,19 @@ public class AmsDb
         defs.Add(new TableDef
         {
             Key = "assets", Table = "ams_assets", KeyField = "id",
+            Columns =
+            {
+                C("asset_id", "id"), C("ams_asset_id", "amsAssetId"),
+                C("display_id", "displayId"), C("name", "name"),
+                C("status", "status"), C("asset_type", "type"),
+                C("category", "category"), C("make", "make"),
+                C("site", "site"), C("current_site", "currentSite"),
+                C("assigned_to", "assignedTo"),
+            },
+        });
+        defs.Add(new TableDef
+        {
+            Key = "mobiles", Table = "ams_mobiles", KeyField = "id",
             Columns =
             {
                 C("asset_id", "id"), C("ams_asset_id", "amsAssetId"),
