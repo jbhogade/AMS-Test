@@ -138,7 +138,7 @@ pip install -r requirements.txt
 python manage.py migrate
 
 # 5. Run the local development server
-python manage.py runserver
+python manage.py runserver 0.0.0.0:8010
 
 # 6. Stop virtual environment
 deactivate

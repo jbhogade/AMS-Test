@@ -35,6 +35,7 @@ const NAV_ITEMS = [
     { page: "dashboard",   label: "Dashboard",   href: "../index.html",       icon: ICONS.dashboard,   section: "Main" },
     { page: "employees",   label: "Employees",   href: "../pages/employees.html",   icon: ICONS.people,  section: "People" },
     { page: "assets",      label: "Assets",      href: "../pages/assets.html",      icon: ICONS.assets,      section: "Inventory" },
+    { page: "mobiles",     label: "Mobiles",     href: "../pages/mobiles.html",     icon: ICONS.simCards,    section: "Inventory" },
     { page: "asset-distribution", label: "Asset Distribution", href: "../pages/asset-distribution.html", icon: ICONS.assets, section: "Inventory" },
     { page: "consumables", label: "Consumables", href: "../pages/consumables.html", icon: ICONS.consumables, section: "Inventory" },
     { page: "spare-parts", label: "Spare Parts", href: "../pages/spare-parts.html", icon: ICONS.spareParts,  section: "Inventory" },
@@ -52,6 +53,7 @@ const PAGE_TITLES = {
     "dashboard":   { title: "Dashboard",       sub: "Overview of your inventory" },
     "employees":   { title: "Employees",       sub: "Employee master, assets & handover records" },
     "assets":      { title: "Assets",          sub: "Equipment, machinery & company items" },
+    "mobiles":     { title: "Mobiles",         sub: "Mobile phones & handheld devices" },
     "consumables": { title: "Consumables",     sub: "Items consumed during operations" },
     "spare-parts": { title: "Spare Parts",     sub: "Replacement components in stores" },
     "accessories": { title: "Accessories",     sub: "Attachments & add-ons for assets" },
@@ -88,6 +90,8 @@ function renderSidebar(currentPage) {
     let lastSection = "";
 
     NAV_ITEMS.forEach(item => {
+        if (typeof amsUserCanAccessNavPage === "function" && !amsUserCanAccessNavPage(item.page)) return;
+
         /* Add a section label when the section changes */
         if (item.section !== lastSection) {
             sectionsHtml += `<div class="sidebar-nav-label">${escapeHtml(item.section)}</div>`;
@@ -207,6 +211,14 @@ function amsRequireSession() {
 }
 
 /* ---- Initialise the whole layout ------------------------------------------- */
+function amsLayoutRedirectIfDenied(currentPage) {
+    if (!currentPage || currentPage === "login" || currentPage === "profile") return;
+    if (typeof amsUserCanAccessNavPage !== "function") return;
+    if (amsUserCanAccessNavPage(currentPage)) return;
+    const fallback = NAV_ITEMS.find(i => i.page !== currentPage && amsUserCanAccessNavPage(i.page));
+    if (fallback) window.location.replace(fallback.href);
+}
+
 function initLayout(currentPage) {
     if (!amsRequireSession()) return;
     initTheme();
@@ -227,6 +239,17 @@ function initLayout(currentPage) {
 
     /* Notification bell (needs the topbar to already be rendered) */
     if (typeof amsInitBell === "function") amsInitBell();
+
+    /* Page access (including Supreme Root per-user assignments) is on the
+       user profile loaded from SQL. Re-apply the sidebar once that lands. */
+    if (typeof amsDbEnsureLoaded === "function") {
+        amsDbEnsureLoaded().then(() => {
+            if (typeof amsEnsureSessionUserProfile === "function") amsEnsureSessionUserProfile();
+            amsLayoutRedirectIfDenied(currentPage);
+            renderSidebar(currentPage);
+            setActiveNav(currentPage);
+        });
+    }
 }
 
 /* =============================================================================

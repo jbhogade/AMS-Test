@@ -12,6 +12,8 @@
 #              ROLE GUARDS (resolved from the logged-in session role):
 #                - "Supreme Root" is only offered as an assignable Role while the
 #                  session role is "Supreme Root".
+#                - Supreme Root accounts are hidden from every non-Supreme Root
+#                  role (table + export). Only Supreme Root can see those rows.
 #                - Supreme Root accounts can never be deleted from this screen.
 #                - Super Root accounts can only be deleted while the session role
 #                  is Supreme Root.
@@ -123,11 +125,18 @@
             }
             window.amsGetAllowedRoleOptions = amsGetAllowedRoleOptions;
 
+            /* Supreme Root accounts are visible only to other Supreme Root users. */
+            function amsIsUserMasterRowVisible(item) {
+                if (!item || item.role !== "Supreme Root") return true;
+                return amsGetViewingAsRole() === "Supreme Root";
+            }
+
             window.AMS_MASTER_CONFIG = {
                 pageTitle: "User Master",
                 pageSub: "Manage system login accounts and roles. A password is required for new accounts so they can log in.",
                 dataArray: AMS_DUMMY_USERS,
                 idKey: "username",
+                rowFilter: amsIsUserMasterRowVisible,
                 fields: [
                     { key: "username",       label: "Username",         required: true },
                     { key: "linkedEmployee", label: "Linked Employee",  type: "select",
@@ -171,6 +180,9 @@
                         remarks: values.remarks || null,
                         active: values.active !== false,
                     };
+                    if (values.role === "Supreme Root" && amsGetViewingAsRole() !== "Supreme Root") {
+                        throw new Error("Only a Supreme Root user can create or edit Supreme Root accounts.");
+                    }
                     if (editingKey) {
                         if (values.password) payload.password = values.password;
                         await amsApiFetch(`/api/auth/users/${encodeURIComponent(editingKey)}`, { method: "PUT", body: payload });
@@ -199,9 +211,9 @@
                 if (sessionRole === "Supreme Root") {
                     hint.innerHTML = `Signed in as <strong>Supreme Root</strong> - full control: can create Supreme Root accounts and delete Super Root accounts.`;
                 } else if (sessionRole === "Super Root") {
-                    hint.textContent = "Signed in as Super Root - cannot create or delete other Supreme Root / Super Root accounts. Access Rights Control Master, Role Access Master, and Supreme Root's Log Report records are hidden from this role.";
+                    hint.textContent = "Signed in as Super Root - Supreme Root accounts are hidden. Cannot create Supreme Root accounts or delete Super Root accounts. Access Rights Control Master, Role Access Master, and Supreme Root's Log Report records are hidden from this role.";
                 } else {
-                    hint.textContent = "Signed in as a limited role - some actions may be restricted by real access rights.";
+                    hint.textContent = "Signed in as a limited role - Supreme Root accounts are hidden. Some actions may be restricted by access rights.";
                 }
             }
 

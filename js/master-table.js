@@ -48,7 +48,8 @@ const AMS_MT_STATE = { editingKey: null };
 function amsExportMaster() {
     const cfg = AMS_MASTER_CONFIG;
     const headers = [...cfg.fields.map(f => f.key), ...(cfg.autoIdField ? [cfg.autoIdField] : []), "active"];
-    const rows = cfg.dataArray.map(item => [
+    const source = (typeof cfg.rowFilter === "function") ? cfg.dataArray.filter(cfg.rowFilter) : cfg.dataArray;
+    const rows = source.map(item => [
         ...cfg.fields.map(f => f.type === "date" ? amsFormatDate(item[f.key]) : item[f.key]),
         ...(cfg.autoIdField ? [item[cfg.autoIdField]] : []), item.active ? "true" : "false",
     ]);
@@ -127,6 +128,10 @@ function amsHandleImportFile(file) {
                 ? cfg.dataArray.find(item => cfg.importMatchKeys.every(k => String(item[k]).toLowerCase() === String(obj[k] || "").toLowerCase()))
                 : cfg.dataArray.find(item => String(item[cfg.idKey]).toLowerCase() === obj[cfg.idKey].toLowerCase());
             if (existing) {
+                if (typeof cfg.rowFilter === "function" && !cfg.rowFilter(existing)) {
+                    results.push({ row: line, record, result: "skipped", reason: "Record is not visible to your role" });
+                    continue;
+                }
                 cfg.fields.forEach(f => { if (obj[f.key]) existing[f.key] = obj[f.key]; });
                 existing.active = active;
                 results.push({ row: line, record, result: "updated", reason: "Existing record updated" });
@@ -134,6 +139,10 @@ function amsHandleImportFile(file) {
                 const newItem = { active };
                 cfg.fields.forEach(f => { newItem[f.key] = obj[f.key] || ""; });
                 if (cfg.autoIdField) newItem[cfg.autoIdField] = cfg.autoIdGenerate(newItem);
+                if (typeof cfg.rowFilter === "function" && !cfg.rowFilter(newItem)) {
+                    results.push({ row: line, record, result: "skipped", reason: "Record is not visible to your role" });
+                    continue;
+                }
                 cfg.dataArray.push(newItem);
                 results.push({ row: line, record, result: "added", reason: "New record added" });
             }
@@ -159,7 +168,8 @@ async function amsRenderMasterTable() {
     const cfg = AMS_MASTER_CONFIG;
     const searchTerm = (document.getElementById("searchBox").value || "").toLowerCase();
 
-    const filtered = cfg.dataArray
+    const source = (typeof cfg.rowFilter === "function") ? cfg.dataArray.filter(cfg.rowFilter) : cfg.dataArray;
+    const filtered = source
         .filter(item => !searchTerm || cfg.fields.some(f => String(item[f.key] || "").toLowerCase().includes(searchTerm)));
 
     /* Sortable headers (shared js/sortable.js engine) */

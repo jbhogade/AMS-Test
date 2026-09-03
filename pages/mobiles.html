@@ -1,32 +1,22 @@
 <!DOCTYPE html>
 <!--
-#-------------- Start Code for : ASSET MASTER PAGE (assets.html) ---------------
+#-------------- Start Code for : MOBILE MASTER PAGE (mobiles.html) -------------
 #
-#  PURPOSE   : Core Asset Master - Add/Edit assets, Assign/Return/Asset Edit to
-#              employees, Transfer between sites, mark Not Working, Retire / Scrap,
-#              Replace, and view the full lifecycle "Asset ID Record" for every
-#              asset. Plus bulk Import / Export / Template.
-#
-#  FIELDS PER SPEC : AMS Asset ID (hidden, Super Root only), Asset ID (Smart
-#              Display ID - short before assign, full after), Asset Type, Asset
-#              Make, Asset Name, Asset Model, Purchase Site, Current Site,
-#              Serial Number, Purchase Date, Warranty End, Status, Assigned To
-#              (Direct + Subordinate/actual user), Vendor, Purchase Cost, Remarks.
-#
-#  PORT NOTE : Ported from v3-3 asset-master-v1-0.html onto the v4-0 single-source
-#              layout (sidebar + topbar mounts from layout.js).
+#  PURPOSE   : Mobile Master - same lifecycle as Asset Master (Add/Edit,
+#              Assign/Return/Asset Edit, Transfer, Not Working, Retire / Scrap,
+#              Replace, Asset ID Record, Import / Export / Template) for
+#              mobile phones and handheld devices, stored separately.
 #
 #  FILES USED :
 #    - css/themes.css, css/main.css, css/assets.css
-#    - js/dummy-data.js (data + helpers), js/theme.js, js/app.js,
-#      js/layout.js (sidebar/header), js/assets.js (this page)
+#    - js/dummy-data.js, js/theme.js, js/app.js, js/layout.js, js/mobiles.js
 #------------------------------------------------------------------------------
 -->
 <html lang="en" data-theme="dark-grey">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Assets | Asset Management System</title>
+    <title>Mobiles | Asset Management System</title>
 
     <link rel="stylesheet" href="../css/themes.css">
     <link rel="stylesheet" href="../css/main.css">
@@ -45,8 +35,8 @@
                 <!-- ==================== PAGE HEADING ==================== -->
                 <div class="page-heading flex items-center justify-between">
                     <div>
-                        <h1>Asset Master</h1>
-                        <p>Manage assets and their full lifecycle - assignment, transfer, repair, retirement.</p>
+                        <h1>Mobile Master</h1>
+                        <p>Manage mobile phones and handheld devices - assignment, transfer, repair, retirement.</p>
                     </div>
                 </div>
 
@@ -83,7 +73,7 @@
                         </label>
                     </div>
                     <div class="flex items-center gap-8">
-                        <button class="btn btn-primary" id="btnAddAsset">&#43; Add Asset</button>
+                        <button class="btn btn-primary" id="btnAddAsset">&#43; Add Mobile</button>
                         <button class="btn btn-secondary" id="btnAssetTemplate">Template</button>
                         <button class="btn btn-secondary" id="btnAssetExport">Export</button>
                         <button class="btn btn-secondary" id="btnAssetImport">Import</button>
@@ -111,7 +101,7 @@
     <div class="modal-overlay" id="modalForm">
         <div class="modal modal-lg">
             <div class="modal-header">
-                <h3 id="formModalTitle">Add Asset</h3>
+                <h3 id="formModalTitle">Add Mobile</h3>
                 <button class="modal-close" data-close="modalForm">&times;</button>
             </div>
             <form id="assetForm">
@@ -224,6 +214,27 @@
                             <input type="text" id="fSerial" class="input" placeholder="Optional">
                         </div>
                         <div class="field">
+                            <label>IMEI No 1</label>
+                            <input type="text" id="fImei1" class="input" placeholder="Optional">
+                        </div>
+                        <div class="field">
+                            <label>IMEI No 2</label>
+                            <input type="text" id="fImei2" class="input" placeholder="Optional">
+                        </div>
+                        <div class="field">
+                            <label>Battery No</label>
+                            <input type="text" id="fBatteryNo" class="input" placeholder="Optional">
+                        </div>
+                        <div class="field">
+                            <label>Charger No</label>
+                            <input type="text" id="fChargerNo" class="input" placeholder="Optional">
+                        </div>
+                        <div class="field">
+                            <label>Mobile No (SIM Card)</label>
+                            <select id="fSimMobileNo" class="select"></select>
+                            <div class="form-hint">Attach a number from SIM Card Master. Default is 0 (none).</div>
+                        </div>
+                        <div class="field">
                             <label>Purchase Date <span class="req">*</span></label>
                             <input type="date" id="fPurchaseDate" class="input" required>
                         </div>
@@ -250,7 +261,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-close="modalForm">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Asset</button>
+                     <button type="submit" class="btn btn-primary">Save Mobile</button>
                 </div>
             </form>
         </div>
@@ -262,7 +273,7 @@
     <div class="modal-overlay" id="modalView">
         <div class="modal">
             <div class="modal-header">
-                <h3>Asset Details</h3>
+                <h3>Mobile Details</h3>
                 <button class="modal-close" data-close="modalView">&times;</button>
             </div>
             <div class="modal-body" id="viewModalBody"></div>
@@ -492,16 +503,16 @@
     <script src="../js/vendor/xlsx.full.min.js"></script>
     <script src="../js/xlsx-helpers.js"></script>
     <script src="../js/print-docs.js"></script>
-    <script src="../js/assets.js"></script>
+    <script src="../js/mobiles.js"></script>
     <script>
-        initLayout("assets");
-        initAssets();
+        initLayout("mobiles");
+        initMobiles();
         amsPopulateVendorSelects();
         amsWireVendorQuickAdds();
     </script>
 </body>
 </html>
 <!--
-#-------------- End of the code : ASSET MASTER PAGE (assets.html) -------------
+#-------------- End of the code : MOBILE MASTER PAGE (mobiles.html) -----------
 #------------------------------------------------------------------------------
 -->

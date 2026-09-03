@@ -42,19 +42,6 @@ function amsWireAccessGate() {
 }
 /*-------------- End of the code ------------------------------------------------*/
 
-/*-------------- Start Code for HELPER: resolve a user's EFFECTIVE page access ---*/
-/* A per-user override (allowedPages set to an explicit array, even an empty one)
-   always wins. Without one, access resolves to that user's ROLE default from
-   Role Access Master (amsGetRoleAccessDefaults()) instead of blanket full access.
-   Supreme-Root-exclusive pages (accessRights, roleAccess) and the Super Root/
-   Supreme Root-only Log Report still ignore this and gate purely on the role. */
-function amsResolveAllowedPages(user) {
-    if (user.allowedPages !== null && user.allowedPages !== undefined) return user.allowedPages;
-    const roleMap = amsGetRoleAccessDefaults()[user.role] || {};
-    return AMS_PAGE_REGISTRY.filter(p => roleMap[p.key] !== false).map(p => p.key);
-}
-/*-------------- End of the code ------------------------------------------------*/
-
 /*-------------- Start Code for RENDER: USER ACCESS TABLE ------------------------*/
 function renderAccessTable() {
     const searchTerm = (document.getElementById("searchBox").value || "").toLowerCase();
@@ -95,6 +82,7 @@ document.addEventListener("click", (e) => {
     if (!btn) return;
     amsEditingUsername = btn.getAttribute("data-edit-access");
     const user = AMS_DUMMY_USERS.find(u => u.username === amsEditingUsername);
+    if (!user) return;
     document.getElementById("editAccessUsername").textContent = amsEditingUsername;
 
     const currentlyAllowed = amsResolveAllowedPages(user);
@@ -126,6 +114,7 @@ document.getElementById("btnClearAllAccess").addEventListener("click", () => {
 
 document.getElementById("btnSaveAccess").addEventListener("click", () => {
     const user = AMS_DUMMY_USERS.find(u => u.username === amsEditingUsername);
+    if (!user) return;
     const checked = [...document.querySelectorAll(".access-page-check:checked")].map(c => c.value);
     user.allowedPages = checked;
     amsDbSaveAsync("users");

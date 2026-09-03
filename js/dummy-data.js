@@ -136,6 +136,7 @@ const AMS_COLLECTIONS = {
     spareParts:      () => AMS_DUMMY_SPARE_PARTS,
     sparePartLog:    () => AMS_DUMMY_SPAREPART_LOG,
     accessories:     () => AMS_DUMMY_ACCESSORIES,
+    mobiles:         () => DUMMY_MOBILES,
     simCards:        () => AMS_DUMMY_SIM_CARDS,
     simOperators:    () => AMS_DUMMY_SIM_OPERATORS,
     simPlans:        () => AMS_DUMMY_SIM_PLANS,
@@ -183,6 +184,7 @@ async function amsDbLoadAll() {
             Math.max(m, parseInt(String(v.vendorId || "0").replace(/\D/g, ""), 10) || 0), 0);
         if (venMax >= AMS_VENDOR_SEQ) AMS_VENDOR_SEQ = venMax + 1;
         amsMigrateEmployeeNames();
+        await amsMergeLoginUsersIntoProfiles();
         AMS_DB_READY = true;
     })();
     return AMS_DB_LOADING;
@@ -825,6 +827,7 @@ const AMS_ASSET_STATUS_OPTIONS = [
     "In Store", "Assigned", "In Repair", "Transfer", "Not Working", "Retired / Scrapped", "Replaced",
 ];
 const DUMMY_ASSETS = [];
+const DUMMY_MOBILES = [];
 
 
 /* =============================================================================
@@ -1387,7 +1390,7 @@ function amsResolvePendingManagers() {
                         is re-pointed to this person so the team's asset records
                         continue under the new incharge, and the transfer is
                         snapshotted for the printed Handover Form. */
-function exitEmployee(amsId, exitDate, remarks, facilitiesDisabled, exitReason, teamInchargeAmsId) {
+function exitEmployee(amsId, exitDate, remarks, facilitiesDisabled, exitReason, teamInchargeAmsId, facilitiesNotApplicable) {
     const emp = findEmployee(amsId);
     if (!emp) return null;
     emp.status = "Inactive";
@@ -1404,10 +1407,8 @@ function exitEmployee(amsId, exitDate, remarks, facilitiesDisabled, exitReason, 
             remarks: a.remarks, usageNote: a.usageNote,
         }));
 
-    /* Facilities disabled at exit (defaults to the facilities revoked on exit) */
-    const disabled = (facilitiesDisabled && facilitiesDisabled.length)
-        ? facilitiesDisabled.map(String)
-        : FACILITIES_CHECKLIST.filter(f => f.revokedOnExit).map(f => f.label);
+    const disabled = Array.isArray(facilitiesDisabled) ? facilitiesDisabled.map(String) : [];
+    const notApplicable = Array.isArray(facilitiesNotApplicable) ? facilitiesNotApplicable.map(String) : [];
 
     /* ---- Subordinate / team transfer to the new Incharge / HOD ----
        Direct subordinates (still active) get their reporting line re-pointed to
@@ -1448,6 +1449,7 @@ function exitEmployee(amsId, exitDate, remarks, facilitiesDisabled, exitReason, 
         exitReason: emp.exitReason,
         exitRemarks: emp.exitRemarks,
         facilitiesDisabled: disabled,
+        facilitiesNotApplicable: notApplicable,
         directAssetsHeld,
         teamTransferredTo,
         subordinateAssetsTransferred,
@@ -1531,7 +1533,7 @@ function amsAssetHolderLabel(a) {
     if (!a) return "";
     if (a.assignedToSubordinate) {
         const emp = amsGetEmployeeByAmsId(a.assignedToSubordinate);
-        return emp ? `${emp.name} (${emp.empId})` : a.assignedToSubordinate;
+        return emp ? `${emp.name} (${amsGetEmployeeDisplayId(emp)})` : a.assignedToSubordinate;
     }
     if (a.assignedSubText) return a.assignedSubText;
     return "";
@@ -1641,6 +1643,7 @@ const AMS_PAGE_REGISTRY = [
     { key: "dashboard",     label: "Dashboard" },
     { key: "employee",      label: "Employee Master" },
     { key: "asset",         label: "Asset Master" },
+    { key: "mobile",        label: "Mobile Master" },
     { key: "reports",       label: "Report Master (page access)" },
     { key: "assetType",     label: "Asset Type Master" },
     { key: "assetMake",     label: "Asset Make Master" },
@@ -1652,6 +1655,10 @@ const AMS_PAGE_REGISTRY = [
     { key: "designation",   label: "Designation Master" },
     { key: "systemAdmin",   label: "System Administrator Master (hub)" },
     { key: "accessory",     label: "Accessory Master" },
+    { key: "simCards",      label: "SIM Card Master" },
+    { key: "vendors",       label: "Vendor Master" },
+    { key: "assetDistribution", label: "Asset Distribution" },
+    { key: "settings",      label: "Settings" },
     { key: "simOperator",   label: "SIM Operator Master" },
     { key: "simPlan",       label: "SIM Plan Master" },
     { key: "consumableCategory", label: "Consumable Category Master" },
@@ -1670,6 +1677,7 @@ const AMS_PAGE_REGISTRY = [
     { key: "report.consumableUsed",     label: "Report: Consumable Used" },
     { key: "report.sparePartsRestock",  label: "Report: Spare Parts Restock" },
     { key: "report.sparePartsUsed",     label: "Report: Spare Parts Used" },
+    { key: "report.assetDistribution",  label: "Report: Asset Distribution" },
 ];
 const AMS_DUMMY_USERS = [];
 
@@ -1706,6 +1714,119 @@ function amsSaveRoleAccessDefaults(map) {
     Object.assign(AMS_ROLE_ACCESS_DEFAULTS, map);
     try { localStorage.setItem(AMS_ROLE_ACCESS_STORAGE_KEY, JSON.stringify(map)); } catch (e) { /* storage full */ }
     amsDbSaveDocAsync("roleAccess");
+}
+
+/* Nav / hub page id -> Access Rights registry key. Pages with no mapping stay visible. */
+const AMS_NAV_TO_REGISTRY = {
+    dashboard: "dashboard",
+    employees: "employee",
+    assets: "asset",
+    mobiles: "mobile",
+    "asset-distribution": "assetDistribution",
+    consumables: "consumable",
+    "spare-parts": "spareParts",
+    accessories: "accessory",
+    "sim-cards": "simCards",
+    vendors: "vendors",
+    reports: "reports",
+    "system-admin": "systemAdmin",
+    settings: "settings",
+    "user-master": "userMaster",
+    company: "company",
+    "access-rights": "accessRights",
+    "role-access": "roleAccess",
+    log: "log",
+    "master-asset-type": "assetType",
+    "master-asset-make": "assetMake",
+    "master-asset-category": "assetCategory",
+    "master-site": "site",
+    "master-department": "department",
+    "master-designation": "designation",
+    "master-sim-operator": "simOperator",
+    "master-sim-plan": "simPlan",
+    "master-consumable-category": "consumableCategory",
+    "master-unit-of-measure": "unitOfMeasure",
+    "master-spare-part-category": "sparePartCategory",
+    "master-vendor-category": "vendorCategory",
+};
+
+function amsGetCurrentUserRecord() {
+    const sess = (typeof amsGetSession === "function") ? amsGetSession() : null;
+    if (!sess || !sess.username) return null;
+    return AMS_DUMMY_USERS.find(u => u.username === sess.username) || null;
+}
+
+function amsEnsureSessionUserProfile() {
+    const sess = (typeof amsGetSession === "function") ? amsGetSession() : null;
+    if (!sess || !sess.username) return;
+    if (AMS_DUMMY_USERS.some(u => u.username === sess.username)) return;
+    AMS_DUMMY_USERS.push({
+        username: sess.username,
+        role: sess.role || "Standard User",
+        displayName: sess.displayName || sess.name || sess.username,
+        linkedEmployee: sess.linkedEmployee || "",
+        email: sess.email || "",
+        remarks: "",
+        active: true,
+        allowedPages: null,
+    });
+}
+
+async function amsMergeLoginUsersIntoProfiles() {
+    amsEnsureSessionUserProfile();
+    try {
+        const list = await amsApiGet("/api/auth/users");
+        if (!Array.isArray(list)) return;
+        list.forEach(u => {
+            if (!u || !u.username) return;
+            const existing = AMS_DUMMY_USERS.find(x => x.username === u.username);
+            if (existing) {
+                if (u.role) existing.role = u.role;
+                if (u.displayName && !existing.displayName) existing.displayName = u.displayName;
+                if (u.email && !existing.email) existing.email = u.email;
+                if (u.linkedEmployee && !existing.linkedEmployee) existing.linkedEmployee = u.linkedEmployee;
+                if (existing.active === undefined) existing.active = u.active !== false;
+            } else {
+                AMS_DUMMY_USERS.push({
+                    username: u.username,
+                    role: u.role || "Standard User",
+                    displayName: u.displayName || u.username,
+                    linkedEmployee: u.linkedEmployee || "",
+                    email: u.email || "",
+                    remarks: u.remarks || "",
+                    active: u.active !== false,
+                    allowedPages: null,
+                });
+            }
+        });
+    } catch (e) { /* Standard User cannot list accounts - session stub is enough */ }
+}
+
+function amsResolveAllowedPages(user) {
+    if (!user) return AMS_PAGE_REGISTRY.map(p => p.key);
+    if (user.allowedPages !== null && user.allowedPages !== undefined) return user.allowedPages;
+    const roleMap = amsGetRoleAccessDefaults()[user.role] || {};
+    return AMS_PAGE_REGISTRY.filter(p => roleMap[p.key] !== false).map(p => p.key);
+}
+
+function amsUserCanAccessPage(registryKey) {
+    if (!registryKey) return true;
+    const role = (typeof amsGetViewingAsRole === "function") ? amsGetViewingAsRole() : "Standard User";
+    if (registryKey === "accessRights" || registryKey === "roleAccess") {
+        if (role !== "Supreme Root") return false;
+    }
+    if (registryKey === "log") {
+        if (role !== "Supreme Root" && role !== "Super Root") return false;
+    }
+    const user = amsGetCurrentUserRecord() || { username: "", role: role, allowedPages: null };
+    const allowed = amsResolveAllowedPages(user);
+    return allowed.indexOf(registryKey) !== -1;
+}
+
+function amsUserCanAccessNavPage(pageId) {
+    const key = AMS_NAV_TO_REGISTRY[pageId];
+    if (!key) return true;
+    return amsUserCanAccessPage(key);
 }
 
 /* =============================================================================

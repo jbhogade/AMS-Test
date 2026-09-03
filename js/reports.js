@@ -38,6 +38,24 @@ function amsWireReportTabs() {
         });
     });
 }
+
+function amsApplyReportTabAccess() {
+    if (typeof amsUserCanAccessPage !== "function") return;
+    let firstVisible = null;
+    document.querySelectorAll(".report-tab").forEach(tab => {
+        const key = "report." + tab.getAttribute("data-report");
+        const allowed = amsUserCanAccessPage(key);
+        tab.style.display = allowed ? "" : "none";
+        const panel = document.getElementById(`panel-${tab.getAttribute("data-report")}`);
+        if (panel && !allowed) panel.classList.remove("active");
+        if (allowed && !firstVisible) firstVisible = tab;
+    });
+    const active = document.querySelector(".report-tab.active");
+    const activeHidden = active && active.style.display === "none";
+    if (firstVisible && (!active || activeHidden)) {
+        firstVisible.click();
+    }
+}
 /*-------------- End of the code ------------------------------------------------*/
 
 /*-------------- Start Code for POPULATE SHARED DROPDOWNS (Sites, Departments, Types) -----*/
@@ -507,6 +525,7 @@ document.addEventListener("DOMContentLoaded", () => {
     amsWireReportAppearance();
     amsWireReportButtons();
     (typeof amsDbEnsureLoaded === "function" ? amsDbEnsureLoaded() : Promise.resolve()).then(() => {
+        amsApplyReportTabAccess();
         amsPopulateSiteFilters();
         amsPopulateIssueHandoverExtraFilters();
         amsPopulateDistReportDept();

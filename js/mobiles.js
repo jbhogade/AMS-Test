@@ -1,26 +1,20 @@
 /*==============================================================================
-#-------------- Start Code for : ASSET MASTER PAGE LOGIC (assets.js) -----------
+#-------------- Start Code for : MOBILE MASTER PAGE LOGIC (mobiles.js) ---------
 #
-#  PURPOSE   : All logic for Asset Master - table render, Smart Asset ID
-#              generation (AMS Asset ID hidden + Display ID + computed Full ID),
-#              Add/Edit, Assign/Asset Edit/Return, Transfer between sites, Not
-#              Working, Retire / Scrap, Replace, and the "Asset ID Record"
-#              lifecycle history popup. Plus bulk Import / Export / Template.
+#  PURPOSE   : All logic for Mobile Master - same lifecycle as Asset Master
+#              (table, Smart IDs, Add/Edit, Assign/Asset Edit/Return, Transfer,
+#              Not Working, Retire / Scrap, Replace, Asset ID Record, Import /
+#              Export / Template) against the separate `mobiles` collection.
 #
-#  PORT NOTE : Ported from v3-3 asset-master-v1-0.js. Works on an in-memory
-#              clone of the shared dummy data (AST_STATE below), same pattern
-#              as employees.js. Employee identity/department is read-only here
-#              and resolved through the shared amsGetEmployeesForPortal() view.
-#              The v3-3 iframe-based "Add Employee" inside the Assign modal is
-#              replaced with a compact inline quick-add form that writes via the
-#              shared addEmployee() helper (single source of truth).
+#  PORT NOTE : Cloned from js/assets.js. AST_STATE.assets points at DUMMY_MOBILES
+#              so this page never mixes records with Asset Master.
 #------------------------------------------------------------------------------*/
 
 /* =============================================================================
    1) IN-MEMORY STATE
    ===========================================================================*/
 const AST_STATE = {
-    assets: DUMMY_ASSETS, /* live reference - DUMMY_ASSETS is the DB-backed collection cache */
+    assets: DUMMY_MOBILES, /* live reference - DUMMY_MOBILES is the DB-backed collection cache */
     editingId: null,      /* asset.id currently being edited/acted on (Add modal = null) */
     assignMode: null,     /* "assign" | "edit" - which action opened modalAssign */
     formCounters: {},     /* per-form sequence counters for generated form numbers */
@@ -83,7 +77,7 @@ function renderAssetTable() {
         .filter(a => {
             if (statusFilterVal && a.status !== statusFilterVal) return false;
             if (!searchTerm) return true;
-            return [a.id, a.type, a.make, a.model, a.serialNumber].some(v => String(v || "").toLowerCase().includes(searchTerm));
+            return [a.id, a.type, a.make, a.model, a.serialNumber, a.imei1, a.imei2, a.batteryNo, a.chargerNo, a.simMobileNo].some(v => String(v || "").toLowerCase().includes(searchTerm));
         });
 
     const getters = {
@@ -545,11 +539,47 @@ function amsSaveQuickAddEmployee() {
 /* =============================================================================
    12) ADD / EDIT ASSET MODAL
    ===========================================================================*/
+function amsPopulateSimMobileSelect(selected) {
+    const sel = document.getElementById("fSimMobileNo");
+    if (!sel) return;
+    const current = (selected === undefined || selected === null || selected === "") ? "0" : String(selected);
+    const sims = (typeof AMS_DUMMY_SIM_CARDS !== "undefined") ? AMS_DUMMY_SIM_CARDS : [];
+    const opts = [`<option value="0">0 (None)</option>`];
+    const seen = new Set(["0"]);
+    sims.forEach(s => {
+        const num = String(s.mobileNumber || "").trim();
+        if (!num || seen.has(num)) return;
+        seen.add(num);
+        const bits = [num];
+        if (s.simId) bits.push(s.simId);
+        if (s.operator) bits.push(s.operator);
+        opts.push(`<option value="${amsEsc(num)}">${amsEsc(bits.join(" · "))}</option>`);
+    });
+    if (current !== "0" && !seen.has(current)) {
+        opts.push(`<option value="${amsEsc(current)}">${amsEsc(current)}</option>`);
+    }
+    sel.innerHTML = opts.join("");
+    sel.value = current;
+    if (sel.value !== current) sel.value = "0";
+}
+
+function amsReadMobileExtraFields() {
+    const simEl = document.getElementById("fSimMobileNo");
+    return {
+        imei1: (document.getElementById("fImei1").value || "").trim(),
+        imei2: (document.getElementById("fImei2").value || "").trim(),
+        batteryNo: (document.getElementById("fBatteryNo").value || "").trim(),
+        chargerNo: (document.getElementById("fChargerNo").value || "").trim(),
+        simMobileNo: (simEl && simEl.value) ? simEl.value : "0",
+    };
+}
+
 function amsOpenAddModal() {
     AST_STATE.editingId = null;
-    document.getElementById("formModalTitle").textContent = "Add Asset";
+    document.getElementById("formModalTitle").textContent = "Add Mobile";
     document.getElementById("assetForm").reset();
     amsPopulateAssetDropdowns();
+    amsPopulateSimMobileSelect("0");
     document.getElementById("fAssetId").value = "";
     document.getElementById("fAssetId").placeholder = amsGenerateDisplayId(amsTypeShort(document.getElementById("fType").value)) + " (leave blank to use this)";
     document.getElementById("fStatus").value = "In Store";
@@ -561,8 +591,9 @@ function amsOpenEditModal(key) {
     const a = AST_STATE.assets.find(x => x.id === key);
     if (!a) return;
     AST_STATE.editingId = key;
-    document.getElementById("formModalTitle").textContent = "Edit Asset";
+    document.getElementById("formModalTitle").textContent = "Edit Mobile";
     amsPopulateAssetDropdowns();
+    amsPopulateSimMobileSelect(a.simMobileNo || "0");
 
     document.getElementById("fAssetId").value = amsBaseDisplayId(a);
     document.getElementById("fType").value = a.type;
@@ -573,6 +604,10 @@ function amsOpenEditModal(key) {
     document.getElementById("fPurchaseSite").value = a.purchaseSite;
     document.getElementById("fCurrentSite").value = a.currentSite || a.site;
     document.getElementById("fSerial").value = a.serialNumber || "";
+    document.getElementById("fImei1").value = a.imei1 || "";
+    document.getElementById("fImei2").value = a.imei2 || "";
+    document.getElementById("fBatteryNo").value = a.batteryNo || "";
+    document.getElementById("fChargerNo").value = a.chargerNo || "";
     document.getElementById("fPurchaseDate").value = a.purchaseDate || "";
     document.getElementById("fWarrantyEnd").value = a.warrantyEnd || "";
     amsSetVendorSelectValue("fVendor", a.vendor || "");
@@ -604,6 +639,7 @@ function amsSubmitAssetForm(e) {
         vendor: document.getElementById("fVendor").value.trim(),
         purchaseCost: document.getElementById("fCost").value.trim(),
         remarks: document.getElementById("fRemarks").value.trim(),
+        ...amsReadMobileExtraFields(),
     };
     const statusVal = document.getElementById("fStatus").value;
 
@@ -632,7 +668,7 @@ function amsSubmitAssetForm(e) {
     }
 
     amsCloseModal("modalForm");
-    amsDbSaveAsync("assets");
+    amsDbSaveAsync("mobiles");
     renderAssetTable();
     if (AST_STATE.replAwaitingAdd) amsResumeReplaceAfterAdd();
 }
@@ -655,6 +691,11 @@ function amsOpenViewModal(key) {
         <div class="detail-row"><span class="detail-label">Category</span><span class="detail-value">${amsEsc(a.category) || "-"}</span></div>
         <div class="detail-row"><span class="detail-label">Asset Name</span><span class="detail-value">${amsEsc(a.name) || "-"}</span></div>
         <div class="detail-row"><span class="detail-label">Serial Number</span><span class="detail-value mono-cell">${amsEsc(a.serialNumber) || "-"}</span></div>
+        <div class="detail-row"><span class="detail-label">IMEI No 1</span><span class="detail-value mono-cell">${amsEsc(a.imei1) || "-"}</span></div>
+        <div class="detail-row"><span class="detail-label">IMEI No 2</span><span class="detail-value mono-cell">${amsEsc(a.imei2) || "-"}</span></div>
+        <div class="detail-row"><span class="detail-label">Battery No</span><span class="detail-value mono-cell">${amsEsc(a.batteryNo) || "-"}</span></div>
+        <div class="detail-row"><span class="detail-label">Charger No</span><span class="detail-value mono-cell">${amsEsc(a.chargerNo) || "-"}</span></div>
+        <div class="detail-row"><span class="detail-label">Mobile No (SIM Card)</span><span class="detail-value mono-cell">${amsEsc(a.simMobileNo || "0")}</span></div>
         <div class="detail-row"><span class="detail-label">Purchase Site</span><span class="detail-value">${amsEsc(a.purchaseSite)}</span></div>
         <div class="detail-row"><span class="detail-label">Current Site</span><span class="detail-value">${amsEsc(a.currentSite || a.site)}</span></div>
         <div class="detail-row"><span class="detail-label">Purchase Date</span><span class="detail-value">${amsFormatDate(a.purchaseDate) || "-"}</span></div>
@@ -705,6 +746,11 @@ function amsDownloadAssetView() {
         ["Category", a.category || "-"],
         ["Asset Name", a.name || "-"],
         ["Serial Number", a.serialNumber || "-"],
+        ["IMEI No 1", a.imei1 || "-"],
+        ["IMEI No 2", a.imei2 || "-"],
+        ["Battery No", a.batteryNo || "-"],
+        ["Charger No", a.chargerNo || "-"],
+        ["Mobile No (SIM Card)", a.simMobileNo || "0"],
         ["Purchase Site", a.purchaseSite || "-"],
         ["Current Site", a.currentSite || a.site || "-"],
         ["Purchase Date", amsFormatDate(a.purchaseDate) || "-"],
@@ -836,7 +882,7 @@ function amsConfirmAssign() {
     amsNotify(`Asset ${a.id} ${isEdit ? "assignment updated for" : "assigned to"} ${directEmp ? directEmp.name : directId}${holderNote}`, "success");
 
     amsCloseModal("modalAssign");
-    amsDbSaveAsync("assets");
+    amsDbSaveAsync("mobiles");
     renderAssetTable();
 }
 
@@ -858,7 +904,7 @@ function amsReturnAsset(key) {
     a.assignedTo = null; a.assignedToSubordinate = null; a.assignedSubText = null; a.assignedDepartment = null; a.assignedDeptText = null; a.usageNote = null; a.dept = ""; a.status = "In Store";
     a.id = amsComputeFullId(a); /* reverts to base display id */
     amsNotify(`Asset returned: ${a.id}${prevEmp ? ` (from ${prevEmp.name})` : ""}`, "info");
-    amsDbSaveAsync("assets");
+    amsDbSaveAsync("mobiles");
     renderAssetTable();
 }
 
@@ -898,7 +944,7 @@ function amsConfirmTransfer() {
     amsNotify(`Asset transferred: ${a.id} moved to ${newSite}`, "info");
 
     amsCloseModal("modalTransfer");
-    amsDbSaveAsync("assets");
+    amsDbSaveAsync("mobiles");
     renderAssetTable();
 }
 
@@ -919,7 +965,7 @@ function amsMarkNotWorking(key) {
         assetIdFull: a.id, statusLabel: "Not Working",
     });
     amsNotify(`Asset marked Not Working: ${a.id}`, "warning");
-    amsDbSaveAsync("assets");
+    amsDbSaveAsync("mobiles");
     renderAssetTable();
 }
 
@@ -937,7 +983,7 @@ function amsRetireAsset(key) {
         assetIdFull: a.id, statusLabel: "Retired / Scrapped",
     });
     amsNotify(`Asset retired/scrapped: ${a.id}`, "danger");
-    amsDbSaveAsync("assets");
+    amsDbSaveAsync("mobiles");
     renderAssetTable();
 }
 
@@ -1092,7 +1138,7 @@ function amsSubmitReplaceForm(e) {
     amsNotify(`Asset replaced: ${amsBaseDisplayId(old)} \u2192 ${amsComputeFullId(newAsset)}`, "warning");
 
     amsCloseModal("modalReplace");
-    amsDbSaveAsync("assets");
+    amsDbSaveAsync("mobiles");
     renderAssetTable();
 }
 
@@ -1373,6 +1419,7 @@ function amsGenerateAssetIssueFormPrint(key, extraRemarks) {
    ===========================================================================*/
 const AST_EXPORT_HEADERS = [
     "displayId", "amsAssetId", "type", "category", "make", "model", "name", "serialNumber",
+    "imei1", "imei2", "batteryNo", "chargerNo", "simMobileNo",
     "purchaseSite", "currentSite", "purchaseDate", "warrantyEnd", "status",
     "assignedToEmpId", "assignedToSubordinateEmpId", "vendor", "purchaseCost", "remarks",
     "replacesAssetId", "replacedByAssetId", "fullAssetId",
@@ -1381,6 +1428,7 @@ const AST_EXPORT_HEADERS = [
    auto-generated by the system and must never be typed in manually. */
 const AST_IMPORT_HEADERS = [
     "displayId", "type*", "category*", "make*", "model", "name", "serialNumber",
+    "imei1", "imei2", "batteryNo", "chargerNo", "simMobileNo",
     "purchaseSite*", "currentSite*", "purchaseDate*", "warrantyEnd", "status",
     "assignedToEmpId", "assignedToSubordinateEmpId", "vendor", "purchaseCost", "remarks",
 ];
@@ -1388,6 +1436,7 @@ const AST_IMPORT_HEADERS = [
 function amsExportAssets() {
     const rows = AST_STATE.assets.map(a => [
         amsBaseDisplayId(a), a.amsAssetId, a.type, a.category || "", a.make, a.model || "", a.name || "", a.serialNumber || "",
+        a.imei1 || "", a.imei2 || "", a.batteryNo || "", a.chargerNo || "", a.simMobileNo || "0",
         a.purchaseSite, a.currentSite || a.site, amsFormatDate(a.purchaseDate), amsFormatDate(a.warrantyEnd), a.status,
         a.assignedTo || "", a.assignedToSubordinate || "", a.vendor || "", a.purchaseCost || "", a.remarks || "",
         a.replacesAssetId || "", a.replacedByAssetId || "", amsComputeFullId(a),
@@ -1402,6 +1451,7 @@ function amsDownloadAssetTemplate() {
     }
     const sample = [
         "LT00099", "Laptop", "IT Hardware", "Dell", "Latitude 5430", "", "SN-EXAMPLE-001",
+        "", "", "", "", "0",
         "Mumbai HO", "Mumbai HO", "13-07-2026", "13-07-2028", "In Store",
         "", "", "Dell India Pvt Ltd", "65000", "Example row - delete before importing",
     ];
@@ -1479,6 +1529,8 @@ function amsImportAssetsFile(file) {
                     type: obj.type, category: obj.category || existing.category, make: obj.make || existing.make, model: obj.model, name: obj.name,
                     serialNumber: obj.serialNumber, purchaseSite: obj.purchaseSite || existing.purchaseSite,
                     currentSite: obj.currentSite, site: obj.currentSite,
+                    imei1: obj.imei1 || "", imei2: obj.imei2 || "", batteryNo: obj.batteryNo || "",
+                    chargerNo: obj.chargerNo || "", simMobileNo: obj.simMobileNo || "0",
                     purchaseDate: purchaseDate || existing.purchaseDate, warrantyEnd: warrantyEnd || existing.warrantyEnd,
                     status, vendor: obj.vendor, purchaseCost: obj.purchaseCost, remarks: obj.remarks,
                 });
@@ -1492,6 +1544,7 @@ function amsImportAssetsFile(file) {
                 const asset = {
                     amsAssetId: amsGenerateAmsAssetId(typeShort), displayId, isLegacyId: !!obj.displayId, id: displayId,
                     type: obj.type, category: obj.category || "", make: obj.make, model: obj.model || "", name: obj.name || "", serialNumber: obj.serialNumber || "",
+                    imei1: obj.imei1 || "", imei2: obj.imei2 || "", batteryNo: obj.batteryNo || "", chargerNo: obj.chargerNo || "", simMobileNo: obj.simMobileNo || "0",
                     purchaseSite: obj.purchaseSite || obj.currentSite, currentSite: obj.currentSite, site: obj.currentSite,
                     purchaseDate, warrantyEnd, status, dept: "", assignedTo: null, assignedToSubordinate: null,
                     vendor: obj.vendor || "", purchaseCost: obj.purchaseCost || "", remarks: obj.remarks || "",
@@ -1503,7 +1556,7 @@ function amsImportAssetsFile(file) {
         }
 
         renderAssetTable();
-        amsDbSaveAsync("assets"); /* persist the imported/updated rows (wholesale PUT) */
+        amsDbSaveAsync("mobiles"); /* persist the imported/updated rows (wholesale PUT) */
         amsShowImportSummary(results);
         const fileInput = document.getElementById("assetImportFileInput");
         if (fileInput) fileInput.value = "";
@@ -1530,7 +1583,7 @@ function hideFormError(id) {
 /* =============================================================================
    23) PAGE INIT
    ===========================================================================*/
-async function initAssets() {
+async function initMobiles() {
     /* Initial render (waits for the DB-backed collections to load first) */
     if (typeof amsDbEnsureLoaded === "function") await amsDbEnsureLoaded();
     amsSortRegisterRenderer("assetTable", renderAssetTable);
@@ -1591,5 +1644,5 @@ async function initAssets() {
 }
 
 /*------------------------------------------------------------------------------
-#-------------- End of the code : ASSET MASTER PAGE LOGIC ----------------------
+#-------------- End of the code : MOBILE MASTER PAGE LOGIC ---------------------
 #------------------------------------------------------------------------------*/

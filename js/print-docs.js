@@ -149,7 +149,9 @@ function amsPrintDocument(printContent, pageTitle, orientation) {
                 .pf-check-block { display: flex; align-items: center; gap: 8px; font-size: 11.5px; }
                 .pf-acc-asset { color: #555; font-size: 10px; }
 
-                .pf-notes-box { border: 1px solid #999; border-top: none; min-height: 40px; padding: 8px 10px; }
+                .pf-notes-box { border: 1px solid #999; border-top: none; min-height: 40px; padding: 8px 10px;
+                    font-size: 11.5px; line-height: 1.5; color: #1a1a1a; }
+                .pf-notes-box strong { font-weight: 700; font-size: inherit; font-style: inherit; font-family: inherit; }
                 .pf-notes-empty { color: #999; font-style: italic; }
 
                 /* Additional Remarks/Notes (IT/HR/Admin) - a distinct, boxed

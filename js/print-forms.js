@@ -62,7 +62,9 @@ function amsBuildAdditionalRemarks(extraRemarks) {
 function amsSubordinateAssetsDetailed(amsId) {
     const list = [];
     getSubordinates(amsId).forEach(sub => {
-        getEmployeeAssets(sub.amsId).forEach(a => list.push({ ...a, subName: getEmployeeFullName(sub), subEmpId: sub.empId }));
+        getEmployeeAssets(sub.amsId).forEach(a => list.push({
+            ...a, subName: getEmployeeFullName(sub), subEmpId: amsGetEmployeeDisplayId(sub),
+        }));
     });
     return list;
 }
@@ -190,9 +192,12 @@ function amsGenerateReport(amsId, type, extraRemarks) {
         site: sa.currentSite || sa.site, holder: sa.subName, holderId: sa.subEmpId,
     }));
     subOwned.forEach(oa => {
+        const holderEmp = oa.assignedToSubordinate ? amsGetEmployeeByAmsId(oa.assignedToSubordinate) : null;
         subRows.push({
             id: amsPrintAssetId(oa), type: oa.type, makeModel: oa.makeModel,
-            site: oa.currentSite || oa.site, holder: amsAssetHolderLabel(oa), holderId: "",
+            site: oa.currentSite || oa.site,
+            holder: holderEmp ? holderEmp.name : (oa.assignedSubText || amsAssetHolderLabel(oa)),
+            holderId: holderEmp ? amsGetEmployeeDisplayId(holderEmp) : "",
         });
     });
     const subordinateHtml = subRows.length ? `
@@ -220,6 +225,8 @@ function amsGenerateReport(amsId, type, extraRemarks) {
             <label class="pf-check-block"><input type="checkbox" disabled> Asset condition verified by IT/Admin</label>
             ${(exitRecord ? exitRecord.facilitiesDisabled : []).map(f => `
                 <label class="pf-check-block"><input type="checkbox" disabled> ${amsEsc(f)} revoked</label>`).join("")}
+            ${((exitRecord && exitRecord.facilitiesNotApplicable) ? exitRecord.facilitiesNotApplicable : []).map(f => `
+                <label class="pf-check-block"><input type="checkbox" disabled> ${amsEsc(f)} - N/A</label>`).join("")}
             <label class="pf-check-block"><input type="checkbox" disabled> Subordinate assets flagged for reassignment (if applicable)</label>
         </div>` : "";
 

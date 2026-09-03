@@ -510,23 +510,36 @@ function openExitModal(amsId) {
             </li>`).join("")
         : `<li><span class="fac-label">No assets held by this employee.</span></li>`;
 
-    /* Facilities to disable - Email Login & ERP Login are pre-checked per rule */
+    /* Facilities start unchecked so the user marks revoke or N/A themselves. */
     const facList = document.getElementById("exit-facility-list");
     facList.innerHTML = FACILITIES_CHECKLIST.map(f => `
         <li>
-            <input type="checkbox" ${f.revokedOnExit ? "checked" : ""} data-fac="${f.key}">
+            <input type="checkbox" data-fac="${f.key}">
             <span class="fac-label">${escapeHtml(f.label)}</span>
+            <label class="fac-na"><input type="checkbox" data-fac-na="${f.key}"> N/A</label>
             <span class="fac-state on">Active</span>
         </li>`).join("");
 
-    /* Live update of each facility's state chip when checked */
-    facList.addEventListener("change", function (e) {
-        if (e.target.matches("input[data-fac]")) {
-            const state = e.target.closest("li").querySelector(".fac-state");
-            state.textContent = e.target.checked ? "Disabled" : "Active";
-            state.className = "fac-state " + (e.target.checked ? "off" : "on");
+    facList.onchange = function (e) {
+        const li = e.target.closest("li");
+        if (!li) return;
+        const revoke = li.querySelector("input[data-fac]");
+        const na = li.querySelector("input[data-fac-na]");
+        const state = li.querySelector(".fac-state");
+        if (!revoke || !na || !state) return;
+        if (e.target.matches("input[data-fac-na]") && na.checked) revoke.checked = false;
+        if (e.target.matches("input[data-fac]") && revoke.checked) na.checked = false;
+        if (na.checked) {
+            state.textContent = "N/A";
+            state.className = "fac-state na";
+        } else if (revoke.checked) {
+            state.textContent = "Disabled";
+            state.className = "fac-state off";
+        } else {
+            state.textContent = "Active";
+            state.className = "fac-state on";
         }
-    });
+    };
 
     /* Subordinate / team assets - list who reports to this person and force a
        choice of the new Incharge / HOD so the team's asset records continue */
@@ -582,11 +595,15 @@ function confirmExit() {
         return;
     }
 
-    /* Collect the facilities that were checked for the handover record */
     const disabledFacilities = [];
+    const naFacilities = [];
     document.querySelectorAll("#exit-facility-list input[data-fac]:checked").forEach(cb => {
         const fac = FACILITIES_CHECKLIST.find(f => f.key === cb.dataset.fac);
         if (fac) disabledFacilities.push(fac.label);
+    });
+    document.querySelectorAll("#exit-facility-list input[data-fac-na]:checked").forEach(cb => {
+        const fac = FACILITIES_CHECKLIST.find(f => f.key === cb.getAttribute("data-fac-na"));
+        if (fac) naFacilities.push(fac.label);
     });
 
     exitEmployee(
@@ -595,11 +612,12 @@ function confirmExit() {
         document.getElementById("exit-remarks").value,
         disabledFacilities,
         exitReason,
-        teamIncharge
+        teamIncharge,
+        naFacilities
     );
 
-    /* Log the event to the permanent activity log */
     const logPieces = ["Facilities disabled: " + (disabledFacilities.join(", ") || "none")];
+    if (naFacilities.length) logPieces.push("N/A: " + naFacilities.join(", "));
     if (exitReason) logPieces.push("Reason: " + exitReason);
     if (teamIncharge) {
         const ic = findEmployee(teamIncharge);
