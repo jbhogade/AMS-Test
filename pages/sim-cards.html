@@ -7,7 +7,8 @@
 #              SIM card from the company; the phone is already tracked as an
 #              Asset, this page stores the SIM card record on its own
 #              (SIM serial / ICCID, mobile number, operator, plan, status,
-#              assignment to an employee, purchase/activation details).
+#              assignment to an employee, optional company-mobile / Personal
+#              Mobile link, purchase/activation details).
 #
 #  FIELDS    : SIM ID (auto-generated, e.g. SIM-000001), SIM Serial / ICCID,
 #              Mobile Number, Operator, Plan, Status (In Store / Issued /
@@ -57,6 +58,12 @@
                 <div class="asset-toolbar">
                     <div class="asset-toolbar-left">
                         <input type="search" id="simSearchBox" class="search-input" placeholder="Search SIM ID, mobile number, operator, ICCID...">
+                        <select id="simOperatorFilter" class="select" style="width:auto;">
+                            <option value="">All Operators</option>
+                        </select>
+                        <select id="simPlanFilter" class="select" style="width:auto;">
+                            <option value="">All Plans</option>
+                        </select>
                         <select id="simStatusFilter" class="select" style="width:auto;">
                             <option value="">All Statuses</option>
                             <option value="In Store">In Store</option>
@@ -208,6 +215,11 @@
                         <label>Assign To Employee <span class="req">*</span></label>
                         <select id="simAssignEmp" class="select" required></select>
                         <div class="form-hint">Employee this SIM card is issued to</div>
+                    </div>
+                    <div class="field field-full">
+                        <label>Used In Mobile</label>
+                        <select id="simAssignMobile" class="select"></select>
+                        <div class="form-hint">Company mobiles without a SIM (default None), or Personal Mobile</div>
                     </div>
                     <div class="field field-full">
                         <label>Assignment Date <span class="req">*</span></label>

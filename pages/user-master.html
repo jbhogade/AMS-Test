@@ -10,10 +10,12 @@
 #              only page-specific part.
 #
 #              ROLE GUARDS (resolved from the logged-in session role):
-#                - "Supreme Root" is only offered as an assignable Role while the
-#                  session role is "Supreme Root".
-#                - Supreme Root accounts are hidden from every non-Supreme Root
-#                  role (table + export). Only Supreme Root can see those rows.
+#                - Assignable roles are limited to the session role and below
+#                  (Admin cannot pick Super Root / Supreme Root; Super Root
+#                  cannot pick Supreme Root).
+#                - Accounts above the session role are hidden (table + export).
+#                  Admin does not see Super Root+; Super Root does not see
+#                  Supreme Root. Only Supreme Root sees every row.
 #                - Supreme Root accounts can never be deleted from this screen.
 #                - Super Root accounts can only be deleted while the session role
 #                  is Supreme Root.
@@ -115,20 +117,35 @@
          ==================================================================== -->
     <script>
         (function () {
-            /* Only a Supreme Root can create/see "Supreme Root" as an assignable
-               role - everyone else's Add/Edit form simply doesn't offer it. */
+            /* Role rank: you may assign / see your own level and below. */
+            const AMS_USER_ROLE_RANK = {
+                "Standard User": 0,
+                "Viewer (Read-Only)": 1,
+                "Admin": 2,
+                "Super Root": 3,
+                "Supreme Root": 4,
+            };
+            function amsUserRoleRank(role) {
+                const n = AMS_USER_ROLE_RANK[role];
+                return typeof n === "number" ? n : -1;
+            }
+            function amsSessionRoleRank() {
+                return amsUserRoleRank(amsGetViewingAsRole());
+            }
+
+            /* Assignable roles stop at the signed-in role (Admin cannot pick
+               Super Root+; Super Root cannot pick Supreme Root). */
             function amsGetAllowedRoleOptions() {
-                const viewingAs = amsGetViewingAsRole();
-                return viewingAs === "Supreme Root"
-                    ? AMS_USER_ROLES
-                    : AMS_USER_ROLES.filter(r => r !== "Supreme Root");
+                const cap = amsSessionRoleRank();
+                return AMS_USER_ROLES.filter(r => amsUserRoleRank(r) <= cap);
             }
             window.amsGetAllowedRoleOptions = amsGetAllowedRoleOptions;
 
-            /* Supreme Root accounts are visible only to other Supreme Root users. */
+            /* Hide accounts strictly above the session role (Admin hides Super
+               Root+; Super Root hides Supreme Root). */
             function amsIsUserMasterRowVisible(item) {
-                if (!item || item.role !== "Supreme Root") return true;
-                return amsGetViewingAsRole() === "Supreme Root";
+                if (!item) return true;
+                return amsUserRoleRank(item.role) <= amsSessionRoleRank();
             }
 
             window.AMS_MASTER_CONFIG = {
@@ -162,15 +179,35 @@
                     { key: "remarks",        label: "Remarks",          multiline: true },
                 ],
                 deleteGuard: (item) => {
-                    const sessionRole = amsGetViewingAsRole();
                     if (item.role === "Supreme Root") return { allowed: false, reason: "Supreme Root accounts cannot be deleted from this screen." };
-                    if (item.role === "Super Root" && sessionRole !== "Supreme Root") return { allowed: false, reason: "Only a Supreme Root user can delete a Super Root account." };
+                    if (amsUserRoleRank(item.role) > amsSessionRoleRank()) return { allowed: false, reason: "You cannot delete an account above your own role." };
+                    if (item.role === "Super Root" && amsGetViewingAsRole() !== "Supreme Root") return { allowed: false, reason: "Only a Supreme Root user can delete a Super Root account." };
+                    return { allowed: true };
+                },
+                writeGuard: (values, existing) => {
+                    if (existing && amsUserRoleRank(existing.role) > amsSessionRoleRank()) {
+                        return { allowed: false, reason: "You cannot edit an account above your own role." };
+                    }
+                    if (values && amsUserRoleRank(values.role) > amsSessionRoleRank()) {
+                        return { allowed: false, reason: "You cannot create or assign a role above your own." };
+                    }
                     return { allowed: true };
                 },
                 /* Sync login accounts to the real ams_users table via the API so
                    new accounts can actually log in. Skipped silently when the
                    API is unreachable so the screen still works offline. */
                 onBeforeSave: async (values, editingKey) => {
+                    if (amsUserRoleRank(values.role) > amsSessionRoleRank()) {
+                        throw new Error("You cannot create or assign a role above your own.");
+                    }
+                    if (editingKey) {
+                        const existing = (typeof AMS_DUMMY_USERS !== "undefined")
+                            ? AMS_DUMMY_USERS.find(u => u.username === editingKey)
+                            : null;
+                        if (existing && amsUserRoleRank(existing.role) > amsSessionRoleRank()) {
+                            throw new Error("You cannot edit an account above your own role.");
+                        }
+                    }
                     const sess = amsGetSession();
                     if (!sess || !sess.token) return; // not logged in / no API
                     const payload = {
@@ -180,9 +217,6 @@
                         remarks: values.remarks || null,
                         active: values.active !== false,
                     };
-                    if (values.role === "Supreme Root" && amsGetViewingAsRole() !== "Supreme Root") {
-                        throw new Error("Only a Supreme Root user can create or edit Supreme Root accounts.");
-                    }
                     if (editingKey) {
                         if (values.password) payload.password = values.password;
                         await amsApiFetch(`/api/auth/users/${encodeURIComponent(editingKey)}`, { method: "PUT", body: payload });
@@ -194,6 +228,9 @@
                     }
                 },
                 onBeforeToggle: async (item, newActive) => {
+                    if (amsUserRoleRank(item.role) > amsSessionRoleRank()) {
+                        throw new Error("You cannot change an account above your own role.");
+                    }
                     const sess = amsGetSession();
                     if (!sess || !sess.token) return;
                     await amsApiFetch(`/api/auth/users/${encodeURIComponent(item.username)}`, { method: "PUT", body: { active: newActive } });
@@ -212,8 +249,10 @@
                     hint.innerHTML = `Signed in as <strong>Supreme Root</strong> - full control: can create Supreme Root accounts and delete Super Root accounts.`;
                 } else if (sessionRole === "Super Root") {
                     hint.textContent = "Signed in as Super Root - Supreme Root accounts are hidden. Cannot create Supreme Root accounts or delete Super Root accounts. Access Rights Control Master, Role Access Master, and Supreme Root's Log Report records are hidden from this role.";
+                } else if (sessionRole === "Admin") {
+                    hint.textContent = "Signed in as Admin - Super Root and Supreme Root accounts are hidden. Cannot create or assign Super Root or Supreme Root roles.";
                 } else {
-                    hint.textContent = "Signed in as a limited role - Supreme Root accounts are hidden. Some actions may be restricted by access rights.";
+                    hint.textContent = "Signed in as a limited role - Super Root and Supreme Root accounts are hidden. Some actions may be restricted by access rights.";
                 }
             }
 

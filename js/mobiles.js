@@ -68,14 +68,28 @@ const AST_STATUS_BADGE = {
     "Transfer": "badge-blue", "Not Working": "badge-red", "Retired / Scrapped": "badge-red", "Replaced": "badge-grey",
 };
 
+function amsPopulateAssetFilters() {
+    const assets = AST_STATE.assets || [];
+    amsFillSelectOptions(document.getElementById("typeFilter"), "All Types", amsUniqueSorted(assets.map(a => a.type)));
+    amsFillSelectOptions(document.getElementById("makeFilter"), "All Makes", amsUniqueSorted(assets.map(a => a.make)));
+    amsFillSelectOptions(document.getElementById("siteFilter"), "All Sites", amsUniqueSorted(assets.map(a => a.currentSite || a.site)));
+}
+
 function renderAssetTable() {
+    amsPopulateAssetFilters();
     const searchTerm = (document.getElementById("searchBox").value || "").toLowerCase();
     const statusFilterVal = document.getElementById("statusFilter").value;
-    const showAmsId = document.getElementById("superRootToggle").checked;
+    const typeFilterVal = (document.getElementById("typeFilter") || {}).value || "";
+    const makeFilterVal = (document.getElementById("makeFilter") || {}).value || "";
+    const siteFilterVal = (document.getElementById("siteFilter") || {}).value || "";
+    const showAmsId = (typeof amsIsSupremeRoot === "function" && amsIsSupremeRoot());
 
     const filtered = AST_STATE.assets
         .filter(a => {
             if (statusFilterVal && a.status !== statusFilterVal) return false;
+            if (typeFilterVal && a.type !== typeFilterVal) return false;
+            if (makeFilterVal && a.make !== makeFilterVal) return false;
+            if (siteFilterVal && (a.currentSite || a.site) !== siteFilterVal) return false;
             if (!searchTerm) return true;
             return [a.id, a.type, a.make, a.model, a.serialNumber, a.imei1, a.imei2, a.batteryNo, a.chargerNo, a.simMobileNo].some(v => String(v || "").toLowerCase().includes(searchTerm));
         });
@@ -680,7 +694,7 @@ function amsOpenViewModal(key) {
     const a = AST_STATE.assets.find(x => x.id === key);
     if (!a) return;
     AST_STATE.viewKey = key;
-    const showAmsId = document.getElementById("superRootToggle").checked;
+    const showAmsId = (typeof amsIsSupremeRoot === "function" && amsIsSupremeRoot());
     const directEmp = a.assignedTo ? amsGetEmployeeByAmsId(a.assignedTo) : null;
     const subEmp = a.assignedToSubordinate ? amsGetEmployeeByAmsId(a.assignedToSubordinate) : null;
 
@@ -702,8 +716,8 @@ function amsOpenViewModal(key) {
         <div class="detail-row"><span class="detail-label">Issue Date</span><span class="detail-value">${amsFormatDate(a.issueDate) || "-"}</span></div>
         <div class="detail-row"><span class="detail-label">Warranty End</span><span class="detail-value">${amsFormatDate(a.warrantyEnd) || "-"}</span></div>
         <div class="detail-row"><span class="detail-label">Status</span><span class="detail-value">${amsEsc(a.status)}</span></div>
-        <div class="detail-row"><span class="detail-label">Assigned To (Direct)</span><span class="detail-value">${directEmp ? amsEsc(directEmp.name) + " (" + amsEsc(directEmp.empId) + ")" : "-"}</span></div>
-        <div class="detail-row"><span class="detail-label">Assigned To (Subordinate)</span><span class="detail-value">${subEmp ? amsEsc(subEmp.name) + " (" + amsEsc(subEmp.empId) + ")" : (a.assignedSubText ? amsEsc(a.assignedSubText) : "-")}</span></div>
+        <div class="detail-row"><span class="detail-label">Assigned To (Direct)</span><span class="detail-value">${directEmp ? amsEsc(directEmp.name) + " (" + amsEsc(amsGetEmployeeDisplayId(directEmp)) + ")" : "-"}</span></div>
+        <div class="detail-row"><span class="detail-label">Assigned To (Subordinate)</span><span class="detail-value">${subEmp ? amsEsc(subEmp.name) + " (" + amsEsc(amsGetEmployeeDisplayId(subEmp)) + ")" : (a.assignedSubText ? amsEsc(a.assignedSubText) : "-")}</span></div>
         <div class="detail-row"><span class="detail-label">Vendor</span><span class="detail-value">${amsEsc(a.vendor) || "-"}</span></div>
         <div class="detail-row"><span class="detail-label">Purchase Cost</span><span class="detail-value">${a.purchaseCost ? formatCurrency(a.purchaseCost) : "-"}</span></div>
         <div class="detail-row"><span class="detail-label">Remarks</span><span class="detail-value">${amsEsc(a.remarks) || "-"}</span></div>
@@ -740,7 +754,7 @@ function amsDownloadAssetView() {
     const subEmp = a.assignedToSubordinate ? amsGetEmployeeByAmsId(a.assignedToSubordinate) : null;
     const rows = [
         ["Field", "Value"],
-        ["AMS Asset ID", a.amsAssetId || "-"],
+        ...((typeof amsIsSupremeRoot === "function" && amsIsSupremeRoot()) ? [["AMS Asset ID", a.amsAssetId || "-"]] : []),
         ["Asset ID (Full)", amsComputeFullId(a)],
         ["Type / Make / Model", `${a.type} - ${a.make} ${a.model || ""}`.trim()],
         ["Category", a.category || "-"],
@@ -757,8 +771,8 @@ function amsDownloadAssetView() {
         ["Issue Date", amsFormatDate(a.issueDate) || "-"],
         ["Warranty End", amsFormatDate(a.warrantyEnd) || "-"],
         ["Status", a.status || "-"],
-        ["Assigned To (Direct)", directEmp ? `${directEmp.name} (${directEmp.empId})` : "-"],
-        ["Assigned To (Subordinate)", subEmp ? `${subEmp.name} (${subEmp.empId})` : (a.assignedSubText || "-")],
+        ["Assigned To (Direct)", directEmp ? `${directEmp.name} (${amsGetEmployeeDisplayId(directEmp)})` : "-"],
+        ["Assigned To (Subordinate)", subEmp ? `${subEmp.name} (${amsGetEmployeeDisplayId(subEmp)})` : (a.assignedSubText || "-")],
         ["Vendor", a.vendor || "-"],
         ["Purchase Cost", a.purchaseCost ? formatCurrency(a.purchaseCost) : "-"],
         ["Remarks", a.remarks || "-"],
@@ -776,10 +790,10 @@ function amsDownloadAssetHistory() {
         amsFormatDate(h.date) || "-",
         amsHistoryEventType(h.action).label,
         h.action,
-        h.empId || "-",
+        amsHistoryEmpDisplayId(h) || "-",
         h.empName || "-",
         h.empDept || "-",
-        h.assetIdFull || "-",
+        h.assetIdFull || amsComputeFullId(a) || "-",
         h.statusLabel || "-",
         h.accessories || "-",
     ]);
@@ -1168,7 +1182,7 @@ function amsOpenHistoryModal(key) {
                 <td class="mono-cell">${amsFormatDate(h.date)}</td>
                 <td><span class="badge ${evt.cls}">${evt.label}</span></td>
                 <td>${amsEsc(h.action)}${h.note ? `<div class="form-hint" style="font-size:12px;margin-top:2px;">${amsEsc(h.note)}</div>` : ""}</td>
-                <td class="mono-cell">${amsEsc(h.empId) || "-"}</td>
+                <td class="mono-cell">${amsEsc(amsHistoryEmpDisplayId(h)) || "-"}</td>
                 <td>${amsEsc(h.empName) || "-"}</td>
                 <td>${amsEsc(h.empDept) || "-"}</td>
                 <td class="mono-cell">${amsEsc(h.assetIdFull)}</td>
@@ -1272,7 +1286,12 @@ function amsGenerateAssetIssueFormPrint(key, extraRemarks) {
     const splitOwned = amsSplitDirectVsSubordinateAssets(owned);
     const directOwned = splitOwned.direct;
     const subOwned = splitOwned.subordinate;
-    const assignmentType = amsAssignmentTypeLabel(directOwned.length, subOwned.length + subAssets.length);
+    const simPreview = typeof amsCollectPrintSimsForEmp === "function"
+        ? amsCollectPrintSimsForEmp(emp.amsId || emp.empId)
+        : { direct: [], subordinate: [] };
+    const assignmentType = amsAssignmentTypeLabel(
+        directOwned.length + simPreview.direct.length,
+        subOwned.length + subAssets.length + simPreview.subordinate.length);
 
     const title = "Asset Issue Form";
     const formNo = amsGenerateAssetFormNo();
@@ -1310,15 +1329,31 @@ function amsGenerateAssetIssueFormPrint(key, extraRemarks) {
     const assetTableHtml = `
         <table class="pf-asset-table">
             <thead>
-                <tr><th style="width:30px;">#</th><th>Asset ID</th><th>Asset Name / Type</th><th>Site</th><th>Physical Condition at Issue</th></tr>
+                <tr>
+                    <th style="width:30px;">#</th><th>Mobile ID</th><th>Type / Make / Model</th>
+                    <th>IMEI No 1</th><th>IMEI No 2</th><th>Battery No</th><th>Charger No</th>
+                    <th>Mobile No</th><th>Site</th><th>Physical Condition at Issue</th>
+                </tr>
             </thead>
             <tbody>
-                ${directOwned.length ? directOwned.map((oa, i) => `
+                ${directOwned.length ? directOwned.map((oa, i) => {
+                    const mm = typeof amsAssetMakeModel === "function" ? amsAssetMakeModel(oa) : (oa.makeModel || "");
+                    const mobileNo = (oa.simMobileNo && oa.simMobileNo !== "0") ? oa.simMobileNo : "-";
+                    return `
                     <tr>
-                        <td>${i + 1}</td><td class="mono">${amsPrintAssetId(oa)}</td><td>${oa.type}${oa.makeModel ? ` (${amsEsc(oa.makeModel)})` : ""}</td><td>${oa.currentSite || oa.site}</td>
+                        <td>${i + 1}</td>
+                        <td class="mono">${amsPrintAssetId(oa)}</td>
+                        <td>${amsEsc(oa.type || "-")}${mm ? ` (${amsEsc(mm)})` : ""}</td>
+                        <td class="mono">${amsEsc(oa.imei1 || "-")}</td>
+                        <td class="mono">${amsEsc(oa.imei2 || "-")}</td>
+                        <td class="mono">${amsEsc(oa.batteryNo || "-")}</td>
+                        <td class="mono">${amsEsc(oa.chargerNo || "-")}</td>
+                        <td class="mono">${amsEsc(mobileNo)}</td>
+                        <td>${amsEsc(oa.currentSite || oa.site || "-")}</td>
                         <td>${conditionRow()}</td>
-                    </tr>`).join("")
-                    : `<tr><td colspan="5" style="text-align:center; color:#777;">No assets currently on record for this employee</td></tr>`}
+                    </tr>`;
+                }).join("")
+                    : `<tr><td colspan="10" style="text-align:center; color:#777;">No mobiles currently on record for this employee</td></tr>`}
             </tbody>
         </table>`;
 
@@ -1333,26 +1368,44 @@ function amsGenerateAssetIssueFormPrint(key, extraRemarks) {
             <label class="pf-check-block" style="grid-column:1 / -1;">Other: ________________________________</label>
         </div>`;
 
+    const simPrint = typeof amsCollectPrintSimsForEmp === "function"
+        ? amsCollectPrintSimsForEmp(emp.amsId || emp.empId)
+        : { direct: [], subordinate: [] };
+    const mobileSimPrint = {
+        html: typeof amsBuildPrintSimCardsSectionHtml === "function"
+            ? amsBuildPrintSimCardsSectionHtml(simPrint.direct, simPrint.subordinate)
+            : "",
+        mobileDirect: 0,
+        mobileTeam: 0,
+        simDirect: simPrint.direct.length,
+        simTeam: simPrint.subordinate.length,
+    };
+
     const subRows = subAssets.map(sa => ({
-        id: amsPrintAssetId(sa), type: sa.type, makeModel: sa.makeModel,
+        id: amsPrintAssetId(sa), type: sa.type, makeModel: sa.makeModel || (typeof amsAssetMakeModel === "function" ? amsAssetMakeModel(sa) : ""),
         site: sa.currentSite || sa.site, holder: sa.subName, holderId: sa.subEmpId,
+        imei1: sa.imei1, simMobileNo: sa.simMobileNo,
     }));
     subOwned.forEach(oa => {
         const holderEmp = oa.assignedToSubordinate ? amsGetEmployeeByAmsId(oa.assignedToSubordinate) : null;
         subRows.push({
-            id: amsPrintAssetId(oa), type: oa.type, makeModel: oa.makeModel,
+            id: amsPrintAssetId(oa), type: oa.type, makeModel: oa.makeModel || (typeof amsAssetMakeModel === "function" ? amsAssetMakeModel(oa) : ""),
             site: oa.currentSite || oa.site,
             holder: holderEmp ? holderEmp.name : (oa.assignedSubText || amsAssetHolderLabel(oa)),
             holderId: holderEmp ? amsGetEmployeeDisplayId(holderEmp) : "",
+            imei1: oa.imei1, simMobileNo: oa.simMobileNo,
         });
     });
     const subordinateHtml = subRows.length ? `
-        <div class="pf-section-bar">Assets Currently Assigned to Subordinates (For Reference)</div>
+        <div class="pf-section-bar">Mobiles Currently Assigned to Subordinates (For Reference)</div>
         <table class="pf-asset-table">
-            <thead><tr><th style="width:30px;">#</th><th>Asset ID</th><th>Type</th><th>Held By</th><th>Employee ID</th><th>Site</th></tr></thead>
+            <thead><tr><th style="width:30px;">#</th><th>Mobile ID</th><th>Type</th><th>IMEI No 1</th><th>Mobile No</th><th>Held By</th><th>Employee ID</th><th>Site</th></tr></thead>
             <tbody>
-                ${subRows.map((sa, i) => `
-                    <tr><td>${i + 1}</td><td class="mono">${sa.id}</td><td>${sa.type}${sa.makeModel ? ` (${amsEsc(sa.makeModel)})` : ""}</td><td>${sa.holder}</td><td class="mono">${sa.holderId ? amsEsc(sa.holderId) : "-"}</td><td>${sa.site}</td></tr>`).join("")}
+                ${subRows.map((sa, i) => {
+                    const mm = sa.makeModel || (typeof amsAssetMakeModel === "function" ? amsAssetMakeModel(sa) : "");
+                    const mobileNo = (sa.simMobileNo && sa.simMobileNo !== "0") ? sa.simMobileNo : "-";
+                    return `<tr><td>${i + 1}</td><td class="mono">${sa.id}</td><td>${amsEsc(sa.type || "-")}${mm ? ` (${amsEsc(mm)})` : ""}</td><td class="mono">${amsEsc(sa.imei1 || "-")}</td><td class="mono">${amsEsc(mobileNo)}</td><td>${amsEsc(sa.holder)}</td><td class="mono">${sa.holderId ? amsEsc(sa.holderId) : "-"}</td><td>${amsEsc(sa.site || "-")}</td></tr>`;
+                }).join("")}
             </tbody>
         </table>` : "";
 
@@ -1368,11 +1421,12 @@ function amsGenerateAssetIssueFormPrint(key, extraRemarks) {
             <div class="pf-section-bar">Issued To</div>
             ${infoBoxesHtml}
 
-            <div class="pf-section-bar">Assets Issued</div>
+            <div class="pf-section-bar">Mobiles Issued</div>
             ${assetTableHtml}
 
             ${accessoriesHtml}
             ${subordinateHtml}
+            ${mobileSimPrint.html}
 
             <div class="pf-section-bar">Remarks / Notes</div>
             <div class="pf-notes-box">
@@ -1403,7 +1457,7 @@ function amsGenerateAssetIssueFormPrint(key, extraRemarks) {
 
             <div class="pf-footer">
                 <span>AMS v4 - Generated electronically</span>
-                <span>Internal Ref: ${formNo} &middot; ${directOwned.length} asset(s) issued &middot; ${directOwned.length} direct, ${subOwned.length + subAssets.length} team</span>
+                <span>Internal Ref: ${formNo} &middot; ${directOwned.length} asset(s) issued &middot; ${directOwned.length} direct, ${subOwned.length + subAssets.length} team${mobileSimPrint.mobileDirect || mobileSimPrint.mobileTeam ? ` &middot; ${mobileSimPrint.mobileDirect} mobile(s), ${mobileSimPrint.mobileTeam} team` : ""}${mobileSimPrint.simDirect || mobileSimPrint.simTeam ? ` &middot; ${mobileSimPrint.simDirect} SIM(s), ${mobileSimPrint.simTeam} team` : ""}</span>
             </div>
         </div>
     `;
@@ -1490,6 +1544,8 @@ function amsImportAssetsFile(file) {
         const results = [];
         const seenDisplayIds = new Set(); /* within-file duplicate detection */
 
+        if (typeof amsDbSuspendSaves === "function") amsDbSuspendSaves();
+        try {
         for (let i = 1; i < rows.length; i++) {
             const raw = rows[i];
             if (!raw.length || raw.every(c => !c)) continue;
@@ -1554,6 +1610,9 @@ function amsImportAssetsFile(file) {
                 results.push({ row: line, record, result: "added", reason: "New asset added" });
             }
         }
+        } finally {
+            if (typeof amsDbResumeSaves === "function") amsDbResumeSaves();
+        }
 
         renderAssetTable();
         amsDbSaveAsync("mobiles"); /* persist the imported/updated rows (wholesale PUT) */
@@ -1591,8 +1650,10 @@ async function initMobiles() {
 
     /* Toolbar */
     document.getElementById("searchBox").addEventListener("input", renderAssetTable);
-    document.getElementById("statusFilter").addEventListener("change", renderAssetTable);
-    document.getElementById("superRootToggle").addEventListener("change", renderAssetTable);
+    ["typeFilter", "makeFilter", "siteFilter", "statusFilter"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener("change", renderAssetTable);
+    });
 
     document.getElementById("btnAddAsset").addEventListener("click", amsOpenAddModal);
     document.getElementById("btnAssetExport").addEventListener("click", amsExportAssets);

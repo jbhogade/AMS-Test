@@ -74,18 +74,17 @@
                         <option value="All">All Departments</option>
                     </select>
 
+                    <select class="select" id="emp-site-filter" style="width:auto;">
+                        <option value="All">All Sites</option>
+                    </select>
+
                     <select class="select" id="emp-status-filter" style="width:auto;">
                         <option value="All">All Status</option>
                         <option value="Active">Active</option>
                         <option value="Inactive">Inactive</option>
                     </select>
 
-                    <div class="cred-level">
-                        <span>View as:</span>
-                        <select class="select" id="emp-cred-level"></select>
-                    </div>
-
-                    <span class="ams-hint" id="ams-hint">&#128274; AMS Employee IDs hidden - switch to Super Root to see them</span>
+                    <span class="ams-hint" id="ams-hint">AMS Employee IDs are hidden</span>
                 </div>
 
                 <!-- ==================== EMPLOYEE TABLE ==================== -->
@@ -97,6 +96,7 @@
                                     <th id="ams-col">AMS ID</th>
                                     <th>Employee</th>
                                     <th>Department</th>
+                                    <th>Site</th>
                                     <th>Designation</th>
                                     <th>Contact</th>
                                     <th>Email</th>
@@ -181,6 +181,10 @@
                         <datalist id="designation-list"></datalist>
                     </div>
                     <div class="field">
+                        <label>Site</label>
+                        <select class="select" id="f-site"></select>
+                    </div>
+                    <div class="field">
                         <label>Reports To (Manager)</label>
                         <select class="select" id="f-manager"></select>
                     </div>
@@ -242,6 +246,10 @@
                     <div class="detail-item">
                         <label>Department</label>
                         <span id="view-dept">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Site</label>
+                        <span id="view-site">-</span>
                     </div>
                     <div class="detail-item">
                         <label>Designation</label>

@@ -22,7 +22,6 @@
 /* =============================================================================
    1) STATE
    ===========================================================================*/
-let currentCredentialLevel = "Standard User";   /* controls AMS ID visibility  */
 let editingAmsId = null;                        /* set while editing employee   */
 let currentEmployeeAmsId = null;                /* the employee being acted on  */
 let currentModal = null;                        /* id of the currently open modal */
@@ -52,6 +51,7 @@ function hideCurrentModal() {
 function getFilteredEmployees() {
     const search = (document.getElementById("emp-search").value || "").toLowerCase();
     const dept = document.getElementById("emp-dept-filter").value;
+    const site = (document.getElementById("emp-site-filter") || {}).value || "All";
     const status = document.getElementById("emp-status-filter").value;
 
     return DUMMY_EMPLOYEES.filter(emp => {
@@ -60,10 +60,12 @@ function getFilteredEmployees() {
             fullName.includes(search) ||
             emp.empId.toLowerCase().includes(search) ||
             emp.designation.toLowerCase().includes(search) ||
-            emp.amsId.toLowerCase().includes(search);
+            emp.amsId.toLowerCase().includes(search) ||
+            (emp.site || "").toLowerCase().includes(search);
         const matchesDept = dept === "All" || emp.department === dept;
+        const matchesSite = site === "All" || site === "" || (emp.site || "") === site;
         const matchesStatus = status === "All" || emp.status === status;
-        return matchesSearch && matchesDept && matchesStatus;
+        return matchesSearch && matchesDept && matchesSite && matchesStatus;
     });
 }
 
@@ -82,8 +84,9 @@ function renderEmployeeTable() {
         designation: emp => emp.designation,
         contact: emp => emp.contact || "",
         email: emp => emp.email || "",
-        owned: emp => amsOwnedEmployeeAssets(emp.amsId).length,
-        team: emp => amsTeamEmployeeAssets(emp.amsId).length,
+        owned: emp => amsOwnedEmployeeHoldings(emp.amsId).length,
+        team: emp => amsTeamEmployeeHoldings(emp.amsId).length,
+        site: emp => emp.site || "",
         status: emp => emp.status,
     };
     const sorted = amsSortRows("employeeTable", employees, getters);
@@ -92,6 +95,7 @@ function renderEmployeeTable() {
             ${amsSortableTh("employeeTable", "amsId", "AMS ID", "ams-col")}
             ${amsSortableTh("employeeTable", "name", "Employee")}
             ${amsSortableTh("employeeTable", "dept", "Department")}
+            ${amsSortableTh("employeeTable", "site", "Site")}
             ${amsSortableTh("employeeTable", "designation", "Designation")}
             ${amsSortableTh("employeeTable", "contact", "Contact")}
             ${amsSortableTh("employeeTable", "email", "Email")}
@@ -102,14 +106,15 @@ function renderEmployeeTable() {
         </tr>`;
     }
 
-    /* Show / hide the AMS Employee ID column based on credential level */
+    /* AMS Employee ID column is Supreme Root only (knowledge / internal key). */
     document.getElementById("ams-col").style.display = amsVisible ? "" : "none";
-    document.getElementById("ams-hint").style.display = amsVisible ? "none" : "";
+    const amsHint = document.getElementById("ams-hint");
+    if (amsHint) amsHint.style.display = "none";
 
     if (sorted.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="9" class="empty-note" style="text-align:center;padding:28px;">
+                <td colspan="${amsVisible ? 11 : 10}" class="empty-note" style="text-align:center;padding:28px;">
                     No employees found. Adjust the search / filters, or add a new employee.
                 </td>
             </tr>`;
@@ -117,11 +122,11 @@ function renderEmployeeTable() {
     }
 
     tbody.innerHTML = sorted.map(emp => {
-        const owned = amsOwnedEmployeeAssets(emp.amsId).length;
-        const team = amsTeamEmployeeAssets(emp.amsId).length;
+        const owned = amsOwnedEmployeeHoldings(emp.amsId).length;
+        const team = amsTeamEmployeeHoldings(emp.amsId).length;
         const badge = badgeClassFor(emp.status);
         const amsCell = amsVisible
-            ? `<td class="muted" title="Hidden from regular users">${escapeHtml(emp.amsId)}</td>`
+            ? `<td class="muted" title="Internal AMS ID (Supreme Root only)">${escapeHtml(emp.amsId)}</td>`
             : "";
 
         return `
@@ -132,11 +137,12 @@ function renderEmployeeTable() {
                         <div class="emp-avatar">${escapeHtml(getEmployeeInitials(emp))}</div>
                         <div class="emp-cell-name">
                             <strong>${escapeHtml(getEmployeeFullName(emp))}</strong>
-                            <span>${escapeHtml(emp.empId)}</span>
+                            <span>${escapeHtml(amsGetEmployeeDisplayId(emp))}</span>
                         </div>
                     </div>
                 </td>
                 <td>${escapeHtml(emp.department)}</td>
+                <td>${escapeHtml(emp.site || "-")}</td>
                 <td>${escapeHtml(emp.designation)}</td>
                 <td class="muted">${escapeHtml(emp.contact || "-")}</td>
                 <td class="muted">${escapeHtml(emp.email || "-")}</td>
@@ -153,7 +159,9 @@ function renderEmployeeTable() {
 function buildActionsMenu(emp) {
     const active = emp.status === "Active";
     const exited = emp.status === "Inactive" && !!getExitRecord(emp.amsId);
-    const holdsAssets = getEmployeeAssets(emp.amsId).length > 0 || getSubordinateAssets(emp.amsId).length > 0;
+    const holdsAssets = getEmployeeAssets(emp.amsId).length > 0 || getSubordinateAssets(emp.amsId).length > 0
+        || getEmployeeMobiles(emp.amsId).length > 0 || getSubordinateMobiles(emp.amsId).length > 0
+        || getEmployeeSimCards(emp.amsId).length > 0 || getSubordinateSimCards(emp.amsId).length > 0;
     return `
         <div class="row-actions">
             <button class="actions-btn" onclick="toggleRowActions(this)">Actions &#9662;</button>
@@ -224,13 +232,7 @@ document.addEventListener("click", function (e) {
    4) CREDENTIAL LEVEL (AMS Employee ID visibility - demo rule)
    ===========================================================================*/
 function isAmsVisible() {
-    const level = CREDENTIAL_LEVELS.find(l => l.name === currentCredentialLevel);
-    return level ? level.amsVisible : false;
-}
-
-function onCredentialChange() {
-    currentCredentialLevel = document.getElementById("emp-cred-level").value;
-    renderEmployeeTable();
+    return typeof amsIsSupremeRoot === "function" ? amsIsSupremeRoot() : false;
 }
 
 /* =============================================================================
@@ -253,6 +255,7 @@ function openAddModal() {
     document.getElementById("f-manager-id").value = "";
     document.getElementById("f-contact").value = "";
     document.getElementById("f-email").value = "";
+    document.getElementById("f-site").value = "";
     hideFormError("employee-form-error");
     showModal("modal-employee");
 }
@@ -277,6 +280,7 @@ function openEditModal(amsId) {
     document.getElementById("f-manager-id").value = onManagerChange() || "";
     document.getElementById("f-contact").value = emp.contact;
     document.getElementById("f-email").value = emp.email;
+    document.getElementById("f-site").value = emp.site || "";
     hideFormError("employee-form-error");
     showModal("modal-employee");
 }
@@ -298,7 +302,8 @@ function saveEmployee() {
         designation: document.getElementById("f-desig").value.trim(),
         managerAmsId: document.getElementById("f-manager").value || null,
         contact: document.getElementById("f-contact").value.trim(),
-        email: document.getElementById("f-email").value.trim()
+        email: document.getElementById("f-email").value.trim(),
+        site: document.getElementById("f-site").value || ""
     };
 
     /* ---- Validation of required fields ---- */
@@ -325,9 +330,9 @@ function viewEmployee(amsId) {
     const emp = findEmployee(amsId);
     if (!emp) return;
 
-    const owned = amsOwnedEmployeeAssets(amsId);
+    const owned = amsOwnedEmployeeHoldings(amsId);
     const subordinates = getSubordinates(amsId);
-    const teamAssets = amsTeamEmployeeAssets(amsId);
+    const teamAssets = amsTeamEmployeeHoldings(amsId);
     const manager = emp.managerAmsId ? findEmployee(emp.managerAmsId) : null;
 
     document.getElementById("view-avatar").textContent = getEmployeeInitials(emp);
@@ -339,8 +344,10 @@ function viewEmployee(amsId) {
     document.getElementById("view-ams-wrap").style.display = isAmsVisible() ? "" : "none";
     document.getElementById("view-ams").textContent = emp.amsId;
 
-    document.getElementById("view-empid").textContent = emp.empId;
+    document.getElementById("view-empid").textContent = amsGetEmployeeDisplayId(emp);
     document.getElementById("view-dept").textContent = emp.department;
+    const viewSite = document.getElementById("view-site");
+    if (viewSite) viewSite.textContent = emp.site || "-";
     document.getElementById("view-desig").textContent = emp.designation;
     document.getElementById("view-manager").textContent = manager ? getEmployeeFullName(manager) : (emp.managerName || emp.managerId || "-");
     document.getElementById("view-contact").textContent = emp.contact || "-";
@@ -355,7 +362,7 @@ function viewEmployee(amsId) {
     ownedList.innerHTML = owned.length
         ? owned.map(a => `
             <li>
-                <span><strong>${escapeHtml(a.id)}</strong> - ${escapeHtml(a.makeModel)}</span>
+                <span><strong>${escapeHtml(amsHoldingDisplayId(a))}</strong> - ${escapeHtml(amsHoldingMakeModel(a) || amsHoldingTypeLabel(a))}</span>
                 <span class="badge ${badgeClassFor(a.status)}">${escapeHtml(a.status)}</span>
             </li>`).join("")
         : `<div class="empty-note">No assets assigned directly.</div>`;
@@ -370,7 +377,7 @@ function viewEmployee(amsId) {
                 : (findEmployee(a.assignedTo) ? getEmployeeFullName(findEmployee(a.assignedTo)) : "team");
             return `
                 <li>
-                    <span><strong>${escapeHtml(a.id)}</strong> - ${escapeHtml(a.makeModel)}
+                    <span><strong>${escapeHtml(amsHoldingDisplayId(a))}</strong> - ${escapeHtml(amsHoldingMakeModel(a) || amsHoldingTypeLabel(a))}
                         <span class="muted">(with ${escapeHtml(holder)})</span>
                     </span>
                     <span class="badge ${badgeClassFor(a.status)}">${escapeHtml(a.status)}</span>
@@ -391,16 +398,17 @@ function amsDownloadEmployeeView() {
     if (!currentEmployeeAmsId) return;
     const emp = findEmployee(currentEmployeeAmsId);
     if (!emp) return;
-    const owned = amsOwnedEmployeeAssets(emp.amsId) || [];
-    const team = amsTeamEmployeeAssets(emp.amsId) || [];
+    const owned = amsOwnedEmployeeHoldings(emp.amsId) || [];
+    const team = amsTeamEmployeeHoldings(emp.amsId) || [];
     const manager = emp.managerAmsId ? findEmployee(emp.managerAmsId) : null;
 
     const rows = [["Field", "Value", "", "Kind", "Asset ID", "Make / Model", "Status", "Holder"]];
     const p = (label, value) => rows.push([label, value == null || value === "" ? "-" : value, "", "", "", "", "", ""]);
-    p("AMS Employee ID", emp.amsId);
-    p("Employee ID", emp.empId);
+    if (isAmsVisible()) p("AMS Employee ID", emp.amsId);
+    p("Employee ID", amsGetEmployeeDisplayId(emp));
     p("Name", getEmployeeFullName(emp));
     p("Department", emp.department);
+    p("Site", emp.site || "-");
     p("Designation", emp.designation);
     p("Manager", manager ? getEmployeeFullName(manager) : (emp.managerName || emp.managerId || "-"));
     p("Contact", emp.contact);
@@ -408,8 +416,8 @@ function amsDownloadEmployeeView() {
     p("Status", emp.status);
     p("Exit Date", emp.exitDate || "-");
 
-    owned.forEach(a => rows.push(["", "", "", "Owned", a.id, a.makeModel || "-", a.status || "-", (typeof amsAssetHolderLabel === "function" && amsAssetHolderLabel(a)) || "-"]));
-    team.forEach(a => rows.push(["", "", "", "Team", a.id, a.makeModel || "-", a.status || "-", "-"]));
+    owned.forEach(a => rows.push(["", "", "", "Owned", amsHoldingDisplayId(a), amsHoldingMakeModel(a) || "-", a.status || "-", (typeof amsAssetHolderLabel === "function" && amsAssetHolderLabel(a)) || "-"]));
+    team.forEach(a => rows.push(["", "", "", "Team", amsHoldingDisplayId(a), amsHoldingMakeModel(a) || "-", a.status || "-", "-"]));
 
     const csv = rows.map(amsCsvRow).join("\r\n");
     amsDownloadFile(csv, `Employee_${emp.empId}.csv`, "text/csv;charset=utf-8;");
@@ -644,7 +652,9 @@ function openIssueForm(amsId) {
     }
     const directCount = getEmployeeAssets(amsId).length;
     const subCount = getSubordinateAssets(amsId).length;
-    if (directCount === 0 && subCount === 0) {
+    const mobileCount = getEmployeeMobiles(amsId).length + getSubordinateMobiles(amsId).length;
+    const simCount = getEmployeeSimCards(amsId).length + getSubordinateSimCards(amsId).length;
+    if (directCount === 0 && subCount === 0 && mobileCount === 0 && simCount === 0) {
         alert("No Assign Report (Asset Issue Form) can be generated for " + getEmployeeFullName(emp) + " because they are not currently holding any assets.");
         return;
     }
@@ -718,9 +728,14 @@ function populateSelects() {
     const deptForm = document.getElementById("f-dept");
     const managerSelect = document.getElementById("f-manager");
     const desigList = document.getElementById("designation-list");
+    const siteForm = document.getElementById("f-site");
+    const siteFilter = document.getElementById("emp-site-filter");
 
     const deptOptions = allDeptOptions();
     const desigOptions = allDesigOptions();
+    const siteNames = (AMS_DUMMY_SITES || []).filter(s => s.active !== false).map(s => s.name);
+    const empSites = DUMMY_EMPLOYEES.map(e => e.site).filter(Boolean);
+    const allSites = amsUniqueSorted(siteNames.concat(empSites));
 
     /* Department filter options */
     deptFilter.innerHTML = `<option value="All">All Departments</option>` +
@@ -728,6 +743,19 @@ function populateSelects() {
 
     /* Department field inside the form */
     deptForm.innerHTML = deptOptions.map(d => `<option value="${escapeHtml(d.name)}">${escapeHtml(d.name)}</option>`).join("");
+
+    if (siteForm) {
+        const prevSite = siteForm.value;
+        siteForm.innerHTML = `<option value="">(None)</option>` +
+            allSites.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+        if (prevSite) siteForm.value = prevSite;
+    }
+    if (siteFilter) {
+        const prevFilter = siteFilter.value || "All";
+        siteFilter.innerHTML = `<option value="All">All Sites</option>` +
+            allSites.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+        siteFilter.value = prevFilter;
+    }
 
     /* Manager (reports-to) dropdown - all active employees */
     managerSelect.innerHTML = `<option value="">(None - top level)</option>` +
@@ -738,9 +766,6 @@ function populateSelects() {
     /* Designation suggestions (datalist) */
     desigList.innerHTML = desigOptions.map(d => `<option value="${escapeHtml(d)}"></option>`).join("");
 
-    /* Credential level selector */
-    const credSelect = document.getElementById("emp-cred-level");
-    credSelect.innerHTML = CREDENTIAL_LEVELS.map(l => `<option>${l.name}</option>`).join("");
 }
 
 /* =============================================================================
@@ -830,7 +855,7 @@ function saveQuickAddDesig() {
    form). Required form fields carry a * marker so the template/export clearly
    highlight what must be supplied.
    ===========================================================================*/
-const EMP_CSV_HEADERS = ["empId*", "name*", "dept*", "designation*", "reportsTo", "managerId", "contact", "email", "status"];
+const EMP_CSV_HEADERS = ["empId*", "name*", "dept*", "designation*", "site", "reportsTo", "managerId", "contact", "email", "status"];
 
 function amsDownloadEmployeeTemplate() {
     if (typeof XLSX === "undefined") {
@@ -842,12 +867,14 @@ function amsDownloadEmployeeTemplate() {
         ["Fields marked with * are required: empId, name, dept, designation."],
         ["AMS Employee ID is auto-generated - do not add it here. empId is the company ID (must be unique)."],
         ["name = the employee's FULL NAME in one column, e.g. Ravikumar Rajendra Tiparadi."],
-        ["dept must match a Department in the Department Master. designation is auto-created if new."],
-        ["reportsTo = the manager's full name (or company Employee ID / AMS ID). managerId = the manager's AMS ID (auto-filled on the form)."],
-        ["The reporting manager's name and ID are saved AS IS - the manager does not have to exist in the system yet. The link is filled in automatically once that manager is added."],
+        ["dept / designation are created in their Masters if they are new."],
+        ["Re-importing the same empId UPDATES that employee (name, dept, site, contact, manager, status, ...)."],
+        ["reportsTo = the manager's full name (or company Employee ID / AMS ID). managerId = the manager's company ID."],
+        ["The reporting manager's name and ID are saved AS IS - the manager does not have to exist yet. The link is filled in automatically once that manager is in this file or added later."],
+        ["site = a Site Master name (optional)."],
         ["status = Active or Inactive (default Active)."],
     ];
-    const sample = ["EMP-000001", "Example Employee", "IT", "Engineer", "", "", "+91 99999 99999", "example@company.com", "Active"];
+    const sample = ["EMP-000001", "Example Employee", "IT", "Engineer", "Mumbai HO", "", "", "+91 99999 99999", "example@company.com", "Active"];
     const wb = XLSX.utils.book_new();
     const instr = XLSX.utils.aoa_to_sheet(instructionRows);
     instr["!cols"] = [{ wch: 100 }];
@@ -860,7 +887,7 @@ function amsExportEmployees() {
     const rows = getFilteredEmployees().map(e => {
         const mgr = e.managerAmsId ? findEmployee(e.managerAmsId) : null;
         return [
-            e.empId, getEmployeeFullName(e), e.department, e.designation,
+            e.empId, getEmployeeFullName(e), e.department, e.designation, e.site || "",
             e.managerName || (mgr ? mgr.empId : ""), e.managerId || (mgr ? mgr.amsId : ""),
             e.contact || "", e.email || "", e.status,
         ];
@@ -887,109 +914,119 @@ function amsImportEmployeesFile(file) {
     amsReadImportRows(file).then((rows) => {
         rows = rows.filter(r => !(r[0] || "").trim().startsWith("#")); /* drop instruction/comment lines */
         if (!rows.length) { alert("File is empty or unreadable."); return; }
-        const headers = rows[0].map(h => h.trim().replace(/\*$/, "")); /* strip the required-marker * */
 
+        /* Skip a leading Instructions block if the file was saved as a single sheet. */
+        let headerIdx = 0;
+        while (headerIdx < rows.length && !/(^empId$|^name$)/i.test(String(rows[headerIdx][0] || "").trim().replace(/\*$/, ""))) {
+            headerIdx++;
+        }
+        if (headerIdx >= rows.length) { alert("Could not find a header row (empId / name)."); return; }
+
+        const headers = rows[headerIdx].map(h => h.trim().replace(/\*$/, "")); /* strip the required-marker * */
         const results = [];
         const seenEmpIds = new Set(); /* in-file duplicate detection */
-        const pendingManagerRefs = []; /* {emp, ref} rows whose manager was not found yet */
+        const pendingManagerRefs = []; /* rows whose manager was not found yet */
 
-        /* ---- PASS 1: validate + add every employee. The reporting manager's
-                name and ID are stored AS IS (verbatim) - the manager does NOT
-                have to exist in the system yet. If the manager is found, the
-                managerAmsId link is set immediately; otherwise it is remembered
-                so amsResolvePendingManagers() auto-links it once that employee
-                is added (same file PASS 2, or on a later day). ---- */
-        for (let i = 1; i < rows.length; i++) {
-            const raw = rows[i];
-            if (!raw.length || raw.every(c => !c)) continue;
-            const obj = {};
-            headers.forEach((h, idx) => { obj[h] = raw[idx] !== undefined ? raw[idx].trim() : ""; });
-            const line = i + 1;
+        if (typeof amsDbSuspendSaves === "function") amsDbSuspendSaves();
+        try {
+            /* ---- PASS 1: validate + upsert every employee. Existing empId
+                    rows are updated. Missing Department / Designation masters
+                    are created so the whole file can land in one import. The
+                    reporting manager is stored AS IS; PASS 2 links managers
+                    that appear later in the same file. ---- */
+            for (let i = headerIdx + 1; i < rows.length; i++) {
+                const raw = rows[i];
+                if (!raw.length || raw.every(c => !c)) continue;
+                const obj = {};
+                headers.forEach((h, idx) => { obj[h] = raw[idx] !== undefined ? raw[idx].trim() : ""; });
+                const line = i + 1;
 
-            const record = obj.empId || obj.name || obj.firstName || "(unnamed)";
+                const record = obj.empId || obj.name || obj.firstName || "(unnamed)";
 
-            /* ---- Required-field validation (same set as the Add form) ---- */
-            const missing = ["empId", "name", "dept", "designation"]
-                .filter(k => !obj[k]);
-            if (missing.length) {
-                results.push({ row: line, record, result: "error", reason: "Missing required field(s): " + missing.join(", ") });
-                continue;
+                const missing = ["empId", "name", "dept", "designation"]
+                    .filter(k => !obj[k]);
+                if (missing.length) {
+                    results.push({ row: line, record, result: "error", reason: "Missing required field(s): " + missing.join(", ") });
+                    continue;
+                }
+
+                const empIdKey = obj.empId.toLowerCase();
+                if (seenEmpIds.has(empIdKey)) {
+                    results.push({ row: line, record, result: "error", reason: `Duplicate empId "${obj.empId}" already used earlier in this file` });
+                    continue;
+                }
+                seenEmpIds.add(empIdKey);
+
+                if (typeof amsEnsureDepartment === "function") amsEnsureDepartment(obj.dept);
+                if (typeof amsEnsureDesignation === "function") amsEnsureDesignation(obj.designation);
+
+                const managerRef = (obj.reportsTo && obj.reportsTo.trim()) || (obj.managerId && obj.managerId.trim()) || "";
+                const manager = managerRef ? findEmployeeAny(managerRef) : null;
+                const status = obj.status === "Inactive" ? "Inactive" : "Active";
+                const payload = {
+                    empId: obj.empId,
+                    name: obj.name,
+                    department: obj.dept,
+                    designation: obj.designation,
+                    site: obj.site || "",
+                    contact: obj.contact || "",
+                    email: obj.email || "",
+                    managerAmsId: manager ? manager.amsId : null,
+                    managerName: (obj.reportsTo && obj.reportsTo.trim()) || (manager ? getEmployeeFullName(manager) : ""),
+                    managerId: (obj.managerId && obj.managerId.trim()) || (manager ? manager.empId : ""),
+                };
+
+                const existing = DUMMY_EMPLOYEES.find(emp => (emp.empId || "").toLowerCase() === empIdKey);
+                let emp;
+                let resultKind;
+                if (existing) {
+                    emp = updateEmployee(existing.amsId, payload);
+                    resultKind = "updated";
+                } else {
+                    emp = addEmployee(payload);
+                    resultKind = "added";
+                }
+                if (!emp) {
+                    results.push({ row: line, record, result: "error", reason: "Could not save this employee" });
+                    continue;
+                }
+                emp.status = status;
+                emp.managerName = payload.managerName;
+                emp.managerId = payload.managerId;
+
+                if (managerRef && !manager) {
+                    emp.pendingManagerRef = managerRef;
+                    pendingManagerRefs.push({ ref: managerRef, empId: obj.empId });
+                    results.push({ row: line, record, result: resultKind, reason: `${resultKind === "updated" ? "Updated" : "Added"} (manager "${managerRef}" saved as-is - will link automatically once that manager is added)` });
+                } else {
+                    if (!managerRef) delete emp.pendingManagerRef;
+                    results.push({ row: line, record, result: resultKind, reason: status === "Inactive" ? `${resultKind === "updated" ? "Updated" : "Added"} (Inactive)` : (resultKind === "updated" ? "Existing employee updated" : "Added") });
+                }
             }
 
-            /* ---- Employee ID must be unique (against the system + this file) ---- */
-            if (seenEmpIds.has(obj.empId.toLowerCase())) {
-                results.push({ row: line, record, result: "error", reason: `Duplicate empId "${obj.empId}" already used earlier in this file` });
-                continue;
-            }
-            seenEmpIds.add(obj.empId.toLowerCase());
-
-            const empIdExists = DUMMY_EMPLOYEES.some(emp => emp.empId.toLowerCase() === obj.empId.toLowerCase());
-            if (empIdExists) {
-                results.push({ row: line, record, result: "error", reason: `Employee ID "${obj.empId}" already exists in the system (use Edit to update)` });
-                continue;
-            }
-
-            /* ---- Reference validation (checks BOTH the hardcoded seeds AND the
-                    DB-backed masters so lookups added in either place import) ---- */
-            if (!amsDeptKnown(obj.dept)) {
-                results.push({ row: line, record, result: "skipped", reason: `Department "${obj.dept}" not found in the Department Master`, missingDept: obj.dept });
-                continue;
-            }
-            if (obj.designation && !amsDesigKnown(obj.designation)) {
-                results.push({ row: line, record, result: "skipped", reason: `Designation "${obj.designation}" not found in the Designation Master`, missingDesig: obj.designation });
-                continue;
-            }
-
-            /* ---- Reporting manager: saved AS IS (name + ID verbatim) ----
-               The manager does not need to exist. We still try to resolve the
-               AMS ID so the link works immediately when the manager is in the
-               system (by empId, AMS ID, or full name). */
-            const managerRef = (obj.reportsTo && obj.reportsTo.trim()) || (obj.managerId && obj.managerId.trim()) || "";
-            const manager = managerRef ? findEmployeeAny(managerRef) : null;
-
-            /* ---- Create the employee ---- */
-            const status = obj.status === "Inactive" ? "Inactive" : "Active";
-            const emp = addEmployee({
-                empId: obj.empId,
-                name: obj.name,
-                department: obj.dept, designation: obj.designation,
-                contact: obj.contact || "", email: obj.email || "",
-                managerAmsId: manager ? manager.amsId : null,
-                managerName: (obj.reportsTo && obj.reportsTo.trim()) || (manager ? getEmployeeFullName(manager) : ""),
-                managerId: (obj.managerId && obj.managerId.trim()) || (manager ? manager.empId : ""),
+            /* ---- PASS 2: every employee from the file now exists, so link any
+                    manager that appeared LATER in the same file ---- */
+            pendingManagerRefs.forEach(({ ref, empId }) => {
+                const emp = DUMMY_EMPLOYEES.find(x => (x.empId || "").toLowerCase() === empId.toLowerCase());
+                if (!emp || emp.managerAmsId) return;
+                const mgr = findEmployeeAny(ref);
+                if (mgr && mgr.amsId !== emp.amsId) {
+                    emp.managerAmsId = mgr.amsId;
+                    emp.managerName = getEmployeeFullName(mgr);
+                    emp.managerId = emp.managerId || mgr.empId;
+                    delete emp.pendingManagerRef;
+                    const row = results.find(r => r.record === empId || r.record === emp.empId);
+                    if (row) row.reason = `${row.result === "updated" ? "Updated" : "Added"} (manager "${ref}" linked)` + (emp.status === "Inactive" ? " - Inactive" : "");
+                }
             });
-            if (emp && status === "Inactive") emp.status = status;
-
-            if (managerRef && !manager) {
-                /* Manager not in the system yet - keep the raw reference and
-                   defer the link instead of skipping the employee. */
-                if (emp) emp.pendingManagerRef = managerRef;
-                pendingManagerRefs.push({ ref: managerRef, empId: obj.empId });
-                results.push({ row: line, record, result: "added", reason: `Added (manager "${managerRef}" saved as-is - will link automatically once that manager is added)` });
-            } else {
-                results.push({ row: line, record, result: "added", reason: status === "Inactive" ? "Added (Inactive)" : "Added" });
-            }
+            amsResolvePendingManagers();
+        } finally {
+            if (typeof amsDbResumeSaves === "function") amsDbResumeSaves();
         }
 
-        /* ---- PASS 2: now every employee from the file exists, so link any
-                manager that appeared LATER in the same file ---- */
-        let linked = 0;
-        pendingManagerRefs.forEach(({ ref, empId }) => {
-            const emp = DUMMY_EMPLOYEES.find(x => x.empId.toLowerCase() === empId.toLowerCase());
-            if (!emp || emp.managerAmsId) return;
-            const mgr = findEmployeeAny(ref);
-            if (mgr && mgr.amsId !== emp.amsId) {
-                emp.managerAmsId = mgr.amsId;
-                delete emp.pendingManagerRef;
-                linked++;
-                const row = results.find(r => r.record === empId);
-                if (row) row.reason = `Added (manager "${ref}" linked)` + (emp.status === "Inactive" ? " - Inactive" : "");
-            }
-        });
-        if (linked) amsDbSaveAsync("employees");
-
-        /* Auto-link any employees who were waiting for a manager in this file */
-        amsResolvePendingManagers();
+        amsDbSaveAsync("employees");
+        amsDbSaveAsync("departments");
+        amsDbSaveAsync("designations");
 
         populateSelects();
         renderEmployeeTable();
@@ -1013,8 +1050,9 @@ async function initEmployees() {
     /* Toolbar events */
     document.getElementById("emp-search").addEventListener("input", renderEmployeeTable);
     document.getElementById("emp-dept-filter").addEventListener("change", renderEmployeeTable);
+    const siteFilterEl = document.getElementById("emp-site-filter");
+    if (siteFilterEl) siteFilterEl.addEventListener("change", renderEmployeeTable);
     document.getElementById("emp-status-filter").addEventListener("change", renderEmployeeTable);
-    document.getElementById("emp-cred-level").addEventListener("change", onCredentialChange);
     document.getElementById("emp-add-btn").addEventListener("click", openAddModal);
 
     /* Employee form events */

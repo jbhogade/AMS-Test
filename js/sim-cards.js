@@ -6,7 +6,9 @@
 #              the lifecycle history shown inside the View modal. Plus bulk
 #              Import / Export / Template. The SIM card record is SEPARATE from
 #              the mobile phone Asset record: a user can be issued a phone
-#              (tracked as an Asset) AND a SIM card (tracked here).
+#              (tracked as an Asset / Mobile) AND a SIM card (tracked here).
+#              Assign/Reassign can link the SIM to an available company mobile
+#              or mark it as used in a Personal Mobile.
 #
 #  DATA      : Reads/writes the shared AMS_DUMMY_SIM_CARDS collection
 #              (DB-backed via the simCards collection key).
@@ -34,12 +36,23 @@ function simEmployeesRef() {
 /* =============================================================================
    2) RENDER: SIM CARD TABLE
    ===========================================================================*/
+function amsPopulateSimFilters() {
+    const sims = SIM_STATE.sims || [];
+    amsFillSelectOptions(document.getElementById("simOperatorFilter"), "All Operators", amsUniqueSorted(sims.map(s => s.operator)));
+    amsFillSelectOptions(document.getElementById("simPlanFilter"), "All Plans", amsUniqueSorted(sims.map(s => s.plan)));
+}
+
 function renderSimTable() {
+    amsPopulateSimFilters();
     const searchTerm = (document.getElementById("simSearchBox").value || "").toLowerCase();
     const statusFilterVal = document.getElementById("simStatusFilter").value;
+    const operatorFilterVal = (document.getElementById("simOperatorFilter") || {}).value || "";
+    const planFilterVal = (document.getElementById("simPlanFilter") || {}).value || "";
 
     const filtered = SIM_STATE.sims.filter(s => {
         if (statusFilterVal && s.status !== statusFilterVal) return false;
+        if (operatorFilterVal && s.operator !== operatorFilterVal) return false;
+        if (planFilterVal && s.plan !== planFilterVal) return false;
         if (!searchTerm) return true;
         return [s.simId, s.mobileNumber, s.operator, s.plan, s.iccid].some(v => String(v || "").toLowerCase().includes(searchTerm));
     });
@@ -286,7 +299,10 @@ function amsSimSubmitForm(e) {
         if (!s) return;
         Object.assign(s, values);
         s.status = statusVal;
-        if (statusVal === "Retired") { s.assignedTo = null; s.assignedDate = ""; }
+        if (statusVal === "Retired") {
+            s.assignedTo = null; s.assignedDate = "";
+            if (amsSimUnlinkFromMobile(s)) amsDbSaveAsync("mobiles");
+        }
         amsNotify(`SIM card updated: ${s.simId}`, "info");
     } else {
         const simId = amsNextSimId();
@@ -295,6 +311,7 @@ function amsSimSubmitForm(e) {
             ...values,
             status: statusVal,
             assignedTo: null, assignedDate: "",
+            linkedMobileId: null, personalMobile: false,
             history: [{ date: new Date().toISOString().slice(0, 10), action: "Added to Inventory", empId: "", empName: "", empDept: "", remarks: "", statusLabel: statusVal }],
         };
         SIM_STATE.sims.push(sim);
@@ -385,7 +402,8 @@ function amsSimOpenViewModal(key) {
         <div class="detail-row"><span class="detail-label">Plan</span><span class="detail-value">${amsEsc(s.plan) || "-"}</span></div>
         <div class="detail-row"><span class="detail-label">Status</span><span class="detail-value">${amsEsc(s.status)}</span></div>
         <div class="detail-row"><span class="detail-label">Activation Date</span><span class="detail-value">${amsFormatDate(s.activationDate) || "-"}</span></div>
-        <div class="detail-row"><span class="detail-label">Assigned To</span><span class="detail-value">${emp ? amsEsc(emp.name) + " (" + amsEsc(emp.empId) + ")" : "-"}</span></div>
+        <div class="detail-row"><span class="detail-label">Assigned To</span><span class="detail-value">${emp ? amsEsc(emp.name) + " (" + amsEsc(amsGetEmployeeDisplayId(emp)) + ")" : "-"}</span></div>
+        <div class="detail-row"><span class="detail-label">Used In Mobile</span><span class="detail-value">${amsEsc(amsSimUsedInLabel(s))}</span></div>
         <div class="detail-row"><span class="detail-label">Assignment Date</span><span class="detail-value">${amsFormatDate(s.assignedDate) || "-"}</span></div>
         <div class="detail-row"><span class="detail-label">Vendor</span><span class="detail-value">${amsEsc(s.vendor) || "-"}</span></div>
         <div class="detail-row"><span class="detail-label">Cost</span><span class="detail-value">${s.cost ? formatCurrency(s.cost) : "-"}</span></div>
@@ -417,7 +435,8 @@ function amsSimDownloadView() {
     p("Plan", s.plan);
     p("Status", s.status);
     p("Activation Date", amsFormatDate(s.activationDate));
-    p("Assigned To", emp ? `${emp.name} (${emp.empId})` : "-");
+    p("Assigned To", emp ? `${emp.name} (${amsGetEmployeeDisplayId(emp)})` : "-");
+    p("Used In Mobile", amsSimUsedInLabel(s));
     p("Assignment Date", amsFormatDate(s.assignedDate));
     p("Vendor", s.vendor);
     p("Cost", s.cost ? formatCurrency(s.cost) : "-");
@@ -442,11 +461,123 @@ function amsSimDownloadView() {
 /* =============================================================================
    8) ASSIGN / REASSIGN
    ===========================================================================*/
+function amsSimMobilesRef() {
+    return (typeof DUMMY_MOBILES !== "undefined" && Array.isArray(DUMMY_MOBILES)) ? DUMMY_MOBILES : [];
+}
+
+function amsSimFindMobileById(mobileId) {
+    if (!mobileId) return null;
+    return amsSimMobilesRef().find(m => m.id === mobileId) || null;
+}
+
+function amsSimMobileHasLinkedSim(mobile, exceptSimId) {
+    if (!mobile) return false;
+    const simNo = String(mobile.simMobileNo || "0").trim();
+    if (simNo && simNo !== "0") return true;
+    return SIM_STATE.sims.some(s =>
+        s.linkedMobileId === mobile.id &&
+        !s.personalMobile &&
+        s.simId !== exceptSimId &&
+        s.status !== "Retired"
+    );
+}
+
+function amsSimAvailableMobiles(exceptSimId) {
+    return amsSimMobilesRef().filter(m => {
+        if (m.status === "Retired / Scrapped" || m.status === "Not Working") return false;
+        return !amsSimMobileHasLinkedSim(m, exceptSimId);
+    });
+}
+
+function amsSimUsedInLabel(s) {
+    if (!s) return "-";
+    if (s.personalMobile) return "Personal Mobile";
+    if (s.linkedMobileId) {
+        const m = amsSimFindMobileById(s.linkedMobileId);
+        if (m) {
+            const mm = (typeof amsAssetMakeModel === "function") ? amsAssetMakeModel(m) : [m.make, m.model].filter(Boolean).join(" ");
+            const id = (typeof amsPrintAssetId === "function") ? amsPrintAssetId(m) : (m.displayId || m.id);
+            return `${id}${mm ? " · " + mm : ""}`;
+        }
+        return s.linkedMobileId;
+    }
+    return "None";
+}
+
+function amsSimUnlinkFromMobile(s) {
+    if (!s) return false;
+    let changed = false;
+    if (s.linkedMobileId && !s.personalMobile) {
+        const m = amsSimFindMobileById(s.linkedMobileId);
+        if (m && String(m.simMobileNo || "0") === String(s.mobileNumber || "")) {
+            m.simMobileNo = "0";
+            changed = true;
+        }
+    }
+    s.linkedMobileId = null;
+    s.personalMobile = false;
+    return changed;
+}
+
+function amsSimApplyMobileLink(s, choice) {
+    const mobilesChanged = amsSimUnlinkFromMobile(s);
+    if (choice === "__personal__") {
+        s.personalMobile = true;
+        s.linkedMobileId = null;
+        return mobilesChanged;
+    }
+    if (!choice) {
+        s.personalMobile = false;
+        s.linkedMobileId = null;
+        return mobilesChanged;
+    }
+    const m = amsSimFindMobileById(choice);
+    if (!m) {
+        s.personalMobile = false;
+        s.linkedMobileId = null;
+        return mobilesChanged;
+    }
+    s.personalMobile = false;
+    s.linkedMobileId = m.id;
+    m.simMobileNo = s.mobileNumber || "0";
+    return true;
+}
+
 function amsSimPopulateEmpDropdown() {
     const activeEmps = simEmployeesRef().filter(e => e.status === "Active");
     document.getElementById("simAssignEmp").innerHTML =
         `<option value="">(Select employee)</option>` +
         activeEmps.map(e => `<option value="${amsEsc(e.empId)}">${amsEsc(e.name)} (${amsEsc(e.dept)})</option>`).join("");
+}
+
+function amsSimPopulateMobileDropdown(sim) {
+    const sel = document.getElementById("simAssignMobile");
+    if (!sel) return;
+    const exceptId = sim ? sim.simId : null;
+    const currentId = sim && sim.linkedMobileId && !sim.personalMobile ? sim.linkedMobileId : "";
+    const mobiles = amsSimAvailableMobiles(exceptId);
+    const opts = [`<option value="">None</option>`, `<option value="__personal__">Personal Mobile</option>`];
+    const seen = new Set();
+    mobiles.forEach(m => {
+        seen.add(m.id);
+        const mm = (typeof amsAssetMakeModel === "function") ? amsAssetMakeModel(m) : [m.make, m.model].filter(Boolean).join(" ");
+        const id = (typeof amsPrintAssetId === "function") ? amsPrintAssetId(m) : (m.displayId || m.id);
+        const bits = [id];
+        if (mm) bits.push(mm);
+        opts.push(`<option value="${amsEsc(m.id)}">${amsEsc(bits.join(" · "))}</option>`);
+    });
+    if (currentId && !seen.has(currentId)) {
+        const m = amsSimFindMobileById(currentId);
+        if (m) {
+            const mm = (typeof amsAssetMakeModel === "function") ? amsAssetMakeModel(m) : [m.make, m.model].filter(Boolean).join(" ");
+            const id = (typeof amsPrintAssetId === "function") ? amsPrintAssetId(m) : (m.displayId || m.id);
+            opts.push(`<option value="${amsEsc(m.id)}">${amsEsc(id)}${mm ? " · " + amsEsc(mm) : ""}</option>`);
+        }
+    }
+    sel.innerHTML = opts.join("");
+    if (sim && sim.personalMobile) sel.value = "__personal__";
+    else if (currentId) sel.value = currentId;
+    else sel.value = "";
 }
 
 function amsSimOpenAssignModal(key, mode) {
@@ -456,6 +587,7 @@ function amsSimOpenAssignModal(key, mode) {
     SIM_STATE.assignMode = mode;
     document.getElementById("simAssignModalTitle").textContent = mode === "reassign" ? "Reassign SIM Card" : "Assign SIM Card";
     amsSimPopulateEmpDropdown();
+    amsSimPopulateMobileDropdown(s);
     document.getElementById("simAssignEmp").value = s.assignedTo || "";
     document.getElementById("simAssignDate").value = new Date().toISOString().slice(0, 10);
     document.getElementById("simAssignRemarks").value = "";
@@ -468,23 +600,28 @@ function amsSimConfirmAssign() {
     const empId = document.getElementById("simAssignEmp").value;
     const assignDate = document.getElementById("simAssignDate").value || new Date().toISOString().slice(0, 10);
     const remarks = document.getElementById("simAssignRemarks").value.trim();
+    const mobileChoice = (document.getElementById("simAssignMobile") || {}).value || "";
     if (!empId) { alert("Select an employee to assign this SIM card to."); return; }
 
     const emp = amsGetEmployeeByAmsId(empId);
     s.assignedTo = empId;
     s.assignedDate = assignDate;
     s.status = "Issued";
+    const mobilesChanged = amsSimApplyMobileLink(s, mobileChoice);
     if (!Array.isArray(s.history)) s.history = [];
+    const usedIn = amsSimUsedInLabel(s);
+    const histRemarks = [remarks, usedIn && usedIn !== "None" ? `Used in: ${usedIn}` : ""].filter(Boolean).join(" | ");
     s.history.push({
         date: assignDate,
         action: SIM_STATE.assignMode === "reassign" ? "Reassigned" : "Assigned",
         empId: emp ? emp.empId : "", empName: emp ? emp.name : "", empDept: emp ? emp.dept : "",
-        remarks, statusLabel: "Issued",
+        remarks: histRemarks, statusLabel: "Issued",
     });
     amsNotify(`SIM card ${s.simId} ${SIM_STATE.assignMode === "reassign" ? "reassigned" : "assigned"} to ${emp ? emp.name : empId}`, "success");
 
     amsSimCloseModal("modalSimAssign");
     amsDbSaveAsync("simCards");
+    if (mobilesChanged) amsDbSaveAsync("mobiles");
     renderSimTable();
 }
 
@@ -504,8 +641,10 @@ function amsSimReturn(key) {
         remarks: "", statusLabel: "In Store",
     });
     s.assignedTo = null; s.assignedDate = ""; s.status = "In Store";
+    const mobilesChanged = amsSimUnlinkFromMobile(s);
     amsNotify(`SIM card returned: ${s.simId}${prevEmp ? ` (from ${prevEmp.name})` : ""}`, "info");
     amsDbSaveAsync("simCards");
+    if (mobilesChanged) amsDbSaveAsync("mobiles");
     renderSimTable();
 }
 
@@ -538,8 +677,10 @@ function amsSimRetire(key) {
         remarks: "", statusLabel: "Retired",
     });
     s.assignedTo = null; s.assignedDate = ""; s.status = "Retired";
+    const mobilesChanged = amsSimUnlinkFromMobile(s);
     amsNotify(`SIM card retired: ${s.simId}`, "info");
     amsDbSaveAsync("simCards");
+    if (mobilesChanged) amsDbSaveAsync("mobiles");
     renderSimTable();
 }
 
@@ -597,7 +738,10 @@ function amsImportSimsFile(file) {
         const headers = rows[0].map(h => h.trim().replace(/\*$/, "")); /* strip the required-marker * */
         const results = [];
         const seenSimIds = new Set(); /* within-file duplicate detection (simId is the DB natural key) */
+        let mobilesChanged = false;
 
+        if (typeof amsDbSuspendSaves === "function") amsDbSuspendSaves();
+        try {
         for (let i = 1; i < rows.length; i++) {
             const raw = rows[i];
             if (!raw.length || raw.every(c => !c)) continue;
@@ -623,14 +767,19 @@ function amsImportSimsFile(file) {
 
             const status = AMS_SIM_STATUS_OPTIONS.includes(obj.status) ? obj.status : "In Store";
 
-            const existing = obj.simId ? SIM_STATE.sims.find(s => s.simId === obj.simId) : null;
+            const existing = obj.simId
+                ? SIM_STATE.sims.find(s => s.simId === obj.simId)
+                : SIM_STATE.sims.find(s => (s.mobileNumber || "") === obj.mobileNumber);
             if (existing) {
                 Object.assign(existing, {
                     iccid: obj.iccid, mobileNumber: obj.mobileNumber, operator: obj.operator, plan: obj.plan,
                     activationDate: obj.activationDate ? amsParseDMY(obj.activationDate) : existing.activationDate,
                     vendor: obj.vendor, cost: obj.cost, remarks: obj.remarks,
                 });
-                if (status === "Retired") { existing.assignedTo = null; existing.assignedDate = ""; }
+                if (status === "Retired") {
+                    existing.assignedTo = null; existing.assignedDate = "";
+                    if (amsSimUnlinkFromMobile(existing)) mobilesChanged = true;
+                }
                 existing.status = status;
                 results.push({ row: line, record, result: "updated", reason: "Existing SIM card updated" });
             } else {
@@ -647,15 +796,20 @@ function amsImportSimsFile(file) {
                     cost: obj.cost || "",
                     remarks: obj.remarks || "",
                     assignedTo: null, assignedDate: "",
+                    linkedMobileId: null, personalMobile: false,
                     history: [{ date: new Date().toISOString().slice(0, 10), action: "Added to Inventory (Import)", empId: "", empName: "", empDept: "", remarks: "", statusLabel: status }],
                 };
                 SIM_STATE.sims.push(sim);
                 results.push({ row: line, record, result: "added", reason: "New SIM card added" });
             }
         }
+        } finally {
+            if (typeof amsDbResumeSaves === "function") amsDbResumeSaves();
+        }
 
         renderSimTable();
         amsDbSaveAsync("simCards"); /* persist the imported/updated rows (wholesale PUT) */
+        if (mobilesChanged) amsDbSaveAsync("mobiles");
         amsSimShowImportSummary(results);
         const fileInput = document.getElementById("simImportFileInput");
         if (fileInput) fileInput.value = "";
@@ -675,7 +829,10 @@ async function initSimCards() {
 
     /* Toolbar */
     document.getElementById("simSearchBox").addEventListener("input", renderSimTable);
-    document.getElementById("simStatusFilter").addEventListener("change", renderSimTable);
+    ["simOperatorFilter", "simPlanFilter", "simStatusFilter"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener("change", renderSimTable);
+    });
     document.getElementById("btnAddSim").addEventListener("click", amsSimOpenAddModal);
     document.getElementById("btnSimExport").addEventListener("click", amsExportSims);
     document.getElementById("btnSimTemplate").addEventListener("click", amsDownloadSimTemplate);

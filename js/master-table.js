@@ -92,6 +92,8 @@ function amsHandleImportFile(file) {
             ? cfg.importMatchKeys.map(k => String(obj[k] || "").toLowerCase()).join("|")
             : String(obj[cfg.idKey] || "").toLowerCase();
 
+        if (typeof amsDbSuspendSaves === "function") amsDbSuspendSaves();
+        try {
         for (let i = 1; i < rows.length; i++) {
             const raw = rows[i];
             if (!raw.length || raw.every(c => !c)) continue;
@@ -132,6 +134,13 @@ function amsHandleImportFile(file) {
                     results.push({ row: line, record, result: "skipped", reason: "Record is not visible to your role" });
                     continue;
                 }
+                if (typeof cfg.writeGuard === "function") {
+                    const guard = cfg.writeGuard(obj, existing);
+                    if (guard && !guard.allowed) {
+                        results.push({ row: line, record, result: "skipped", reason: guard.reason || "Not allowed for your role" });
+                        continue;
+                    }
+                }
                 cfg.fields.forEach(f => { if (obj[f.key]) existing[f.key] = obj[f.key]; });
                 existing.active = active;
                 results.push({ row: line, record, result: "updated", reason: "Existing record updated" });
@@ -143,9 +152,19 @@ function amsHandleImportFile(file) {
                     results.push({ row: line, record, result: "skipped", reason: "Record is not visible to your role" });
                     continue;
                 }
+                if (typeof cfg.writeGuard === "function") {
+                    const guard = cfg.writeGuard(newItem, null);
+                    if (guard && !guard.allowed) {
+                        results.push({ row: line, record, result: "skipped", reason: guard.reason || "Not allowed for your role" });
+                        continue;
+                    }
+                }
                 cfg.dataArray.push(newItem);
                 results.push({ row: line, record, result: "added", reason: "New record added" });
             }
+        }
+        } finally {
+            if (typeof amsDbResumeSaves === "function") amsDbResumeSaves();
         }
 
         amsRenderMasterTable();
@@ -162,15 +181,64 @@ function amsHandleImportFile(file) {
     });
 }
 
+function amsMtFilterFields() {
+    const cfg = AMS_MASTER_CONFIG;
+    return (cfg.fields || []).filter(f => f.type === "select" && !f.hideInTable);
+}
+
+function amsMtEnsureFilters() {
+    const searchBox = document.getElementById("searchBox");
+    if (!searchBox) return;
+    let bar = document.getElementById("mtFilterBar");
+    if (!bar) {
+        bar = document.createElement("div");
+        bar.id = "mtFilterBar";
+        bar.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;align-items:center;";
+        searchBox.insertAdjacentElement("afterend", bar);
+    }
+    const fields = amsMtFilterFields();
+    const needed = fields.map(f => `mtFilter-${f.key}`).concat(["mtFilter-active"]);
+    const existing = Array.from(bar.querySelectorAll("select")).map(el => el.id);
+    if (existing.join(",") === needed.join(",")) return;
+    bar.innerHTML = fields.map(f =>
+        `<select id="mtFilter-${amsEsc(f.key)}" class="select" style="width:auto;"><option value="">All ${amsEsc(f.label)}</option></select>`
+    ).join("") + `<select id="mtFilter-active" class="select" style="width:auto;">
+        <option value="">All Status</option>
+        <option value="true">Active</option>
+        <option value="false">Inactive</option>
+    </select>`;
+    bar.querySelectorAll("select").forEach(el => el.addEventListener("change", amsRenderMasterTable));
+}
+
+function amsMtPopulateFilters(source) {
+    amsMtFilterFields().forEach(f => {
+        const el = document.getElementById(`mtFilter-${f.key}`);
+        if (!el) return;
+        amsFillSelectOptions(el, `All ${f.label}`, amsUniqueSorted((source || []).map(item => item[f.key])));
+    });
+}
+
 /* ---- RENDER: the master table ---------------------------------------------- */
 async function amsRenderMasterTable() {
     if (typeof amsDbEnsureLoaded === "function") await amsDbEnsureLoaded();
     const cfg = AMS_MASTER_CONFIG;
     const searchTerm = (document.getElementById("searchBox").value || "").toLowerCase();
+    amsMtEnsureFilters();
 
     const source = (typeof cfg.rowFilter === "function") ? cfg.dataArray.filter(cfg.rowFilter) : cfg.dataArray;
+    amsMtPopulateFilters(source);
     const filtered = source
-        .filter(item => !searchTerm || cfg.fields.some(f => String(item[f.key] || "").toLowerCase().includes(searchTerm)));
+        .filter(item => {
+            const activeFilter = (document.getElementById("mtFilter-active") || {}).value || "";
+            if (activeFilter === "true" && !item.active) return false;
+            if (activeFilter === "false" && item.active) return false;
+            for (const f of amsMtFilterFields()) {
+                const val = (document.getElementById(`mtFilter-${f.key}`) || {}).value || "";
+                if (val && String(item[f.key] || "") !== val) return false;
+            }
+            if (!searchTerm) return true;
+            return cfg.fields.some(f => String(item[f.key] || "").toLowerCase().includes(searchTerm));
+        });
 
     /* Sortable headers (shared js/sortable.js engine) */
     const getterMap = {};
@@ -327,6 +395,14 @@ document.getElementById("mtForm").addEventListener("submit", async (e) => {
     const active = document.getElementById("mt-active").checked;
     values.active = active;
 
+    if (typeof cfg.writeGuard === "function") {
+        const existing = AMS_MT_STATE.editingKey
+            ? cfg.dataArray.find(i => i[cfg.idKey] === AMS_MT_STATE.editingKey)
+            : null;
+        const guard = cfg.writeGuard(values, existing || null);
+        if (guard && !guard.allowed) { amsToast(guard.reason || "You don't have permission to save this record.", "warning"); return; }
+    }
+
     if (cfg.autoIdField && !AMS_MT_STATE.editingKey) {
         values[cfg.autoIdField] = cfg.autoIdGenerate(values); // auto IDs are always unique
     } else {
@@ -371,8 +447,13 @@ async function amsMtToggleActive(key) {
     const item = cfg.dataArray.find(i => i[cfg.idKey] === key);
     const newActive = !item.active;
     if (typeof cfg.onBeforeToggle === "function") {
-        const hook = cfg.onBeforeToggle(item, newActive);
-        if (hook && typeof hook.then === "function") await hook;
+        try {
+            const hook = cfg.onBeforeToggle(item, newActive);
+            if (hook && typeof hook.then === "function") await hook;
+        } catch (err) {
+            amsToast(err.message || "Update cancelled.", "danger");
+            return;
+        }
     }
     item.active = newActive;
     amsToast(`${cfg.pageTitle.replace(" Master", "")} ${item.active ? "activated" : "deactivated"}: ${key}`, item.active ? "success" : "warning");

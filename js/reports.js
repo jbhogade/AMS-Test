@@ -92,13 +92,16 @@ function amsClassifyEvent(action) {
 
 /*-------------- Start Code for ASSET LIFECYCLE REPORT --------------------------*/
 function amsFlattenAssetHistory() {
-    return DUMMY_ASSETS.flatMap(a =>
-        (a.history || []).map(h => ({
-            ...h,
-            assetDisplayId: a.id || a.amsAssetId || "",
-            assetType: a.type,
-            assetSite: a.currentSite || a.site,
-        })));
+    const mapItem = (a, typeFallback) => (a.history || []).map(h => ({
+        ...h,
+        empId: amsHistoryEmpDisplayId(h),
+        assetDisplayId: (typeof amsPrintAssetId === "function" ? amsPrintAssetId(a) : (a.id || a.simId || a.amsAssetId || "")),
+        assetType: a.type || typeFallback || "",
+        assetSite: a.currentSite || a.site || "",
+    }));
+    return DUMMY_ASSETS.flatMap(a => mapItem(a))
+        .concat((typeof DUMMY_MOBILES !== "undefined" ? DUMMY_MOBILES : []).flatMap(a => mapItem(a)))
+        .concat((typeof AMS_DUMMY_SIM_CARDS !== "undefined" ? AMS_DUMMY_SIM_CARDS : []).flatMap(s => mapItem(s, "SIM Card")));
 }
 
 function amsRenderAssetLifecycleReport() {
@@ -174,7 +177,7 @@ function amsRenderIssueHandoverTable(tableId, reportType, searchId, siteId, from
             if (!emp) return;
             const isExited = emp.status === "Exited";
             if (wantExited !== isExited) return;
-            if (searchTerm && ![emp.name, emp.empIdCompany, emp.dept, a.id].some(v => String(v).toLowerCase().includes(searchTerm))) return;
+            if (searchTerm && ![emp.name, amsGetEmployeeDisplayId(emp), emp.dept, amsPrintAssetId(a)].some(v => String(v).toLowerCase().includes(searchTerm))) return;
             const assetSite = a.currentSite || a.site;
             if (site && assetSite !== site) return;
             if (dept && emp.dept !== dept) return;
@@ -190,11 +193,11 @@ function amsRenderIssueHandoverTable(tableId, reportType, searchId, siteId, from
 
     amsSortRegisterRenderer(tableId, () => amsRenderIssueHandoverTable(tableId, reportType, searchId, siteId, fromId, toId, deptId, typeId));
     const getters = {
-        empCode: r => r.emp.empIdCompany,
+        empCode: r => amsGetEmployeeDisplayId(r.emp),
         empName: r => r.emp.name,
         status: r => r.isExited ? "Exited" : "Active",
         dept: r => r.emp.dept,
-        assetId: r => r.a.id,
+        assetId: r => amsPrintAssetId(r.a),
         assetType: r => r.a.type,
         site: r => r.assetSite,
     };
@@ -204,11 +207,11 @@ function amsRenderIssueHandoverTable(tableId, reportType, searchId, siteId, from
         const statusBadge = r.isExited ? `<span class="badge badge-red">Exited</span>` : `<span class="badge badge-green">Active</span>`;
         const rowStyle = r.isExited ? ' style="background:color-mix(in srgb, var(--danger) 10%, transparent);"' : "";
         return `<tr${rowStyle}>
-            <td class="mono">${amsEsc(r.emp.empIdCompany)}</td>
+            <td class="mono">${amsEsc(amsGetEmployeeDisplayId(r.emp))}</td>
             <td><a href="#" class="clickable-id" data-report-emp="${amsEsc(r.emp.amsId)}" data-report-type="${reportType}">${amsEsc(r.emp.name)}</a></td>
             <td>${statusBadge}</td>
             <td>${amsEsc(r.emp.dept)}</td>
-            <td class="mono"><a href="#" class="clickable-id" data-report-emp="${amsEsc(r.emp.amsId)}" data-report-type="${reportType}">${amsEsc(r.a.id)}</a></td>
+            <td class="mono"><a href="#" class="clickable-id" data-report-emp="${amsEsc(r.emp.amsId)}" data-report-type="${reportType}">${amsEsc(amsPrintAssetId(r.a))}</a></td>
             <td>${amsEsc(r.a.type)}</td>
             <td>${amsEsc(r.assetSite)}</td>
         </tr>`;
@@ -457,10 +460,11 @@ function amsWireReportButtons() {
 /*-------------- Start Code for ASSET DISTRIBUTION REPORT -----------------------*/
 function amsBuildDistReportRows() {
     return (amsGetEmployeesForPortal() || []).map(emp => {
-        const direct = amsOwnedEmployeeAssets(emp.empId) || [];
-        const team = amsTeamEmployeeAssets(emp.empId) || [];
+        const amsId = emp.amsId || emp.empId;
+        const direct = amsOwnedEmployeeHoldings(amsId) || [];
+        const team = amsTeamEmployeeHoldings(amsId) || [];
         return {
-            empId: emp.empId, name: emp.name, dept: emp.dept || "", designation: emp.designation || "",
+            empId: amsGetEmployeeDisplayId(emp), name: emp.name, dept: emp.dept || "", designation: emp.designation || "",
             directCount: direct.length, teamCount: team.length, total: direct.length + team.length,
         };
     });

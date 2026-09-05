@@ -224,12 +224,20 @@ async function amsDbSaveArray(arr) {
 
 /* Convenience: fire-and-forget save (keeps the UI responsive; errors still
    surface through amsDbSave's toast). */
+/* Bulk import (and similar batch mutators) suspend fire-and-forget PUTs so
+   overlapping wholesale replaces cannot wipe rows added earlier in the same
+   pass. Callers MUST persist once after resume. */
+let AMS_DB_SAVE_SUSPEND = 0;
+function amsDbSuspendSaves() { AMS_DB_SAVE_SUSPEND += 1; }
+function amsDbResumeSaves() { if (AMS_DB_SAVE_SUSPEND > 0) AMS_DB_SAVE_SUSPEND -= 1; }
+function amsDbSavesSuspended() { return AMS_DB_SAVE_SUSPEND > 0; }
+
 function amsDbSaveAsync(key) {
-    if (!amsDbIsReady()) return;
+    if (!amsDbIsReady() || AMS_DB_SAVE_SUSPEND > 0) return;
     amsDbSave(key).catch(() => {});
 }
 function amsDbSaveDocAsync(key) {
-    if (!amsDbIsReady()) return;
+    if (!amsDbIsReady() || AMS_DB_SAVE_SUSPEND > 0) return;
     amsDbSaveDoc(key).catch(() => {});
 }
 
@@ -483,6 +491,45 @@ function amsEsc(str) {
     const div = document.createElement("div");
     div.textContent = str || "";
     return div.innerHTML;
+}
+
+/* Unique, trimmed, case-insensitive values for toolbar filter dropdowns. */
+function amsUniqueSorted(values) {
+    const seen = {};
+    const out = [];
+    (values || []).forEach(v => {
+        const s = String(v == null ? "" : v).trim();
+        if (!s) return;
+        const k = s.toLowerCase();
+        if (seen[k]) return;
+        seen[k] = true;
+        out.push(s);
+    });
+    out.sort((a, b) => a.localeCompare(b));
+    return out;
+}
+
+/* Rebuilds a <select> while keeping the current value when it is still valid. */
+function amsFillSelectOptions(selectEl, allLabel, values) {
+    if (!selectEl) return;
+    const prev = selectEl.value;
+    const list = values || [];
+    selectEl.innerHTML = `<option value="">${amsEsc(allLabel)}</option>` +
+        list.map(v => `<option value="${amsEsc(v)}">${amsEsc(v)}</option>`).join("");
+    if (prev && (prev === "" || list.indexOf(prev) !== -1)) selectEl.value = prev;
+}
+
+/* Company Employee ID for a history / report row. Stored empId may be the
+   hidden AMS ID (portal view-model) or the company ID; never show AMS IDs
+   except on Supreme Root-only screens. */
+function amsHistoryEmpDisplayId(h) {
+    if (!h) return "";
+    const raw = h.empId || h.empCode || "";
+    if (!raw) return "";
+    const emp = (typeof findEmployeeAny === "function" && findEmployeeAny(raw))
+        || (typeof amsGetEmployeeByAmsId === "function" && amsGetEmployeeByAmsId(raw))
+        || null;
+    return emp ? amsGetEmployeeDisplayId(emp) : raw;
 }
 
 /* =============================================================================
@@ -776,6 +823,7 @@ function amsGetEmployeeByAmsId(amsId) {
         email: e.email,
         status: e.status,
         reportsTo: e.managerAmsId,
+        site: e.site || "",
     };
 }
 
@@ -1183,11 +1231,19 @@ const DESIGNATIONS = [
     "Accountant", "HR Executive", "Machine Operator", "Security Guard"
 ];
 
-/* ---- Credential levels (demo of the "Super Root User" visibility rule) ----- */
+/* Hidden AMS IDs (employee AMS ID, AMS Asset ID) are knowledge-only for
+   Supreme Root. Other roles always see company / display IDs. */
+function amsIsSupremeRoot() {
+    const role = (typeof amsGetViewingAsRole === "function") ? amsGetViewingAsRole() : "";
+    return role === "Supreme Root";
+}
+
+/* ---- Credential levels (legacy names kept for older imports) ----- */
 const CREDENTIAL_LEVELS = [
     { name: "Standard User",  amsVisible: false },
     { name: "Administrator",  amsVisible: false },
-    { name: "Super Root",     amsVisible: true  }
+    { name: "Super Root",     amsVisible: false },
+    { name: "Supreme Root",   amsVisible: true  }
 ];
 
 /* ---- Facilities checked / disabled during employee exit or handover --------- */
@@ -1327,6 +1383,7 @@ function addEmployee(data) {
            even when the manager record does not exist yet). */
         managerName: data.managerName || "",
         managerId: data.managerId || "",
+        site: data.site || "",
         status: "Active",
         exitDate: null
     };
@@ -1350,6 +1407,7 @@ function updateEmployee(amsId, data) {
     emp.contact = data.contact || "";
     emp.email = data.email || "";
     emp.managerAmsId = data.managerAmsId || null;
+    emp.site = data.site || "";
     amsDbSaveAsync("employees");
     amsResolvePendingManagers();
     return emp;
@@ -1398,13 +1456,33 @@ function exitEmployee(amsId, exitDate, remarks, facilitiesDisabled, exitReason, 
     emp.exitRemarks = remarks || "";
     emp.exitReason = exitReason || "";
 
-    /* Snapshot the direct assets held at exit (before releasing them) */
+    /* Snapshot the direct assets / mobiles / SIMs held at exit (before releasing them) */
     const directAssetsHeld = DUMMY_ASSETS
         .filter(a => a.assignedTo === amsId)
         .map(a => ({
-            assetId: a.id, type: a.type, makeModel: a.makeModel,
-            site: a.currentSite || a.site, assignedDepartment: a.assignedDepartment,
+            id: a.id, assetId: a.id, type: a.type, makeModel: amsAssetMakeModel(a),
+            site: a.currentSite || a.site, currentSite: a.currentSite || a.site,
+            assignedDepartment: a.assignedDepartment,
             remarks: a.remarks, usageNote: a.usageNote,
+            assignedTo: a.assignedTo, displayId: a.displayId,
+        }));
+    const directMobilesHeld = DUMMY_MOBILES
+        .filter(a => a.assignedTo === amsId)
+        .map(a => ({
+            id: a.id, displayId: a.displayId, type: a.type, make: a.make, model: a.model,
+            makeModel: amsAssetMakeModel(a),
+            imei1: a.imei1, imei2: a.imei2, batteryNo: a.batteryNo, chargerNo: a.chargerNo,
+            simMobileNo: a.simMobileNo || "0",
+            site: a.currentSite || a.site, currentSite: a.currentSite || a.site,
+            remarks: a.remarks, status: a.status, assignedTo: a.assignedTo,
+            assignedToSubordinate: a.assignedToSubordinate, assignedSubText: a.assignedSubText,
+        }));
+    const directSimCardsHeld = AMS_DUMMY_SIM_CARDS
+        .filter(s => s.assignedTo === amsId)
+        .map(s => ({
+            simId: s.simId, mobileNumber: s.mobileNumber, operator: s.operator,
+            plan: s.plan, status: s.status, assignedTo: s.assignedTo,
+            linkedMobileId: s.linkedMobileId || null, personalMobile: !!s.personalMobile,
         }));
 
     const disabled = Array.isArray(facilitiesDisabled) ? facilitiesDisabled.map(String) : [];
@@ -1430,13 +1508,41 @@ function exitEmployee(amsId, exitDate, remarks, facilitiesDisabled, exitReason, 
         subordinates.forEach(sub => {
             getEmployeeAssets(sub.amsId).forEach(a => {
                 subordinateAssetsTransferred.push({
-                    subAmsId: sub.amsId, subName: getEmployeeFullName(sub), subEmpId: sub.empId,
-                    assetId: a.id, type: a.type, makeModel: a.makeModel,
-                    site: a.currentSite || a.site, status: a.status,
+                    subAmsId: sub.amsId, subName: getEmployeeFullName(sub), subEmpId: amsGetEmployeeDisplayId(sub),
+                    assetId: a.id, type: a.type, makeModel: amsAssetMakeModel(a),
+                    site: a.currentSite || a.site, status: a.status, kind: "asset",
+                });
+            });
+            getEmployeeMobiles(sub.amsId).forEach(a => {
+                subordinateAssetsTransferred.push({
+                    subAmsId: sub.amsId, subName: getEmployeeFullName(sub), subEmpId: amsGetEmployeeDisplayId(sub),
+                    assetId: a.id, type: a.type, makeModel: amsAssetMakeModel(a),
+                    site: a.currentSite || a.site, status: a.status, kind: "mobile",
+                    imei1: a.imei1, simMobileNo: a.simMobileNo,
+                });
+            });
+            getEmployeeSimCards(sub.amsId).forEach(s => {
+                subordinateAssetsTransferred.push({
+                    subAmsId: sub.amsId, subName: getEmployeeFullName(sub), subEmpId: amsGetEmployeeDisplayId(sub),
+                    assetId: s.simId, type: "SIM Card", makeModel: [s.operator, s.plan].filter(Boolean).join(" / "),
+                    site: s.mobileNumber || "-", status: s.status, kind: "sim",
                 });
             });
         });
     }
+
+    const subordinateMobilesHeld = [];
+    const subordinateSimCardsHeld = [];
+    getSubordinates(amsId).forEach(sub => {
+        getEmployeeMobiles(sub.amsId).forEach(a => subordinateMobilesHeld.push({
+            ...a, id: a.id, holder: getEmployeeFullName(sub), holderId: amsGetEmployeeDisplayId(sub),
+            site: a.currentSite || a.site, subName: getEmployeeFullName(sub), subEmpId: amsGetEmployeeDisplayId(sub),
+        }));
+        getEmployeeSimCards(sub.amsId).forEach(s => subordinateSimCardsHeld.push({
+            ...s, holder: getEmployeeFullName(sub), holderId: amsGetEmployeeDisplayId(sub),
+            subName: getEmployeeFullName(sub), subEmpId: amsGetEmployeeDisplayId(sub),
+        }));
+    });
 
     AMS_DUMMY_EXIT_RECORDS.push({
         exitId: amsGenerateExitId(),
@@ -1451,6 +1557,10 @@ function exitEmployee(amsId, exitDate, remarks, facilitiesDisabled, exitReason, 
         facilitiesDisabled: disabled,
         facilitiesNotApplicable: notApplicable,
         directAssetsHeld,
+        directMobilesHeld,
+        directSimCardsHeld,
+        subordinateMobilesHeld,
+        subordinateSimCardsHeld,
         teamTransferredTo,
         subordinateAssetsTransferred,
     });
@@ -1458,8 +1568,27 @@ function exitEmployee(amsId, exitDate, remarks, facilitiesDisabled, exitReason, 
     DUMMY_ASSETS.forEach(a => {
         if (a.assignedTo === amsId) a.assignedTo = null;
     });
+    DUMMY_MOBILES.forEach(a => {
+        if (a.assignedTo === amsId) {
+            a.assignedTo = null; a.assignedToSubordinate = null; a.assignedSubText = null;
+            a.status = "In Store";
+        }
+    });
+    AMS_DUMMY_SIM_CARDS.forEach(s => {
+        if (s.assignedTo === amsId) {
+            s.assignedTo = null; s.assignedDate = ""; s.status = "In Store";
+            if (s.linkedMobileId && !s.personalMobile) {
+                const m = DUMMY_MOBILES.find(x => x.id === s.linkedMobileId);
+                if (m && String(m.simMobileNo || "0") === String(s.mobileNumber || "")) m.simMobileNo = "0";
+            }
+            s.linkedMobileId = null;
+            s.personalMobile = false;
+        }
+    });
     amsDbSaveAsync("employees");
     amsDbSaveAsync("assets");
+    amsDbSaveAsync("mobiles");
+    amsDbSaveAsync("simCards");
     amsDbSaveAsync("exitRecords");
     return emp;
 }
@@ -1479,10 +1608,40 @@ function getEmployeeAssets(amsId) {
     return DUMMY_ASSETS.filter(a => a.assignedTo === amsId);
 }
 
+/* Mobiles directly assigned to an employee (Mobile Master collection) */
+function getEmployeeMobiles(amsId) {
+    return DUMMY_MOBILES.filter(a => a.assignedTo === amsId);
+}
+
+/* SIM cards currently assigned to an employee */
+function getEmployeeSimCards(amsId) {
+    return AMS_DUMMY_SIM_CARDS.filter(s => s.assignedTo === amsId);
+}
+
+function amsSimPrintUsedIn(s) {
+    if (!s) return "None";
+    if (s.personalMobile) return "Personal Mobile";
+    if (!s.linkedMobileId) return "None";
+    const m = DUMMY_MOBILES.find(x => x.id === s.linkedMobileId);
+    return m && typeof amsPrintAssetId === "function" ? amsPrintAssetId(m) : s.linkedMobileId;
+}
+
 /* Assets owned by an employee's subordinates (the whole team) */
 function getSubordinateAssets(amsId) {
     const subIds = getSubordinates(amsId).map(s => s.amsId);
     return DUMMY_ASSETS.filter(a => subIds.includes(a.assignedTo));
+}
+
+/* Mobiles owned by an employee's direct subordinates */
+function getSubordinateMobiles(amsId) {
+    const subIds = getSubordinates(amsId).map(s => s.amsId);
+    return DUMMY_MOBILES.filter(a => subIds.includes(a.assignedTo));
+}
+
+/* SIM cards owned by an employee's direct subordinates */
+function getSubordinateSimCards(amsId) {
+    const subIds = getSubordinates(amsId).map(s => s.amsId);
+    return AMS_DUMMY_SIM_CARDS.filter(s => subIds.includes(s.assignedTo));
 }
 
 /* Assets not assigned to anyone yet */
@@ -1568,6 +1727,41 @@ function amsTeamEmployeeAssets(amsId) {
     return team;
 }
 
+/* Owned / Team lists that include assigned Mobiles and SIM cards so Employee
+   Master counters, distribution, and reports count every held device. */
+function amsOwnedEmployeeHoldings(amsId) {
+    const assets = amsOwnedEmployeeAssets(amsId);
+    const mobiles = getEmployeeMobiles(amsId).filter(a => !amsAssetIsDeptOrSub(a));
+    const sims = getEmployeeSimCards(amsId);
+    return assets.concat(mobiles, sims);
+}
+
+function amsTeamEmployeeHoldings(amsId) {
+    const team = amsTeamEmployeeAssets(amsId).slice();
+    getSubordinateMobiles(amsId).forEach(a => team.push(a));
+    getEmployeeMobiles(amsId).forEach(a => { if (amsAssetIsDeptOrSub(a)) team.push(a); });
+    getSubordinateSimCards(amsId).forEach(s => team.push(s));
+    return team;
+}
+
+function amsHoldingDisplayId(item) {
+    if (!item) return "";
+    if (item.simId) return item.simId;
+    return (typeof amsPrintAssetId === "function") ? amsPrintAssetId(item) : (item.id || item.assetId || "");
+}
+
+function amsHoldingMakeModel(item) {
+    if (!item) return "";
+    if (item.simId) return [item.operator, item.plan, item.mobileNumber].filter(Boolean).join(" / ");
+    return (typeof amsAssetMakeModel === "function") ? amsAssetMakeModel(item) : (item.makeModel || "");
+}
+
+function amsHoldingTypeLabel(item) {
+    if (!item) return "";
+    if (item.simId) return "SIM Card";
+    return item.type || "";
+}
+
 /* Printed "Assignment Type" label for an Asset Issue Form, based on the mix of
    assets shown on the form. */
 function amsAssignmentTypeLabel(directCount, teamCount) {
@@ -1631,6 +1825,188 @@ function amsBuildPrintAccessoriesHtml(assets) {
         <div class="pf-checklist-grid">
             ${rows.join("")}
         </div>`;
+}
+
+function amsAssetMakeModel(oa) {
+    if (!oa) return "";
+    if (oa.makeModel) return oa.makeModel;
+    return [oa.make, oa.model].filter(Boolean).join(" ").trim();
+}
+
+function amsCollectPrintMobilesForEmp(amsId) {
+    const split = amsSplitDirectVsSubordinateAssets(getEmployeeMobiles(amsId));
+    const subordinate = [];
+    getSubordinates(amsId).forEach(sub => {
+        getEmployeeMobiles(sub.amsId).forEach(a => subordinate.push({
+            ...a,
+            id: amsPrintAssetId(a),
+            holder: getEmployeeFullName(sub),
+            holderId: amsGetEmployeeDisplayId(sub),
+            site: a.currentSite || a.site,
+        }));
+    });
+    split.subordinate.forEach(oa => {
+        const holderEmp = oa.assignedToSubordinate ? amsGetEmployeeByAmsId(oa.assignedToSubordinate) : null;
+        subordinate.push({
+            ...oa,
+            id: amsPrintAssetId(oa),
+            holder: holderEmp ? holderEmp.name : (oa.assignedSubText || amsAssetHolderLabel(oa)),
+            holderId: holderEmp ? amsGetEmployeeDisplayId(holderEmp) : "",
+            site: oa.currentSite || oa.site,
+        });
+    });
+    return { direct: split.direct, subordinate };
+}
+
+function amsCollectPrintSimsForEmp(amsId) {
+    const subordinate = [];
+    getSubordinates(amsId).forEach(sub => {
+        getEmployeeSimCards(sub.amsId).forEach(s => subordinate.push({
+            ...s,
+            holder: getEmployeeFullName(sub),
+            holderId: amsGetEmployeeDisplayId(sub),
+        }));
+    });
+    return { direct: getEmployeeSimCards(amsId), subordinate };
+}
+
+function amsBuildPrintMobilesSectionHtml(directList, subList, opts) {
+    const withCondition = !!(opts && opts.withCondition);
+    const conditionRow = () => ["Good", "Needs Repair / Service", "Damaged"].map(o =>
+        `<label class="pf-check-inline"><input type="checkbox" disabled> ${o}</label>`).join("");
+    const typeLabel = m => {
+        const mm = amsAssetMakeModel(m);
+        return `${amsEsc(m.type || "-")}${mm ? ` (${amsEsc(mm)})` : ""}`;
+    };
+    const mobileNo = m => (m.simMobileNo && m.simMobileNo !== "0") ? m.simMobileNo : "-";
+    let html = "";
+    const mobileTitle = (opts && opts.returnedLabel) ? "Mobiles Returned" : "Mobiles Issued";
+    if (directList && directList.length) {
+        html += `
+        <div class="pf-section-bar">${mobileTitle}</div>
+        <table class="pf-asset-table">
+            <thead>
+                <tr>
+                    <th style="width:30px;">#</th><th>Mobile ID</th><th>Type / Make / Model</th>
+                    <th>IMEI No 1</th><th>IMEI No 2</th><th>Battery No</th><th>Charger No</th>
+                    <th>Mobile No</th><th>Site</th>${withCondition ? "<th>Physical Condition at Issue</th>" : ""}
+                </tr>
+            </thead>
+            <tbody>
+                ${directList.map((m, i) => `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td class="mono">${amsEsc(amsPrintAssetId(m))}</td>
+                        <td>${typeLabel(m)}</td>
+                        <td class="mono">${amsEsc(m.imei1 || "-")}</td>
+                        <td class="mono">${amsEsc(m.imei2 || "-")}</td>
+                        <td class="mono">${amsEsc(m.batteryNo || "-")}</td>
+                        <td class="mono">${amsEsc(m.chargerNo || "-")}</td>
+                        <td class="mono">${amsEsc(mobileNo(m))}</td>
+                        <td>${amsEsc(m.currentSite || m.site || "-")}</td>
+                        ${withCondition ? `<td>${conditionRow()}</td>` : ""}
+                    </tr>`).join("")}
+            </tbody>
+        </table>`;
+    }
+    if (subList && subList.length) {
+        html += `
+        <div class="pf-section-bar">Mobiles Currently Assigned to Subordinates (For Reference)</div>
+        <table class="pf-asset-table">
+            <thead>
+                <tr>
+                    <th style="width:30px;">#</th><th>Mobile ID</th><th>Type / Make / Model</th>
+                    <th>IMEI No 1</th><th>Mobile No</th><th>Held By</th><th>Employee ID</th><th>Site</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${subList.map((m, i) => `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td class="mono">${amsEsc(m.id || amsPrintAssetId(m))}</td>
+                        <td>${typeLabel(m)}</td>
+                        <td class="mono">${amsEsc(m.imei1 || "-")}</td>
+                        <td class="mono">${amsEsc(mobileNo(m))}</td>
+                        <td>${amsEsc(m.holder || m.subName || "-")}</td>
+                        <td class="mono">${m.holderId || m.subEmpId ? amsEsc(m.holderId || m.subEmpId) : "-"}</td>
+                        <td>${amsEsc(m.site || m.currentSite || "-")}</td>
+                    </tr>`).join("")}
+            </tbody>
+        </table>`;
+    }
+    return html;
+}
+
+function amsBuildPrintSimCardsSectionHtml(directList, subList, opts) {
+    const simTitle = (opts && opts.returnedLabel) ? "SIM Cards Returned" : "SIM Cards Issued";
+    let html = "";
+    if (directList && directList.length) {
+        html += `
+        <div class="pf-section-bar">${simTitle}</div>
+        <table class="pf-asset-table">
+            <thead>
+                <tr>
+                    <th style="width:30px;">#</th><th>SIM ID</th><th>Mobile Number</th>
+                    <th>Operator</th><th>Plan</th><th>Used In</th><th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${directList.map((s, i) => `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td class="mono">${amsEsc(s.simId || "-")}</td>
+                        <td class="mono">${amsEsc(s.mobileNumber || "-")}</td>
+                        <td>${amsEsc(s.operator || "-")}</td>
+                        <td>${amsEsc(s.plan || "-")}</td>
+                        <td>${amsEsc(amsSimPrintUsedIn(s))}</td>
+                        <td>${amsEsc(s.status || "-")}</td>
+                    </tr>`).join("")}
+            </tbody>
+        </table>`;
+    }
+    if (subList && subList.length) {
+        html += `
+        <div class="pf-section-bar">SIM Cards Currently Assigned to Subordinates (For Reference)</div>
+        <table class="pf-asset-table">
+            <thead>
+                <tr>
+                    <th style="width:30px;">#</th><th>SIM ID</th><th>Mobile Number</th>
+                    <th>Operator</th><th>Plan</th><th>Held By</th><th>Employee ID</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${subList.map((s, i) => `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td class="mono">${amsEsc(s.simId || "-")}</td>
+                        <td class="mono">${amsEsc(s.mobileNumber || "-")}</td>
+                        <td>${amsEsc(s.operator || "-")}</td>
+                        <td>${amsEsc(s.plan || "-")}</td>
+                        <td>${amsEsc(s.holder || s.subName || "-")}</td>
+                        <td class="mono">${s.holderId || s.subEmpId ? amsEsc(s.holderId || s.subEmpId) : "-"}</td>
+                    </tr>`).join("")}
+            </tbody>
+        </table>`;
+    }
+    return html;
+}
+
+function amsBuildPrintMobileSimHtml(amsId, opts) {
+    const exitRecord = opts && opts.exitRecord;
+    const mobiles = exitRecord
+        ? { direct: exitRecord.directMobilesHeld || [], subordinate: exitRecord.subordinateMobilesHeld || [] }
+        : amsCollectPrintMobilesForEmp(amsId);
+    const sims = exitRecord
+        ? { direct: exitRecord.directSimCardsHeld || [], subordinate: exitRecord.subordinateSimCardsHeld || [] }
+        : amsCollectPrintSimsForEmp(amsId);
+    return {
+        html: amsBuildPrintMobilesSectionHtml(mobiles.direct, mobiles.subordinate, opts)
+            + amsBuildPrintSimCardsSectionHtml(sims.direct, sims.subordinate, opts),
+        mobileDirect: mobiles.direct.length,
+        mobileTeam: mobiles.subordinate.length,
+        simDirect: sims.direct.length,
+        simTeam: sims.subordinate.length,
+    };
 }
 
 /* =============================================================================
@@ -2080,7 +2456,9 @@ function getAssetsByStatus() {
 function getEmployeeSummary() {
     const active = DUMMY_EMPLOYEES.filter(e => e.status === "Active").length;
     const inactive = DUMMY_EMPLOYEES.length - active;
-    const assignedAssets = DUMMY_ASSETS.filter(a => a.assignedTo).length;
+    const assignedAssets = DUMMY_ASSETS.filter(a => a.assignedTo).length
+        + DUMMY_MOBILES.filter(a => a.assignedTo).length
+        + AMS_DUMMY_SIM_CARDS.filter(s => s.assignedTo).length;
     return { total: DUMMY_EMPLOYEES.length, active, inactive, assignedAssets };
 }
 

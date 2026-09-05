@@ -93,8 +93,13 @@ function amsGenerateReport(amsId, type, extraRemarks) {
     const directOwned = splitOwned ? splitOwned.direct : owned;
     const subOwned = splitOwned ? splitOwned.subordinate : [];
     const subAssets = isIssue ? amsSubordinateAssetsDetailed(amsId) : [];
+    const mobileSimPreview = typeof amsBuildPrintMobileSimHtml === "function"
+        ? amsBuildPrintMobileSimHtml(amsId, { withCondition: isIssue, returnedLabel: !isIssue, exitRecord: isIssue ? null : exitRecord })
+        : { html: "", mobileDirect: 0, mobileTeam: 0, simDirect: 0, simTeam: 0 };
     const assignmentType = isIssue
-        ? amsAssignmentTypeLabel(directOwned.length, subOwned.length + subAssets.length)
+        ? amsAssignmentTypeLabel(
+            directOwned.length + mobileSimPreview.mobileDirect + mobileSimPreview.simDirect,
+            subOwned.length + subAssets.length + mobileSimPreview.mobileTeam + mobileSimPreview.simTeam)
         : "";
 
     const title = isIssue ? "Asset Issue Form" : "Asset Handover Form";
@@ -187,6 +192,8 @@ function amsGenerateReport(amsId, type, extraRemarks) {
             <label class="pf-check-block" style="grid-column:1 / -1;">Other: ________________________________</label>
         </div>`) : "";
 
+    const mobileSimPrint = mobileSimPreview;
+
     const subRows = subAssets.map(sa => ({
         id: amsPrintAssetId(sa), type: sa.type, makeModel: sa.makeModel,
         site: sa.currentSite || sa.site, holder: sa.subName, holderId: sa.subEmpId,
@@ -247,6 +254,7 @@ function amsGenerateReport(amsId, type, extraRemarks) {
 
             ${accessoriesHtml}
             ${subordinateHtml}
+            ${mobileSimPrint.html}
             ${transferHtml}
             ${clearanceHtml}
 
@@ -292,7 +300,7 @@ function amsGenerateReport(amsId, type, extraRemarks) {
 
             <div class="pf-footer">
                 <span>AMS v4 - Generated electronically</span>
-                <span>Internal Ref: ${formNo} &middot; ${directOwned.length} asset(s) ${isIssue ? "issued" : "returned"}${isIssue ? ` &middot; ${directOwned.length} direct, ${subOwned.length + subAssets.length} team` : ""}</span>
+                <span>Internal Ref: ${formNo} &middot; ${directOwned.length} asset(s) ${isIssue ? "issued" : "returned"}${isIssue ? ` &middot; ${directOwned.length} direct, ${subOwned.length + subAssets.length} team` : ""}${mobileSimPrint.mobileDirect || mobileSimPrint.mobileTeam ? ` &middot; ${mobileSimPrint.mobileDirect} mobile(s), ${mobileSimPrint.mobileTeam} team` : ""}${mobileSimPrint.simDirect || mobileSimPrint.simTeam ? ` &middot; ${mobileSimPrint.simDirect} SIM(s), ${mobileSimPrint.simTeam} team` : ""}</span>
             </div>
         </div>
     `;

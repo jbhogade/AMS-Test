@@ -32,6 +32,16 @@ function amsExportTableToXlsx(filename, tableEl) {
     amsExportXlsx(filename, rows[0], rows.slice(1));
 }
 
+/* Templates put an Instructions sheet first. Prefer "Template", then the first
+   sheet that is not named Instructions, then sheet 0. */
+function amsPickImportSheet(wb) {
+    const names = wb.SheetNames || [];
+    const preferred = names.find(n => /^template$/i.test(n))
+        || names.find(n => !/^instructions?$/i.test(n))
+        || names[0];
+    return wb.Sheets[preferred];
+}
+
 /* Reads an uploaded file and resolves to a 2D array of strings (header row
    first), whether the file is CSV or Excel (.xlsx / legacy .xls). Empty rows
    are dropped, matching amsParseCsv() behaviour so downstream handlers that
@@ -51,8 +61,8 @@ function amsReadImportRows(file) {
             reader.onload = (e) => {
                 try {
                     const wb = XLSX.read(new Uint8Array(e.target.result), { type: "array" });
-                    const ws = wb.Sheets[wb.SheetNames[0]];
-                    const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+                    const ws = amsPickImportSheet(wb);
+                    const aoa = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: false });
                     const cleaned = aoa
                         .map(row => row.map(c => c == null ? "" : String(c)))
                         .filter(row => row.some(c => c.trim() !== ""));

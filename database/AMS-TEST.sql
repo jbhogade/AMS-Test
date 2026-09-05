@@ -229,11 +229,16 @@ BEGIN
     CREATE TABLE dbo.ams_vendors (
         row_id     BIGINT IDENTITY(1,1) NOT NULL,
         record_key NVARCHAR(200) NOT NULL,
-        vendor_id  NVARCHAR(50)  NULL,
-        name       NVARCHAR(200) NULL,
-        category   NVARCHAR(200) NULL,
-        city       NVARCHAR(200) NULL,
-        active     BIT           NOT NULL DEFAULT 1,
+        vendor_id      NVARCHAR(50)  NULL,
+        name           NVARCHAR(200) NULL,
+        category       NVARCHAR(200) NULL,
+        city           NVARCHAR(200) NULL,
+        contact_person NVARCHAR(200) NULL,
+        phone          NVARCHAR(50)  NULL,
+        email          NVARCHAR(200) NULL,
+        gstin          NVARCHAR(20)  NULL,
+        remarks        NVARCHAR(500) NULL,
+        active         BIT           NOT NULL DEFAULT 1,
         data_json  NVARCHAR(MAX) NOT NULL,
         updated_at DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT PK_ams_vendors PRIMARY KEY (record_key)
@@ -360,6 +365,12 @@ BEGIN
         site           NVARCHAR(200) NULL,
         current_site   NVARCHAR(200) NULL,
         assigned_to    NVARCHAR(200) NULL,
+        model          NVARCHAR(200) NULL,
+        serial_number  NVARCHAR(200) NULL,
+        vendor         NVARCHAR(200) NULL,
+        purchase_date  NVARCHAR(20)  NULL,
+        warranty_end   NVARCHAR(20)  NULL,
+        purchase_cost  NVARCHAR(50)  NULL,
         data_json      NVARCHAR(MAX) NOT NULL,
         updated_at     DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT PK_ams_assets PRIMARY KEY (record_key)
@@ -386,6 +397,57 @@ IF OBJECT_ID(N'dbo.ams_assets', N'U') IS NOT NULL
     CREATE INDEX IX_ams_assets_site ON dbo.ams_assets(current_site);
 GO
 
+/* ---- Mobiles ---------------------------------------------------------------- */
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ams_mobiles (
+        row_id         BIGINT IDENTITY(1,1) NOT NULL,
+        record_key     NVARCHAR(200) NOT NULL,
+        asset_id       NVARCHAR(200) NULL,
+        ams_asset_id   NVARCHAR(200) NULL,
+        display_id     NVARCHAR(200) NULL,
+        name           NVARCHAR(300) NULL,
+        status         NVARCHAR(100) NULL,
+        asset_type     NVARCHAR(200) NULL,
+        category       NVARCHAR(200) NULL,
+        make           NVARCHAR(200) NULL,
+        site           NVARCHAR(200) NULL,
+        current_site   NVARCHAR(200) NULL,
+        assigned_to    NVARCHAR(200) NULL,
+        model          NVARCHAR(200) NULL,
+        serial_number  NVARCHAR(200) NULL,
+        imei1          NVARCHAR(50)  NULL,
+        imei2          NVARCHAR(50)  NULL,
+        battery_no     NVARCHAR(100) NULL,
+        charger_no     NVARCHAR(100) NULL,
+        sim_mobile_no  NVARCHAR(50)  NULL,
+        vendor         NVARCHAR(200) NULL,
+        purchase_date  NVARCHAR(20)  NULL,
+        warranty_end   NVARCHAR(20)  NULL,
+        purchase_cost  NVARCHAR(50)  NULL,
+        data_json      NVARCHAR(MAX) NOT NULL,
+        updated_at     DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT PK_ams_mobiles PRIMARY KEY (record_key)
+    );
+END
+GO
+
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_mobiles', N'status') IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_mobiles_status' AND object_id = OBJECT_ID(N'dbo.ams_mobiles'))
+    CREATE INDEX IX_ams_mobiles_status ON dbo.ams_mobiles(status);
+GO
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_mobiles', N'asset_type') IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_mobiles_type' AND object_id = OBJECT_ID(N'dbo.ams_mobiles'))
+    CREATE INDEX IX_ams_mobiles_type ON dbo.ams_mobiles(asset_type);
+GO
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_mobiles', N'current_site') IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_mobiles_site' AND object_id = OBJECT_ID(N'dbo.ams_mobiles'))
+    CREATE INDEX IX_ams_mobiles_site ON dbo.ams_mobiles(current_site);
+GO
+
 /* ---- Employees -------------------------------------------------------------- */
 IF OBJECT_ID(N'dbo.ams_employees', N'U') IS NULL
 BEGIN
@@ -397,8 +459,12 @@ BEGIN
         full_name   NVARCHAR(300) NULL,
         department  NVARCHAR(200) NULL,
         designation NVARCHAR(200) NULL,
-        status      NVARCHAR(50)  NULL,
-        data_json   NVARCHAR(MAX) NOT NULL,
+        site           NVARCHAR(200) NULL,
+        status         NVARCHAR(50)  NULL,
+        contact        NVARCHAR(50)  NULL,
+        email          NVARCHAR(200) NULL,
+        manager_ams_id NVARCHAR(200) NULL,
+        data_json      NVARCHAR(MAX) NOT NULL,
         updated_at  DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT PK_ams_employees PRIMARY KEY (record_key)
     );
@@ -414,6 +480,11 @@ IF OBJECT_ID(N'dbo.ams_employees', N'U') IS NOT NULL
     AND COL_LENGTH(N'dbo.ams_employees', N'status') IS NOT NULL
     AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_employees_status' AND object_id = OBJECT_ID(N'dbo.ams_employees'))
     CREATE INDEX IX_ams_employees_status ON dbo.ams_employees(status);
+GO
+IF OBJECT_ID(N'dbo.ams_employees', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_employees', N'site') IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_employees_site' AND object_id = OBJECT_ID(N'dbo.ams_employees'))
+    CREATE INDEX IX_ams_employees_site ON dbo.ams_employees(site);
 GO
 
 /* ---- Consumables (stock per site) -------------------------------------------- */
@@ -504,10 +575,17 @@ BEGIN
         mobile_number NVARCHAR(50)  NULL,
         operator      NVARCHAR(200) NULL,
         plan_name     NVARCHAR(200) NULL,
-        status        NVARCHAR(50)  NULL,
-        assigned_to   NVARCHAR(200) NULL,
-        data_json     NVARCHAR(MAX) NOT NULL,
-        updated_at    DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
+        status           NVARCHAR(50)  NULL,
+        assigned_to      NVARCHAR(200) NULL,
+        iccid            NVARCHAR(50)  NULL,
+        activation_date  NVARCHAR(20)  NULL,
+        vendor           NVARCHAR(200) NULL,
+        cost             NVARCHAR(50)  NULL,
+        assigned_date    NVARCHAR(20)  NULL,
+        linked_mobile_id NVARCHAR(200) NULL,
+        personal_mobile  BIT           NULL,
+        data_json        NVARCHAR(MAX) NOT NULL,
+        updated_at       DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT PK_ams_sim_cards PRIMARY KEY (record_key)
     );
 END
@@ -537,15 +615,150 @@ IF OBJECT_ID(N'dbo.ams_assets', N'U') IS NOT NULL
    AND COL_LENGTH(N'dbo.ams_assets', N'current_site') IS NULL
    ALTER TABLE dbo.ams_assets ADD current_site NVARCHAR(200) NULL;
 GO
+IF OBJECT_ID(N'dbo.ams_assets', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_assets', N'model') IS NULL
+   ALTER TABLE dbo.ams_assets ADD model NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_assets', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_assets', N'serial_number') IS NULL
+   ALTER TABLE dbo.ams_assets ADD serial_number NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_assets', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_assets', N'vendor') IS NULL
+   ALTER TABLE dbo.ams_assets ADD vendor NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_assets', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_assets', N'purchase_date') IS NULL
+   ALTER TABLE dbo.ams_assets ADD purchase_date NVARCHAR(20) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_assets', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_assets', N'warranty_end') IS NULL
+   ALTER TABLE dbo.ams_assets ADD warranty_end NVARCHAR(20) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_assets', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_assets', N'purchase_cost') IS NULL
+   ALTER TABLE dbo.ams_assets ADD purchase_cost NVARCHAR(50) NULL;
+GO
+
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_mobiles', N'model') IS NULL
+   ALTER TABLE dbo.ams_mobiles ADD model NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_mobiles', N'serial_number') IS NULL
+   ALTER TABLE dbo.ams_mobiles ADD serial_number NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_mobiles', N'imei1') IS NULL
+   ALTER TABLE dbo.ams_mobiles ADD imei1 NVARCHAR(50) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_mobiles', N'imei2') IS NULL
+   ALTER TABLE dbo.ams_mobiles ADD imei2 NVARCHAR(50) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_mobiles', N'battery_no') IS NULL
+   ALTER TABLE dbo.ams_mobiles ADD battery_no NVARCHAR(100) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_mobiles', N'charger_no') IS NULL
+   ALTER TABLE dbo.ams_mobiles ADD charger_no NVARCHAR(100) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_mobiles', N'sim_mobile_no') IS NULL
+   ALTER TABLE dbo.ams_mobiles ADD sim_mobile_no NVARCHAR(50) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_mobiles', N'vendor') IS NULL
+   ALTER TABLE dbo.ams_mobiles ADD vendor NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_mobiles', N'purchase_date') IS NULL
+   ALTER TABLE dbo.ams_mobiles ADD purchase_date NVARCHAR(20) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_mobiles', N'warranty_end') IS NULL
+   ALTER TABLE dbo.ams_mobiles ADD warranty_end NVARCHAR(20) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_mobiles', N'purchase_cost') IS NULL
+   ALTER TABLE dbo.ams_mobiles ADD purchase_cost NVARCHAR(50) NULL;
+GO
+
+IF OBJECT_ID(N'dbo.ams_vendors', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_vendors', N'contact_person') IS NULL
+   ALTER TABLE dbo.ams_vendors ADD contact_person NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_vendors', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_vendors', N'phone') IS NULL
+   ALTER TABLE dbo.ams_vendors ADD phone NVARCHAR(50) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_vendors', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_vendors', N'email') IS NULL
+   ALTER TABLE dbo.ams_vendors ADD email NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_vendors', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_vendors', N'gstin') IS NULL
+   ALTER TABLE dbo.ams_vendors ADD gstin NVARCHAR(20) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_vendors', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_vendors', N'remarks') IS NULL
+   ALTER TABLE dbo.ams_vendors ADD remarks NVARCHAR(500) NULL;
+GO
 
 IF OBJECT_ID(N'dbo.ams_employees', N'U') IS NOT NULL
    AND COL_LENGTH(N'dbo.ams_employees', N'status') IS NULL
    ALTER TABLE dbo.ams_employees ADD status NVARCHAR(50) NULL;
 GO
 
+IF OBJECT_ID(N'dbo.ams_employees', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_employees', N'site') IS NULL
+   ALTER TABLE dbo.ams_employees ADD site NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_employees', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_employees', N'contact') IS NULL
+   ALTER TABLE dbo.ams_employees ADD contact NVARCHAR(50) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_employees', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_employees', N'email') IS NULL
+   ALTER TABLE dbo.ams_employees ADD email NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_employees', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_employees', N'manager_ams_id') IS NULL
+   ALTER TABLE dbo.ams_employees ADD manager_ams_id NVARCHAR(200) NULL;
+GO
+
 IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
    AND COL_LENGTH(N'dbo.ams_sim_cards', N'status') IS NULL
    ALTER TABLE dbo.ams_sim_cards ADD status NVARCHAR(50) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_sim_cards', N'iccid') IS NULL
+   ALTER TABLE dbo.ams_sim_cards ADD iccid NVARCHAR(50) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_sim_cards', N'activation_date') IS NULL
+   ALTER TABLE dbo.ams_sim_cards ADD activation_date NVARCHAR(20) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_sim_cards', N'vendor') IS NULL
+   ALTER TABLE dbo.ams_sim_cards ADD vendor NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_sim_cards', N'cost') IS NULL
+   ALTER TABLE dbo.ams_sim_cards ADD cost NVARCHAR(50) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_sim_cards', N'assigned_date') IS NULL
+   ALTER TABLE dbo.ams_sim_cards ADD assigned_date NVARCHAR(20) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_sim_cards', N'linked_mobile_id') IS NULL
+   ALTER TABLE dbo.ams_sim_cards ADD linked_mobile_id NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_sim_cards', N'personal_mobile') IS NULL
+   ALTER TABLE dbo.ams_sim_cards ADD personal_mobile BIT NULL;
 GO
 
 IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
@@ -562,6 +775,31 @@ IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
 BEGIN
     EXEC sp_rename N'dbo.ams_sim_cards.plan', N'plan_name', 'COLUMN';
 END
+GO
+
+/* Indexes on columns that older databases only get via the ALTER block above.
+   Create them here so a single script run on an existing DB both adds the
+   columns and indexes them (CREATE INDEX is skipped if the column is still
+   missing). Fresh databases already have the columns from CREATE TABLE. */
+IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_sim_cards', N'linked_mobile_id') IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_sim_cards_linked_mobile' AND object_id = OBJECT_ID(N'dbo.ams_sim_cards'))
+    CREATE INDEX IX_ams_sim_cards_linked_mobile ON dbo.ams_sim_cards(linked_mobile_id);
+GO
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_mobiles', N'imei1') IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_mobiles_imei1' AND object_id = OBJECT_ID(N'dbo.ams_mobiles'))
+    CREATE INDEX IX_ams_mobiles_imei1 ON dbo.ams_mobiles(imei1);
+GO
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_mobiles', N'sim_mobile_no') IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_mobiles_sim_mobile_no' AND object_id = OBJECT_ID(N'dbo.ams_mobiles'))
+    CREATE INDEX IX_ams_mobiles_sim_mobile_no ON dbo.ams_mobiles(sim_mobile_no);
+GO
+IF OBJECT_ID(N'dbo.ams_employees', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_employees', N'email') IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_employees_email' AND object_id = OBJECT_ID(N'dbo.ams_employees'))
+    CREATE INDEX IX_ams_employees_email ON dbo.ams_employees(email);
 GO
 
 /* Profile columns for dbo.ams_users. Databases created by an older script

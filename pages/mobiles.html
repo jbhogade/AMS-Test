@@ -56,6 +56,15 @@
                 <div class="asset-toolbar">
                     <div class="asset-toolbar-left">
                         <input type="search" id="searchBox" class="search-input" placeholder="Search Asset ID, type, make, serial...">
+                        <select id="typeFilter" class="select" style="width:auto;">
+                            <option value="">All Types</option>
+                        </select>
+                        <select id="makeFilter" class="select" style="width:auto;">
+                            <option value="">All Makes</option>
+                        </select>
+                        <select id="siteFilter" class="select" style="width:auto;">
+                            <option value="">All Sites</option>
+                        </select>
                         <select id="statusFilter" class="select" style="width:auto;">
                             <option value="">All Statuses</option>
                             <option value="In Store">In Store</option>
@@ -66,11 +75,6 @@
                             <option value="Retired / Scrapped">Retired / Scrapped</option>
                             <option value="Replaced">Replaced</option>
                         </select>
-                        <!-- Demo-only toggle: simulates a Super Root user. AMS Asset ID
-                             stays hidden unless this is on. Same pattern as v3-3. -->
-                        <label class="role-toggle">
-                            <input type="checkbox" id="superRootToggle"> Viewing as Super Root
-                        </label>
                     </div>
                     <div class="flex items-center gap-8">
                         <button class="btn btn-primary" id="btnAddAsset">&#43; Add Mobile</button>

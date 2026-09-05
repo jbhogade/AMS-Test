@@ -45,36 +45,51 @@ function distHistoryEventType(action) {
    Replaced / Transferred / Retired ...), plus the assets they currently hold
    when no lifecycle entry exists for them (seed/imported data). This is what
    makes Asset Distribution the place where every record is kept. */
-function distEmployeeLifecycle(amsId) {
-    const records = [];
-    const seen = {}; /* assetIdFull -> true, so a currently-held asset is not added twice */
-    DUMMY_ASSETS.forEach(a => {
-        (a.history || []).forEach(h => {
-            if (h.empId !== amsId) return;
+function distHistoryMatches(h, amsId) {
+    if (!h || !h.empId) return false;
+    if (h.empId === amsId) return true;
+    const emp = typeof findEmployeeAny === "function" ? findEmployeeAny(h.empId) : null;
+    return !!(emp && emp.amsId === amsId);
+}
+
+function distScanHistory(list, amsId, records, seen, idOf) {
+    (list || []).forEach(item => {
+        (item.history || []).forEach(h => {
+            if (!distHistoryMatches(h, amsId)) return;
             const evt = distHistoryEventType(h.action);
+            const displayId = h.assetIdFull || idOf(item);
             records.push({
                 date: h.date || "",
                 action: h.action,
                 label: evt.label,
                 cls: evt.cls,
-                assetIdFull: h.assetIdFull || amsBaseDisplayId(a),
-                statusLabel: h.statusLabel || a.status || "",
+                assetIdFull: displayId,
+                statusLabel: h.statusLabel || item.status || "",
                 note: h.note || "",
             });
-            seen[h.assetIdFull || a.id] = true;
+            seen[displayId] = true;
         });
     });
+}
+
+function distEmployeeLifecycle(amsId) {
+    const records = [];
+    const seen = {}; /* assetIdFull -> true, so a currently-held asset is not added twice */
+    distScanHistory(DUMMY_ASSETS, amsId, records, seen, a => amsPrintAssetId(a));
+    distScanHistory(DUMMY_MOBILES, amsId, records, seen, a => amsPrintAssetId(a));
+    distScanHistory(AMS_DUMMY_SIM_CARDS, amsId, records, seen, s => s.simId);
     const current = [];
-    amsOwnedEmployeeAssets(amsId).forEach(a => current.push({ a, kind: "Direct" }));
-    amsTeamEmployeeAssets(amsId).forEach(a => current.push({ a, kind: "Team" }));
+    amsOwnedEmployeeHoldings(amsId).forEach(a => current.push({ a, kind: "Direct" }));
+    amsTeamEmployeeHoldings(amsId).forEach(a => current.push({ a, kind: "Team" }));
     current.forEach(({ a, kind }) => {
-        if (seen[a.id]) return;
+        const id = amsHoldingDisplayId(a);
+        if (seen[id]) return;
         records.push({
             date: "",
             action: "Currently held",
             label: kind === "Direct" ? "Direct" : "Team",
             cls: kind === "Direct" ? "badge-green" : "badge-transfer",
-            assetIdFull: amsComputeFullId(a),
+            assetIdFull: id,
             statusLabel: a.status || "",
             note: "",
         });
@@ -86,9 +101,10 @@ function distEmployeeLifecycle(amsId) {
 function distBuildRows() {
     const employees = amsGetEmployeesForPortal();
     return employees.map(emp => {
-        const direct = amsOwnedEmployeeAssets(emp.empId) || [];
-        const team = amsTeamEmployeeAssets(emp.empId) || [];
-        const records = distEmployeeLifecycle(emp.empId);
+        const amsId = emp.amsId || emp.empId;
+        const direct = amsOwnedEmployeeHoldings(amsId) || [];
+        const team = amsTeamEmployeeHoldings(amsId) || [];
+        const records = distEmployeeLifecycle(amsId);
         return {
             empId: emp.empId,              /* internal key = AMS ID (assets link to it) */
             displayId: amsGetEmployeeDisplayId(emp), /* company-issued display ID, shown in UI + exports */
@@ -201,10 +217,10 @@ function distOpenDetail(empId) {
     document.getElementById("distDetailTitle").textContent = `${r.name} (${r.displayId}) - Asset Detail`;
 
     const row = (a, kindCls, kindLabel) => `<tr>
-        <td class="mono-cell">${amsEsc(amsComputeFullId(a))}</td>
-        <td>${amsEsc(a.type)}</td>
-        <td>${amsEsc(a.make)} ${amsEsc(a.model)}</td>
-        <td>${amsEsc(a.serialNumber) || "-"}</td>
+        <td class="mono-cell">${amsEsc(amsHoldingDisplayId(a))}</td>
+        <td>${amsEsc(amsHoldingTypeLabel(a))}</td>
+        <td>${amsEsc(amsHoldingMakeModel(a))}</td>
+        <td>${amsEsc(a.serialNumber || a.iccid || a.mobileNumber) || "-"}</td>
         <td>${amsEsc(a.status)}</td>
         <td><span class="badge ${kindCls}">${kindLabel}</span></td>
     </tr>`;
