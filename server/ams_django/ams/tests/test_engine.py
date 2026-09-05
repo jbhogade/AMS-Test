@@ -43,6 +43,12 @@ class RegistryTests(unittest.TestCase):
         for key in ("consumableLog", "sparePartLog"):
             self.assertIsNone(KEY_INDEX[key].key_field)
 
+    def test_employees_table_has_site_column(self):
+        cols = {c.sql for c in KEY_INDEX["employees"].columns}
+        self.assertIn("site", cols)
+        self.assertIn("department", cols)
+        self.assertIn("status", cols)
+
 
 class ColumnValueTests(unittest.TestCase):
     def test_full_name_compute_prefers_name(self):

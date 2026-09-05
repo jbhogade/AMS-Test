@@ -172,11 +172,16 @@ BEGIN
     CREATE TABLE dbo.ams_vendors (
         row_id     BIGINT IDENTITY(1,1) NOT NULL,
         record_key NVARCHAR(200) NOT NULL,
-        vendor_id  NVARCHAR(50)  NULL,
-        name       NVARCHAR(200) NULL,
-        category   NVARCHAR(200) NULL,
-        city       NVARCHAR(200) NULL,
-        active     BIT           NOT NULL DEFAULT 1,
+        vendor_id      NVARCHAR(50)  NULL,
+        name           NVARCHAR(200) NULL,
+        category       NVARCHAR(200) NULL,
+        city           NVARCHAR(200) NULL,
+        contact_person NVARCHAR(200) NULL,
+        phone          NVARCHAR(50)  NULL,
+        email          NVARCHAR(200) NULL,
+        gstin          NVARCHAR(20)  NULL,
+        remarks        NVARCHAR(500) NULL,
+        active         BIT           NOT NULL DEFAULT 1,
         data_json  NVARCHAR(MAX) NOT NULL,
         updated_at DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT PK_ams_vendors PRIMARY KEY (record_key)
@@ -285,6 +290,12 @@ BEGIN
         site           NVARCHAR(200) NULL,
         current_site   NVARCHAR(200) NULL,
         assigned_to    NVARCHAR(200) NULL,
+        model          NVARCHAR(200) NULL,
+        serial_number  NVARCHAR(200) NULL,
+        vendor         NVARCHAR(200) NULL,
+        purchase_date  NVARCHAR(20)  NULL,
+        warranty_end   NVARCHAR(20)  NULL,
+        purchase_cost  NVARCHAR(50)  NULL,
         data_json      NVARCHAR(MAX) NOT NULL,
         updated_at     DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT PK_ams_assets PRIMARY KEY (record_key)
@@ -307,6 +318,17 @@ BEGIN
         site           NVARCHAR(200) NULL,
         current_site   NVARCHAR(200) NULL,
         assigned_to    NVARCHAR(200) NULL,
+        model          NVARCHAR(200) NULL,
+        serial_number  NVARCHAR(200) NULL,
+        imei1          NVARCHAR(50)  NULL,
+        imei2          NVARCHAR(50)  NULL,
+        battery_no     NVARCHAR(100) NULL,
+        charger_no     NVARCHAR(100) NULL,
+        sim_mobile_no  NVARCHAR(50)  NULL,
+        vendor         NVARCHAR(200) NULL,
+        purchase_date  NVARCHAR(20)  NULL,
+        warranty_end   NVARCHAR(20)  NULL,
+        purchase_cost  NVARCHAR(50)  NULL,
         data_json      NVARCHAR(MAX) NOT NULL,
         updated_at     DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT PK_ams_mobiles PRIMARY KEY (record_key)
@@ -323,9 +345,13 @@ BEGIN
         full_name   NVARCHAR(300) NULL,
         department  NVARCHAR(200) NULL,
         designation NVARCHAR(200) NULL,
-        status      NVARCHAR(50)  NULL,
-        data_json   NVARCHAR(MAX) NOT NULL,
-        updated_at  DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
+        site           NVARCHAR(200) NULL,
+        status         NVARCHAR(50)  NULL,
+        contact        NVARCHAR(50)  NULL,
+        email          NVARCHAR(200) NULL,
+        manager_ams_id NVARCHAR(200) NULL,
+        data_json      NVARCHAR(MAX) NOT NULL,
+        updated_at     DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT PK_ams_employees PRIMARY KEY (record_key)
     );
 END;
@@ -397,10 +423,17 @@ BEGIN
         mobile_number NVARCHAR(50)  NULL,
         operator      NVARCHAR(200) NULL,
         plan_name     NVARCHAR(200) NULL,
-        status        NVARCHAR(50)  NULL,
-        assigned_to   NVARCHAR(200) NULL,
-        data_json     NVARCHAR(MAX) NOT NULL,
-        updated_at    DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
+        status           NVARCHAR(50)  NULL,
+        assigned_to      NVARCHAR(200) NULL,
+        iccid            NVARCHAR(50)  NULL,
+        activation_date  NVARCHAR(20)  NULL,
+        vendor           NVARCHAR(200) NULL,
+        cost             NVARCHAR(50)  NULL,
+        assigned_date    NVARCHAR(20)  NULL,
+        linked_mobile_id NVARCHAR(200) NULL,
+        personal_mobile  BIT           NULL,
+        data_json        NVARCHAR(MAX) NOT NULL,
+        updated_at       DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT PK_ams_sim_cards PRIMARY KEY (record_key)
     );
 END;
@@ -478,9 +511,108 @@ IF OBJECT_ID(N'dbo.ams_assets', N'U') IS NOT NULL
 IF OBJECT_ID(N'dbo.ams_employees', N'U') IS NOT NULL
     AND COL_LENGTH(N'dbo.ams_employees', N'status') IS NULL
     ALTER TABLE dbo.ams_employees ADD status NVARCHAR(50) NULL;
+IF OBJECT_ID(N'dbo.ams_employees', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_employees', N'site') IS NULL
+    ALTER TABLE dbo.ams_employees ADD site NVARCHAR(200) NULL;
+IF OBJECT_ID(N'dbo.ams_employees', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_employees', N'contact') IS NULL
+    ALTER TABLE dbo.ams_employees ADD contact NVARCHAR(50) NULL;
+IF OBJECT_ID(N'dbo.ams_employees', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_employees', N'email') IS NULL
+    ALTER TABLE dbo.ams_employees ADD email NVARCHAR(200) NULL;
+IF OBJECT_ID(N'dbo.ams_employees', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_employees', N'manager_ams_id') IS NULL
+    ALTER TABLE dbo.ams_employees ADD manager_ams_id NVARCHAR(200) NULL;
+IF OBJECT_ID(N'dbo.ams_assets', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_assets', N'model') IS NULL
+    ALTER TABLE dbo.ams_assets ADD model NVARCHAR(200) NULL;
+IF OBJECT_ID(N'dbo.ams_assets', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_assets', N'serial_number') IS NULL
+    ALTER TABLE dbo.ams_assets ADD serial_number NVARCHAR(200) NULL;
+IF OBJECT_ID(N'dbo.ams_assets', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_assets', N'vendor') IS NULL
+    ALTER TABLE dbo.ams_assets ADD vendor NVARCHAR(200) NULL;
+IF OBJECT_ID(N'dbo.ams_assets', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_assets', N'purchase_date') IS NULL
+    ALTER TABLE dbo.ams_assets ADD purchase_date NVARCHAR(20) NULL;
+IF OBJECT_ID(N'dbo.ams_assets', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_assets', N'warranty_end') IS NULL
+    ALTER TABLE dbo.ams_assets ADD warranty_end NVARCHAR(20) NULL;
+IF OBJECT_ID(N'dbo.ams_assets', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_assets', N'purchase_cost') IS NULL
+    ALTER TABLE dbo.ams_assets ADD purchase_cost NVARCHAR(50) NULL;
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_mobiles', N'model') IS NULL
+    ALTER TABLE dbo.ams_mobiles ADD model NVARCHAR(200) NULL;
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_mobiles', N'serial_number') IS NULL
+    ALTER TABLE dbo.ams_mobiles ADD serial_number NVARCHAR(200) NULL;
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_mobiles', N'imei1') IS NULL
+    ALTER TABLE dbo.ams_mobiles ADD imei1 NVARCHAR(50) NULL;
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_mobiles', N'imei2') IS NULL
+    ALTER TABLE dbo.ams_mobiles ADD imei2 NVARCHAR(50) NULL;
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_mobiles', N'battery_no') IS NULL
+    ALTER TABLE dbo.ams_mobiles ADD battery_no NVARCHAR(100) NULL;
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_mobiles', N'charger_no') IS NULL
+    ALTER TABLE dbo.ams_mobiles ADD charger_no NVARCHAR(100) NULL;
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_mobiles', N'sim_mobile_no') IS NULL
+    ALTER TABLE dbo.ams_mobiles ADD sim_mobile_no NVARCHAR(50) NULL;
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_mobiles', N'vendor') IS NULL
+    ALTER TABLE dbo.ams_mobiles ADD vendor NVARCHAR(200) NULL;
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_mobiles', N'purchase_date') IS NULL
+    ALTER TABLE dbo.ams_mobiles ADD purchase_date NVARCHAR(20) NULL;
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_mobiles', N'warranty_end') IS NULL
+    ALTER TABLE dbo.ams_mobiles ADD warranty_end NVARCHAR(20) NULL;
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_mobiles', N'purchase_cost') IS NULL
+    ALTER TABLE dbo.ams_mobiles ADD purchase_cost NVARCHAR(50) NULL;
+IF OBJECT_ID(N'dbo.ams_vendors', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_vendors', N'contact_person') IS NULL
+    ALTER TABLE dbo.ams_vendors ADD contact_person NVARCHAR(200) NULL;
+IF OBJECT_ID(N'dbo.ams_vendors', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_vendors', N'phone') IS NULL
+    ALTER TABLE dbo.ams_vendors ADD phone NVARCHAR(50) NULL;
+IF OBJECT_ID(N'dbo.ams_vendors', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_vendors', N'email') IS NULL
+    ALTER TABLE dbo.ams_vendors ADD email NVARCHAR(200) NULL;
+IF OBJECT_ID(N'dbo.ams_vendors', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_vendors', N'gstin') IS NULL
+    ALTER TABLE dbo.ams_vendors ADD gstin NVARCHAR(20) NULL;
+IF OBJECT_ID(N'dbo.ams_vendors', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_vendors', N'remarks') IS NULL
+    ALTER TABLE dbo.ams_vendors ADD remarks NVARCHAR(500) NULL;
 IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
     AND COL_LENGTH(N'dbo.ams_sim_cards', N'status') IS NULL
     ALTER TABLE dbo.ams_sim_cards ADD status NVARCHAR(50) NULL;
+IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_sim_cards', N'iccid') IS NULL
+    ALTER TABLE dbo.ams_sim_cards ADD iccid NVARCHAR(50) NULL;
+IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_sim_cards', N'activation_date') IS NULL
+    ALTER TABLE dbo.ams_sim_cards ADD activation_date NVARCHAR(20) NULL;
+IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_sim_cards', N'vendor') IS NULL
+    ALTER TABLE dbo.ams_sim_cards ADD vendor NVARCHAR(200) NULL;
+IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_sim_cards', N'cost') IS NULL
+    ALTER TABLE dbo.ams_sim_cards ADD cost NVARCHAR(50) NULL;
+IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_sim_cards', N'assigned_date') IS NULL
+    ALTER TABLE dbo.ams_sim_cards ADD assigned_date NVARCHAR(20) NULL;
+IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_sim_cards', N'linked_mobile_id') IS NULL
+    ALTER TABLE dbo.ams_sim_cards ADD linked_mobile_id NVARCHAR(200) NULL;
+IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_sim_cards', N'personal_mobile') IS NULL
+    ALTER TABLE dbo.ams_sim_cards ADD personal_mobile BIT NULL;
 IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
     AND COL_LENGTH(N'dbo.ams_sim_cards', N'plan_name') IS NULL
     AND COL_LENGTH(N'dbo.ams_sim_cards', N'plan') IS NULL
@@ -507,6 +639,9 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_employees_departm
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_employees_status' AND object_id = OBJECT_ID(N'dbo.ams_employees'))
     AND COL_LENGTH(N'dbo.ams_employees', N'status') IS NOT NULL
     CREATE INDEX IX_ams_employees_status ON dbo.ams_employees(status);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_employees_site' AND object_id = OBJECT_ID(N'dbo.ams_employees'))
+    AND COL_LENGTH(N'dbo.ams_employees', N'site') IS NOT NULL
+    CREATE INDEX IX_ams_employees_site ON dbo.ams_employees(site);
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_consumables_site' AND object_id = OBJECT_ID(N'dbo.ams_consumables'))
     AND COL_LENGTH(N'dbo.ams_consumables', N'site') IS NOT NULL
     CREATE INDEX IX_ams_consumables_site ON dbo.ams_consumables(site);
@@ -519,6 +654,18 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_sim_cards_operato
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_sim_cards_status' AND object_id = OBJECT_ID(N'dbo.ams_sim_cards'))
     AND COL_LENGTH(N'dbo.ams_sim_cards', N'status') IS NOT NULL
     CREATE INDEX IX_ams_sim_cards_status ON dbo.ams_sim_cards(status);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_sim_cards_linked_mobile' AND object_id = OBJECT_ID(N'dbo.ams_sim_cards'))
+    AND COL_LENGTH(N'dbo.ams_sim_cards', N'linked_mobile_id') IS NOT NULL
+    CREATE INDEX IX_ams_sim_cards_linked_mobile ON dbo.ams_sim_cards(linked_mobile_id);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_mobiles_imei1' AND object_id = OBJECT_ID(N'dbo.ams_mobiles'))
+    AND COL_LENGTH(N'dbo.ams_mobiles', N'imei1') IS NOT NULL
+    CREATE INDEX IX_ams_mobiles_imei1 ON dbo.ams_mobiles(imei1);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_mobiles_sim_mobile_no' AND object_id = OBJECT_ID(N'dbo.ams_mobiles'))
+    AND COL_LENGTH(N'dbo.ams_mobiles', N'sim_mobile_no') IS NOT NULL
+    CREATE INDEX IX_ams_mobiles_sim_mobile_no ON dbo.ams_mobiles(sim_mobile_no);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_employees_email' AND object_id = OBJECT_ID(N'dbo.ams_employees'))
+    AND COL_LENGTH(N'dbo.ams_employees', N'email') IS NOT NULL
+    CREATE INDEX IX_ams_employees_email ON dbo.ams_employees(email);
 """
 
 SEED_USERS = [
@@ -630,6 +777,9 @@ def _build_table_defs():
             c("category", "category"), c("make", "make"),
             c("site", "site"), c("current_site", "currentSite"),
             c("assigned_to", "assignedTo"),
+            c("model", "model"), c("serial_number", "serialNumber"),
+            c("vendor", "vendor"), c("purchase_date", "purchaseDate"),
+            c("warranty_end", "warrantyEnd"), c("purchase_cost", "purchaseCost"),
         ]),
         TableDef("mobiles", "ams_mobiles", key_field="id", columns=[
             c("asset_id", "id"), c("ams_asset_id", "amsAssetId"),
@@ -638,12 +788,21 @@ def _build_table_defs():
             c("category", "category"), c("make", "make"),
             c("site", "site"), c("current_site", "currentSite"),
             c("assigned_to", "assignedTo"),
+            c("model", "model"), c("serial_number", "serialNumber"),
+            c("imei1", "imei1"), c("imei2", "imei2"),
+            c("battery_no", "batteryNo"), c("charger_no", "chargerNo"),
+            c("sim_mobile_no", "simMobileNo"), c("vendor", "vendor"),
+            c("purchase_date", "purchaseDate"), c("warranty_end", "warrantyEnd"),
+            c("purchase_cost", "purchaseCost"),
         ]),
         TableDef("employees", "ams_employees", key_field="amsId", columns=[
             c("ams_id", "amsId"), c("emp_id", "empId"),
             c("full_name", None, compute=_full_name_compute),
             c("department", "department"), c("designation", "designation"),
+            c("site", "site"),
             c("status", "status"),
+            c("contact", "contact"), c("email", "email"),
+            c("manager_ams_id", "managerAmsId"),
         ]),
         TableDef("assetTypes", "ams_asset_types", key_field="name", columns=[
             c("name", "name"), c("shortform", "shortform"), c("active", "active", "bit"),
@@ -667,7 +826,9 @@ def _build_table_defs():
             c("acc_code", "accCode"), c("name", "name"), c("asset_type", "assetType"), c("active", "active", "bit"),
         ]),
         TableDef("vendors", "ams_vendors", key_field="name", columns=[
-            c("vendor_id", "vendorId"), c("name", "name"), c("category", "category"), c("city", "city"), c("active", "active", "bit"),
+            c("vendor_id", "vendorId"), c("name", "name"), c("category", "category"), c("city", "city"),
+            c("contact_person", "contactPerson"), c("phone", "phone"), c("email", "email"),
+            c("gstin", "gstin"), c("remarks", "remarks"), c("active", "active", "bit"),
         ]),
         TableDef("simOperators", "ams_sim_operators", key_field="name", columns=[
             c("name", "name"), c("helpline", "helpline"), c("website", "website"), c("active", "active", "bit"),
@@ -704,6 +865,10 @@ def _build_table_defs():
             c("sim_id", "simId"), c("mobile_number", "mobileNumber"),
             c("operator", "operator"), c("plan_name", "plan"),
             c("status", "status"), c("assigned_to", "assignedTo"),
+            c("iccid", "iccid"), c("activation_date", "activationDate"),
+            c("vendor", "vendor"), c("cost", "cost"),
+            c("assigned_date", "assignedDate"), c("linked_mobile_id", "linkedMobileId"),
+            c("personal_mobile", "personalMobile", "bit"),
         ]),
         TableDef("users", "ams_user_profiles", key_field="username", columns=[
             c("username", "username"), c("role", "role"), c("display_name", "displayName"),
