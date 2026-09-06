@@ -12,8 +12,8 @@
 #
 #  FIELDS    : SIM ID (auto-generated, e.g. SIM-000001), SIM Serial / ICCID,
 #              Mobile Number, Operator, Plan, Status (In Store / Issued /
-#              Blocked / Retired), Activation Date, Vendor, Cost, Remarks,
-#              Assigned To (employee) + lifecycle history.
+#              Blocked / Retired), optional Site, Activation Date, Vendor, Cost,
+#              Remarks, Assigned To (employee) + lifecycle history.
 #
 #  FILES USED :
 #    - css/themes.css, css/main.css, css/assets.css
@@ -70,6 +70,9 @@
                             <option value="Issued">Issued</option>
                             <option value="Blocked">Blocked</option>
                             <option value="Retired">Retired</option>
+                        </select>
+                        <select id="simSiteFilter" class="select" style="width:auto;">
+                            <option value="">All Sites</option>
                         </select>
                     </div>
                     <div class="flex items-center gap-8">
@@ -140,6 +143,12 @@
                             <select id="fSimStatus" class="select" required></select>
                         </div>
                         <div class="field">
+                            <label>Site</label>
+                            <select id="fSimSite" class="select">
+                                <option value="">(None)</option>
+                            </select>
+                        </div>
+                        <div class="field">
                             <label>Activation Date</label>
                             <input type="date" id="fSimActivationDate" class="input">
                         </div>
@@ -201,7 +210,7 @@
     </div>
 
     <!-- ====================================================================
-         MODAL : ASSIGN / REASSIGN SIM CARD
+          MODAL : ASSIGN / REASSIGN / EDIT SIM ISSUE
          ==================================================================== -->
     <div class="modal-overlay" id="modalSimAssign">
         <div class="modal">
@@ -262,6 +271,7 @@
     <script src="../js/sortable.js"></script>
     <script src="../js/vendor/xlsx.full.min.js"></script>
     <script src="../js/xlsx-helpers.js"></script>
+    <script src="../js/print-docs.js"></script>
     <script src="../js/sim-cards.js"></script>
     <script>
         initLayout("sim-cards");

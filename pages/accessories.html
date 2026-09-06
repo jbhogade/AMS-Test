@@ -58,7 +58,7 @@
 
                 <!-- ==================== TOOLBAR ==================== -->
                 <div class="toolbar">
-                    <input type="text" id="searchBox" class="search-input" placeholder="Search accessory name, asset type...">
+                    <input type="text" id="searchBox" class="search-input" placeholder="Search accessory name, asset type, site...">
 
                     <div style="display:flex; gap:8px; flex-wrap:wrap;">
                         <button class="btn btn-primary" id="btnAddMaster">+ Add</button>
@@ -137,6 +137,19 @@
                                 if (!v.name || !v.shortform) { alert("Enter both Asset Type Name and Shortform."); return null; }
                                 if (AMS_DUMMY_ASSET_TYPES.some(t => t.name.toLowerCase() === v.name.toLowerCase())) { alert("This Asset Type already exists."); return null; }
                                 AMS_DUMMY_ASSET_TYPES.push({ name: v.name, shortform: v.shortform.toUpperCase(), active: true });
+                                return v.name;
+                            } } },
+                    { key: "site", label: "Site", type: "select", includeBlank: true,
+                        optionsFrom: () => AMS_DUMMY_SITES.filter(s => s.active).map(s => s.name),
+                        quickAdd: { fields: [
+                            { key: "name", label: "New Site Name" },
+                            { key: "shortform", label: "Shortform (for Asset ID)", upper: true, maxLength: 4 },
+                        ],
+                            onAdd: (v) => {
+                                if (!v.name || !v.shortform) { alert("Enter both Site Name and Shortform."); return null; }
+                                if (AMS_DUMMY_SITES.some(s => s.name.toLowerCase() === v.name.toLowerCase())) { alert("This Site already exists."); return null; }
+                                AMS_DUMMY_SITES.push({ name: v.name, shortform: v.shortform.toUpperCase(), address: "", active: true });
+                                if (typeof amsDbSaveAsync === "function") amsDbSaveAsync("sites");
                                 return v.name;
                             } } },
                 ],

@@ -670,7 +670,7 @@ function amsQuickAddAccessory(name, assetType) {
         return null;
     }
     AMS_ACC_SEQ += 1;
-    AMS_DUMMY_ACCESSORIES.push({ accCode: `ACC-${String(AMS_ACC_SEQ).padStart(6, "0")}`, name: trimmed, assetType, active: true });
+    AMS_DUMMY_ACCESSORIES.push({ accCode: `ACC-${String(AMS_ACC_SEQ).padStart(6, "0")}`, name: trimmed, assetType, site: "", active: true });
     amsDbSaveAsync("accessories");
     return trimmed;
 }
@@ -965,10 +965,11 @@ const AMS_DUMMY_SPAREPART_LOG = [];
    8a) SIM CARD MASTER  (mobile SIM cards issued to employees)
    ----------------------------------------------------------------------------
    A SIM card and a mobile phone are issued together to some users. The phone
-   itself is tracked as a normal Asset; this collection stores the separate SIM
-   record (SIM serial / ICCID, the mobile number on it, operator, plan, issue
-   status and assignment). Rendered by pages/sim-cards.html + js/sim-cards.js
-   in the same style as the Asset Master.
+   is tracked in Mobile Master (`DUMMY_MOBILES`); this collection stores the
+   separate SIM record. Assigning either side keeps both in sync: the SIM's
+   `linkedMobileId` is the phone's stable `amsAssetId`, and the phone's
+   `simMobileNo` is the SIM mobile number. Rendered by pages/sim-cards.html
+   + js/sim-cards.js in the same style as the Asset Master.
    ===========================================================================*/
 
 const AMS_SIM_STATUS_OPTIONS = ["In Store", "Issued", "Blocked", "Retired"];
@@ -1055,6 +1056,202 @@ function amsNextSimId() {
         return isNaN(n) ? m : Math.max(m, n);
     }, 0);
     return "SIM-" + String(maxSeq + 1).padStart(6, "0");
+}
+
+/* Stable key for a mobile record. Display `id` changes on assign/transfer
+   (Smart Asset ID suffix), so SIM.linkedMobileId must store amsAssetId. */
+function amsMobileStableId(m) {
+    if (!m) return "";
+    return m.amsAssetId || m.id || "";
+}
+
+function amsFindMobileByRef(ref) {
+    if (!ref) return null;
+    const list = (typeof DUMMY_MOBILES !== "undefined" && Array.isArray(DUMMY_MOBILES)) ? DUMMY_MOBILES : [];
+    return list.find(m => m.amsAssetId === ref)
+        || list.find(m => m.id === ref)
+        || list.find(m => m.displayId === ref)
+        || null;
+}
+
+function amsFindSimByMobileNumber(num) {
+    const n = String(num || "").trim();
+    if (!n || n === "0") return null;
+    return AMS_DUMMY_SIM_CARDS.find(s => String(s.mobileNumber || "").trim() === n) || null;
+}
+
+function amsSimMatchesMobile(s, m) {
+    if (!s || !m || s.personalMobile) return false;
+    const sid = s.linkedMobileId;
+    if (!sid) return false;
+    return sid === m.amsAssetId || sid === m.id || sid === m.displayId;
+}
+
+function amsUnlinkSimFromMobile(s) {
+    if (!s) return false;
+    let changed = false;
+    if (s.linkedMobileId && !s.personalMobile) {
+        const m = amsFindMobileByRef(s.linkedMobileId);
+        if (m && String(m.simMobileNo || "0") === String(s.mobileNumber || "")) {
+            m.simMobileNo = "0";
+            changed = true;
+        }
+    }
+    s.linkedMobileId = null;
+    s.personalMobile = false;
+    return changed;
+}
+
+function amsLinkSimToMobile(s, m) {
+    if (!s || !m) return false;
+    amsUnlinkSimFromMobile(s);
+    AMS_DUMMY_SIM_CARDS.forEach(other => {
+        if (other === s || other.personalMobile) return;
+        if (amsSimMatchesMobile(other, m)) {
+            other.linkedMobileId = null;
+            other.personalMobile = false;
+        }
+    });
+    s.personalMobile = false;
+    s.linkedMobileId = amsMobileStableId(m);
+    m.simMobileNo = s.mobileNumber || "0";
+    return true;
+}
+
+function amsIssueSimToEmployee(s, empId, assignDate, remarks) {
+    if (!s || !empId || s.status === "Retired") return false;
+    const already = s.assignedTo === empId && s.status === "Issued";
+    const emp = typeof amsGetEmployeeByAmsId === "function" ? amsGetEmployeeByAmsId(empId) : null;
+    s.assignedTo = empId;
+    s.assignedDate = assignDate || s.assignedDate || new Date().toISOString().slice(0, 10);
+    s.status = "Issued";
+    if (!already) {
+        if (!Array.isArray(s.history)) s.history = [];
+        s.history.push({
+            date: s.assignedDate,
+            action: "Assigned",
+            empId: emp ? emp.empId : "",
+            empName: emp ? emp.name : "",
+            empDept: emp ? emp.dept : "",
+            remarks: remarks || "Linked from Mobile Master",
+            statusLabel: "Issued",
+        });
+    }
+    return true;
+}
+
+function amsIssueMobileToEmployee(m, empId, assignDate, remarks) {
+    if (!m || !empId) return false;
+    if (["Retired / Scrapped", "Not Working", "Replaced"].includes(m.status)) return false;
+    if (m.assignedTo && m.assignedTo !== empId) return false;
+    const already = m.assignedTo === empId && m.status === "Assigned";
+    const emp = typeof amsGetEmployeeByAmsId === "function" ? amsGetEmployeeByAmsId(empId) : null;
+    m.assignedTo = empId;
+    m.status = "Assigned";
+    m.dept = emp ? emp.dept : (m.dept || "");
+    if (typeof amsComputeFullId === "function") m.id = amsComputeFullId(m);
+    if (!already) {
+        if (!Array.isArray(m.history)) m.history = [];
+        m.history.push({
+            date: assignDate || new Date().toISOString().slice(0, 10),
+            action: "Assigned - New",
+            empId: emp ? emp.empId : "",
+            empName: emp ? emp.name : "",
+            empDept: emp ? emp.dept : "",
+            assetIdFull: m.id,
+            statusLabel: "Assigned",
+            note: remarks || "Linked from SIM Card Master",
+        });
+    }
+    return true;
+}
+
+/* Mobile Master picked a SIM number (Add/Edit or Assign). Mirrors the link
+   onto the SIM card and issues it to the same employee when the phone is assigned. */
+function amsSyncMobileToSimNumber(mobile, simNumber, empId, assignDate) {
+    if (!mobile) return false;
+    const num = String(simNumber == null ? (mobile.simMobileNo || "0") : simNumber).trim() || "0";
+    let simsChanged = false;
+    AMS_DUMMY_SIM_CARDS.forEach(s => {
+        if (s.personalMobile) return;
+        if (amsSimMatchesMobile(s, mobile) && String(s.mobileNumber || "").trim() !== num) {
+            s.linkedMobileId = null;
+            simsChanged = true;
+        }
+    });
+    mobile.simMobileNo = num;
+    if (num === "0") return simsChanged;
+    const s = amsFindSimByMobileNumber(num);
+    if (!s || s.status === "Retired") return simsChanged;
+    if (s.linkedMobileId && !s.personalMobile) {
+        const prev = amsFindMobileByRef(s.linkedMobileId);
+        if (prev && prev !== mobile && String(prev.simMobileNo || "0") === String(s.mobileNumber || "")) {
+            prev.simMobileNo = "0";
+        }
+    }
+    s.linkedMobileId = amsMobileStableId(mobile);
+    s.personalMobile = false;
+    simsChanged = true;
+    const emp = empId || mobile.assignedTo;
+    if (emp && s.status !== "Blocked" && (!s.assignedTo || s.assignedTo === emp)) {
+        amsIssueSimToEmployee(s, emp, assignDate, "Linked from Mobile Master");
+    }
+    return simsChanged;
+}
+
+/* SIM Master Assign/Reassign Used In. choice is "", "__personal__", or a
+   stable mobile id. Also assigns an In-Store phone to the same employee. */
+function amsSyncSimChoiceToMobile(s, choice, empId, assignDate) {
+    if (!s) return false;
+    if (choice === "__personal__") {
+        const changed = amsUnlinkSimFromMobile(s);
+        s.personalMobile = true;
+        s.linkedMobileId = null;
+        return changed;
+    }
+    if (!choice) return amsUnlinkSimFromMobile(s);
+    const m = amsFindMobileByRef(choice);
+    if (!m) {
+        amsUnlinkSimFromMobile(s);
+        return true;
+    }
+    amsLinkSimToMobile(s, m);
+    if (empId) amsIssueMobileToEmployee(m, empId, assignDate, "Linked from SIM Card Master");
+    return true;
+}
+
+function amsUnlinkMobileSim(mobile, returnSim) {
+    if (!mobile) return false;
+    const empId = mobile.assignedTo;
+    const num = String(mobile.simMobileNo || "0").trim();
+    let simsChanged = false;
+    AMS_DUMMY_SIM_CARDS.forEach(s => {
+        const sameNumber = num && num !== "0" && String(s.mobileNumber || "").trim() === num && !s.personalMobile;
+        const matched = amsSimMatchesMobile(s, mobile)
+            || (sameNumber && (!s.linkedMobileId || amsSimMatchesMobile(s, mobile)));
+        if (!matched) return;
+        if (returnSim && empId && s.assignedTo === empId && s.status !== "Retired") {
+            if (!Array.isArray(s.history)) s.history = [];
+            const emp = typeof amsGetEmployeeByAmsId === "function" ? amsGetEmployeeByAmsId(empId) : null;
+            s.history.push({
+                date: new Date().toISOString().slice(0, 10),
+                action: "Returned",
+                empId: emp ? emp.empId : "",
+                empName: emp ? emp.name : "",
+                empDept: emp ? emp.dept : "",
+                remarks: "Returned with linked mobile",
+                statusLabel: "In Store",
+            });
+            s.assignedTo = null;
+            s.assignedDate = "";
+            s.status = "In Store";
+        }
+        s.linkedMobileId = null;
+        s.personalMobile = false;
+        simsChanged = true;
+    });
+    if (num && num !== "0") mobile.simMobileNo = "0";
+    return simsChanged;
 }
 
 
@@ -1578,7 +1775,7 @@ function exitEmployee(amsId, exitDate, remarks, facilitiesDisabled, exitReason, 
         if (s.assignedTo === amsId) {
             s.assignedTo = null; s.assignedDate = ""; s.status = "In Store";
             if (s.linkedMobileId && !s.personalMobile) {
-                const m = DUMMY_MOBILES.find(x => x.id === s.linkedMobileId);
+                const m = amsFindMobileByRef(s.linkedMobileId);
                 if (m && String(m.simMobileNo || "0") === String(s.mobileNumber || "")) m.simMobileNo = "0";
             }
             s.linkedMobileId = null;
@@ -1622,7 +1819,7 @@ function amsSimPrintUsedIn(s) {
     if (!s) return "None";
     if (s.personalMobile) return "Personal Mobile";
     if (!s.linkedMobileId) return "None";
-    const m = DUMMY_MOBILES.find(x => x.id === s.linkedMobileId);
+    const m = amsFindMobileByRef(s.linkedMobileId);
     return m && typeof amsPrintAssetId === "function" ? amsPrintAssetId(m) : s.linkedMobileId;
 }
 
@@ -1947,7 +2144,7 @@ function amsBuildPrintSimCardsSectionHtml(directList, subList, opts) {
             <thead>
                 <tr>
                     <th style="width:30px;">#</th><th>SIM ID</th><th>Mobile Number</th>
-                    <th>Operator</th><th>Plan</th><th>Used In</th><th>Status</th>
+                    <th>Operator</th><th>Plan</th><th>Site</th><th>Used In</th><th>Status</th>
                 </tr>
             </thead>
             <tbody>
@@ -1958,6 +2155,7 @@ function amsBuildPrintSimCardsSectionHtml(directList, subList, opts) {
                         <td class="mono">${amsEsc(s.mobileNumber || "-")}</td>
                         <td>${amsEsc(s.operator || "-")}</td>
                         <td>${amsEsc(s.plan || "-")}</td>
+                        <td>${amsEsc(s.site || "-")}</td>
                         <td>${amsEsc(amsSimPrintUsedIn(s))}</td>
                         <td>${amsEsc(s.status || "-")}</td>
                     </tr>`).join("")}
@@ -1971,7 +2169,7 @@ function amsBuildPrintSimCardsSectionHtml(directList, subList, opts) {
             <thead>
                 <tr>
                     <th style="width:30px;">#</th><th>SIM ID</th><th>Mobile Number</th>
-                    <th>Operator</th><th>Plan</th><th>Held By</th><th>Employee ID</th>
+                    <th>Operator</th><th>Plan</th><th>Site</th><th>Held By</th><th>Employee ID</th>
                 </tr>
             </thead>
             <tbody>
@@ -1982,6 +2180,7 @@ function amsBuildPrintSimCardsSectionHtml(directList, subList, opts) {
                         <td class="mono">${amsEsc(s.mobileNumber || "-")}</td>
                         <td>${amsEsc(s.operator || "-")}</td>
                         <td>${amsEsc(s.plan || "-")}</td>
+                        <td>${amsEsc(s.site || "-")}</td>
                         <td>${amsEsc(s.holder || s.subName || "-")}</td>
                         <td class="mono">${s.holderId || s.subEmpId ? amsEsc(s.holderId || s.subEmpId) : "-"}</td>
                     </tr>`).join("")}

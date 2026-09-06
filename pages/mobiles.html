@@ -3,9 +3,10 @@
 #-------------- Start Code for : MOBILE MASTER PAGE (mobiles.html) -------------
 #
 #  PURPOSE   : Mobile Master - same lifecycle as Asset Master (Add/Edit,
-#              Assign/Return/Asset Edit, Transfer, Not Working, Retire / Scrap,
-#              Replace, Asset ID Record, Import / Export / Template) for
-#              mobile phones and handheld devices, stored separately.
+#              Assign/Return/Edit Mobile Issue, Transfer, Not Working, Retire /
+#              Scrap, Replace, Asset ID Record, Import / Export / Template) for
+#              mobile phones and handheld devices, stored separately. SIM Card
+#              assignment is available on Assign and Edit Mobile Issue.
 #
 #  FILES USED :
 #    - css/themes.css, css/main.css, css/assets.css
@@ -289,12 +290,12 @@
     </div>
 
     <!-- ====================================================================
-         MODAL : ASSIGN / ASSET EDIT (assignment)
+          MODAL : ASSIGN / EDIT MOBILE ISSUE
          ==================================================================== -->
     <div class="modal-overlay" id="modalAssign">
         <div class="modal modal-lg">
             <div class="modal-header">
-                <h3 id="assignModalTitle">Assign Asset</h3>
+                <h3 id="assignModalTitle">Assign Mobile</h3>
                 <button class="modal-close" data-close="modalAssign">&times;</button>
             </div>
             <div class="modal-body">
@@ -305,7 +306,7 @@
                             <select id="assignDirectEmp" class="select" required></select>
                             <button type="button" class="btn-quickadd" data-open-add-employee="assignDirectEmp" title="Add new Employee">+</button>
                         </div>
-                        <div class="form-hint">Employee officially responsible for this asset</div>
+                        <div class="form-hint">Employee officially responsible for this mobile</div>
                     </div>
                     <div class="field field-full">
                         <label>Assign To (Subordinate / Actual User)</label>
@@ -314,7 +315,12 @@
                             <button type="button" class="btn-quickadd" data-open-add-employee="assignSubEmp" title="Add new Employee">+</button>
                         </div>
                         <input type="text" id="assignSubText" class="input" style="display:none; margin-top:6px;" placeholder="Actual user's name (not in User Master)">
-                        <div class="form-hint">Optional - the person who actually uses the asset. Pick from the list, or choose "Other / Not in User Master..." and type a name for anyone not in the User Master.</div>
+                        <div class="form-hint">Optional - the person who actually uses the mobile. Pick from the list, or choose "Other / Not in User Master..." and type a name for anyone not in the User Master.</div>
+                    </div>
+                    <div class="field field-full">
+                        <label>SIM Card</label>
+                        <select id="assignSimMobileNo" class="select"></select>
+                        <div class="form-hint">Optional - company SIM to issue with this mobile (None by default). Links SIM Card Master and issues the SIM to the same employee.</div>
                     </div>
                     <div class="field field-full">
                         <label>Assignment Date <span class="req">*</span></label>

@@ -215,6 +215,7 @@ BEGIN
         acc_code   NVARCHAR(50)  NULL,
         name       NVARCHAR(200) NULL,
         asset_type NVARCHAR(200) NULL,
+        site       NVARCHAR(200) NULL,
         active     BIT           NOT NULL DEFAULT 1,
         data_json  NVARCHAR(MAX) NOT NULL,
         updated_at DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
@@ -584,6 +585,7 @@ BEGIN
         assigned_date    NVARCHAR(20)  NULL,
         linked_mobile_id NVARCHAR(200) NULL,
         personal_mobile  BIT           NULL,
+        site             NVARCHAR(200) NULL,
         data_json        NVARCHAR(MAX) NOT NULL,
         updated_at       DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT PK_ams_sim_cards PRIMARY KEY (record_key)
@@ -776,6 +778,14 @@ BEGIN
     EXEC sp_rename N'dbo.ams_sim_cards.plan', N'plan_name', 'COLUMN';
 END
 GO
+IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_sim_cards', N'site') IS NULL
+   ALTER TABLE dbo.ams_sim_cards ADD site NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_accessories', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_accessories', N'site') IS NULL
+   ALTER TABLE dbo.ams_accessories ADD site NVARCHAR(200) NULL;
+GO
 
 /* Indexes on columns that older databases only get via the ALTER block above.
    Create them here so a single script run on an existing DB both adds the
@@ -800,6 +810,16 @@ IF OBJECT_ID(N'dbo.ams_employees', N'U') IS NOT NULL
     AND COL_LENGTH(N'dbo.ams_employees', N'email') IS NOT NULL
     AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_employees_email' AND object_id = OBJECT_ID(N'dbo.ams_employees'))
     CREATE INDEX IX_ams_employees_email ON dbo.ams_employees(email);
+GO
+IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_sim_cards', N'site') IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_sim_cards_site' AND object_id = OBJECT_ID(N'dbo.ams_sim_cards'))
+    CREATE INDEX IX_ams_sim_cards_site ON dbo.ams_sim_cards(site);
+GO
+IF OBJECT_ID(N'dbo.ams_accessories', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_accessories', N'site') IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_accessories_site' AND object_id = OBJECT_ID(N'dbo.ams_accessories'))
+    CREATE INDEX IX_ams_accessories_site ON dbo.ams_accessories(site);
 GO
 
 /* Profile columns for dbo.ams_users. Databases created by an older script
