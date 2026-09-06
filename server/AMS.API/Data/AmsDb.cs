@@ -237,6 +237,7 @@ public class AmsDb
                 acc_code   NVARCHAR(50)  NULL,
                 name       NVARCHAR(200) NULL,
                 asset_type NVARCHAR(200) NULL,
+                site       NVARCHAR(200) NULL,
                 active     BIT           NOT NULL DEFAULT 1,
                 data_json  NVARCHAR(MAX) NOT NULL,
                 updated_at DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
@@ -509,6 +510,7 @@ public class AmsDb
                 assigned_date    NVARCHAR(20)  NULL,
                 linked_mobile_id NVARCHAR(200) NULL,
                 personal_mobile  BIT           NULL,
+                site             NVARCHAR(200) NULL,
                 data_json        NVARCHAR(MAX) NOT NULL,
                 updated_at       DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
                 CONSTRAINT PK_ams_sim_cards PRIMARY KEY (record_key)
@@ -596,6 +598,12 @@ public class AmsDb
         IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_employees_email' AND object_id = OBJECT_ID(N'dbo.ams_employees'))
             AND COL_LENGTH(N'dbo.ams_employees', N'email') IS NOT NULL
             CREATE INDEX IX_ams_employees_email ON dbo.ams_employees(email);
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_sim_cards_site' AND object_id = OBJECT_ID(N'dbo.ams_sim_cards'))
+            AND COL_LENGTH(N'dbo.ams_sim_cards', N'site') IS NOT NULL
+            CREATE INDEX IX_ams_sim_cards_site ON dbo.ams_sim_cards(site);
+        IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_accessories_site' AND object_id = OBJECT_ID(N'dbo.ams_accessories'))
+            AND COL_LENGTH(N'dbo.ams_accessories', N'site') IS NOT NULL
+            CREATE INDEX IX_ams_accessories_site ON dbo.ams_accessories(site);
 ";
 
     private async Task EnsureSchemaAsync()
@@ -751,7 +759,13 @@ public class AmsDb
             IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
                 AND COL_LENGTH(N'dbo.ams_sim_cards', N'plan_name') IS NULL
                 AND COL_LENGTH(N'dbo.ams_sim_cards', N'plan') IS NOT NULL
-                EXEC sp_rename N'dbo.ams_sim_cards.plan', N'plan_name', 'COLUMN';");
+                EXEC sp_rename N'dbo.ams_sim_cards.plan', N'plan_name', 'COLUMN';
+            IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
+                AND COL_LENGTH(N'dbo.ams_sim_cards', N'site') IS NULL
+                ALTER TABLE dbo.ams_sim_cards ADD site NVARCHAR(200) NULL;
+            IF OBJECT_ID(N'dbo.ams_accessories', N'U') IS NOT NULL
+                AND COL_LENGTH(N'dbo.ams_accessories', N'site') IS NULL
+                ALTER TABLE dbo.ams_accessories ADD site NVARCHAR(200) NULL;");
 
         await ExecuteAsync(conn, SchemaIndexesSql);
     }
@@ -937,7 +951,7 @@ public class AmsDb
         defs.Add(new TableDef
         {
             Key = "accessories", Table = "ams_accessories", KeyField = "accCode",
-            Columns = { C("acc_code", "accCode"), C("name", "name"), C("asset_type", "assetType"), C("active", "active", "bit") },
+            Columns = { C("acc_code", "accCode"), C("name", "name"), C("asset_type", "assetType"), C("site", "site"), C("active", "active", "bit") },
         });
         defs.Add(new TableDef
         {
@@ -1018,7 +1032,7 @@ public class AmsDb
                 C("iccid", "iccid"), C("activation_date", "activationDate"),
                 C("vendor", "vendor"), C("cost", "cost"),
                 C("assigned_date", "assignedDate"), C("linked_mobile_id", "linkedMobileId"),
-                C("personal_mobile", "personalMobile", "bit"),
+                C("personal_mobile", "personalMobile", "bit"), C("site", "site"),
             },
         });
         defs.Add(new TableDef
