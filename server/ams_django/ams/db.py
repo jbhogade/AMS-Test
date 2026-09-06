@@ -160,6 +160,7 @@ BEGIN
         acc_code   NVARCHAR(50)  NULL,
         name       NVARCHAR(200) NULL,
         asset_type NVARCHAR(200) NULL,
+        site       NVARCHAR(200) NULL,
         active     BIT           NOT NULL DEFAULT 1,
         data_json  NVARCHAR(MAX) NOT NULL,
         updated_at DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
@@ -432,6 +433,7 @@ BEGIN
         assigned_date    NVARCHAR(20)  NULL,
         linked_mobile_id NVARCHAR(200) NULL,
         personal_mobile  BIT           NULL,
+        site             NVARCHAR(200) NULL,
         data_json        NVARCHAR(MAX) NOT NULL,
         updated_at       DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT PK_ams_sim_cards PRIMARY KEY (record_key)
@@ -621,6 +623,12 @@ IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
     AND COL_LENGTH(N'dbo.ams_sim_cards', N'plan_name') IS NULL
     AND COL_LENGTH(N'dbo.ams_sim_cards', N'plan') IS NOT NULL
     EXEC sp_rename N'dbo.ams_sim_cards.plan', N'plan_name', 'COLUMN';
+IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_sim_cards', N'site') IS NULL
+    ALTER TABLE dbo.ams_sim_cards ADD site NVARCHAR(200) NULL;
+IF OBJECT_ID(N'dbo.ams_accessories', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_accessories', N'site') IS NULL
+    ALTER TABLE dbo.ams_accessories ADD site NVARCHAR(200) NULL;
 """
 
 SCHEMA_INDEXES_SQL = """
@@ -666,6 +674,12 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_mobiles_sim_mobil
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_employees_email' AND object_id = OBJECT_ID(N'dbo.ams_employees'))
     AND COL_LENGTH(N'dbo.ams_employees', N'email') IS NOT NULL
     CREATE INDEX IX_ams_employees_email ON dbo.ams_employees(email);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_sim_cards_site' AND object_id = OBJECT_ID(N'dbo.ams_sim_cards'))
+    AND COL_LENGTH(N'dbo.ams_sim_cards', N'site') IS NOT NULL
+    CREATE INDEX IX_ams_sim_cards_site ON dbo.ams_sim_cards(site);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_accessories_site' AND object_id = OBJECT_ID(N'dbo.ams_accessories'))
+    AND COL_LENGTH(N'dbo.ams_accessories', N'site') IS NOT NULL
+    CREATE INDEX IX_ams_accessories_site ON dbo.ams_accessories(site);
 """
 
 SEED_USERS = [
@@ -823,7 +837,7 @@ def _build_table_defs():
             c("name", "name"), c("active", "active", "bit"),
         ]),
         TableDef("accessories", "ams_accessories", key_field="accCode", columns=[
-            c("acc_code", "accCode"), c("name", "name"), c("asset_type", "assetType"), c("active", "active", "bit"),
+            c("acc_code", "accCode"), c("name", "name"), c("asset_type", "assetType"), c("site", "site"), c("active", "active", "bit"),
         ]),
         TableDef("vendors", "ams_vendors", key_field="name", columns=[
             c("vendor_id", "vendorId"), c("name", "name"), c("category", "category"), c("city", "city"),
@@ -868,7 +882,7 @@ def _build_table_defs():
             c("iccid", "iccid"), c("activation_date", "activationDate"),
             c("vendor", "vendor"), c("cost", "cost"),
             c("assigned_date", "assignedDate"), c("linked_mobile_id", "linkedMobileId"),
-            c("personal_mobile", "personalMobile", "bit"),
+            c("personal_mobile", "personalMobile", "bit"), c("site", "site"),
         ]),
         TableDef("users", "ams_user_profiles", key_field="username", columns=[
             c("username", "username"), c("role", "role"), c("display_name", "displayName"),
