@@ -1,0 +1,6 @@
+name,description,active
+Nos,Number of pieces,true
+Box,,true
+Pack,,true
+Ream,,true
+Meter,,true

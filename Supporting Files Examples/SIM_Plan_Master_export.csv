@@ -1,0 +1,4 @@
+name,planType,description,active
+Prepaid,Prepaid,,true
+Postpaid,Postpaid,,true
+Corporate Plan,Corporate,,true

@@ -1,0 +1,12 @@
+name,assetType,accCode,active
+Laptop Charger,Laptop,ACC-000025,true
+Laptop Bag,Laptop,ACC-000026,true
+Laptop Stand,Laptop,ACC-000027,true
+Laptop Cooling Fan,Laptop,ACC-000028,true
+Wireless Mouse,Laptop,ACC-000029,true
+Wireless Keyboard,Laptop,ACC-000030,true
+VGA Display Cable,Desktop,ACC-000031,true
+HDMI Cable,Desktop,ACC-000032,true
+Display Port (DP) Cable,Desktop,ACC-000033,true
+Power Cable (Monitor),Desktop,ACC-000034,true
+Power Cable (CPU System),Desktop,ACC-000035,true
