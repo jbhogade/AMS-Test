@@ -35,12 +35,16 @@ window.AMS_MASTER_CONFIG = {
         { key: "name", label: "Part Name", required: true },
         { key: "assetType", label: "Compatible Asset Type", required: true, type: "select",
             optionsFrom: () => AMS_DUMMY_ASSET_TYPES.filter(t => t.active).map(t => t.name),
-            quickAdd: { fields: [{ key: "name", label: "New Asset Type Name" }, { key: "shortform", label: "Shortform (for Asset ID)", upper: true, maxLength: 4 }],
+            quickAdd: { fields: [
+                { key: "name", label: "New Asset Type Name" },
+                { key: "shortform", label: "Shortform (for Asset ID)", upper: true, maxLength: 4 },
+                { key: "category", label: "Asset Category", type: "select",
+                    optionsFrom: () => AMS_DUMMY_ASSET_CATEGORIES.filter(c => c.active).map(c => c.name) },
+            ],
                 onAdd: (v) => {
-                    if (!v.name || !v.shortform) { alert("Enter both Asset Type Name and Shortform."); return null; }
-                    if (AMS_DUMMY_ASSET_TYPES.some(t => t.name.toLowerCase() === v.name.toLowerCase())) { alert("This Asset Type already exists."); return null; }
-                    AMS_DUMMY_ASSET_TYPES.push({ name: v.name, shortform: v.shortform.toUpperCase(), active: true });
-                    return v.name;
+                    const added = amsQuickAddAssetType(v.name, v.shortform, v.category);
+                    if (!added) { alert("Enter Asset Type Name, Shortform, and Category - or the Type already exists."); return null; }
+                    return added;
                 } } },
         { key: "category", label: "Category", required: true, type: "select",
             optionsFrom: () => amsGetActiveSparePartCategoryNames(),

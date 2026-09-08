@@ -135,6 +135,21 @@
                             <select id="fStatus" class="select" required></select>
                         </div>
                         <div class="field">
+                            <label>Category <span class="req">*</span></label>
+                            <div class="select-with-add">
+                                <select id="fCategory" class="select" required></select>
+                                <button type="button" class="btn-quickadd" data-quickadd="category" title="Add new Category">+</button>
+                                <div class="quickadd-popover" id="qaPopoverCategory">
+                                    <label class="qa-label">New Category Name</label>
+                                    <input type="text" id="qaCategoryName" placeholder="e.g. Software License">
+                                    <div class="qa-actions">
+                                        <button type="button" class="btn btn-secondary" data-qa-cancel="category">Cancel</button>
+                                        <button type="button" class="btn btn-primary" data-qa-save="category">Add</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="field">
                             <label>Asset Type <span class="req">*</span></label>
                             <div class="select-with-add">
                                 <select id="fType" class="select" required></select>
@@ -147,21 +162,6 @@
                                     <div class="qa-actions">
                                         <button type="button" class="btn btn-secondary" data-qa-cancel="type">Cancel</button>
                                         <button type="button" class="btn btn-primary" data-qa-save="type">Add</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="field">
-                            <label>Category <span class="req">*</span></label>
-                            <div class="select-with-add">
-                                <select id="fCategory" class="select" required></select>
-                                <button type="button" class="btn-quickadd" data-quickadd="category" title="Add new Category">+</button>
-                                <div class="quickadd-popover" id="qaPopoverCategory">
-                                    <label class="qa-label">New Category Name</label>
-                                    <input type="text" id="qaCategoryName" placeholder="e.g. Software License">
-                                    <div class="qa-actions">
-                                        <button type="button" class="btn btn-secondary" data-qa-cancel="category">Cancel</button>
-                                        <button type="button" class="btn btn-primary" data-qa-save="category">Add</button>
                                     </div>
                                 </div>
                             </div>

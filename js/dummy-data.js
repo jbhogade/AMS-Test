@@ -183,9 +183,11 @@ async function amsDbLoadAll() {
         const venMax = AMS_DUMMY_VENDORS.reduce((m, v) =>
             Math.max(m, parseInt(String(v.vendorId || "0").replace(/\D/g, ""), 10) || 0), 0);
         if (venMax >= AMS_VENDOR_SEQ) AMS_VENDOR_SEQ = venMax + 1;
+        const makesBackfilled = amsBackfillAssetMakeCodes();
         amsMigrateEmployeeNames();
         await amsMergeLoginUsersIntoProfiles();
         AMS_DB_READY = true;
+        if (makesBackfilled) amsDbSaveAsync("assetMakes");
     })();
     return AMS_DB_LOADING;
 }
@@ -672,6 +674,129 @@ function amsQuickAddAccessory(name, assetType) {
     AMS_ACC_SEQ += 1;
     AMS_DUMMY_ACCESSORIES.push({ accCode: `ACC-${String(AMS_ACC_SEQ).padStart(6, "0")}`, name: trimmed, assetType, site: "", active: true });
     amsDbSaveAsync("accessories");
+    return trimmed;
+}
+
+let AMS_MAKE_SEQ = 0;
+
+function amsNextMakeCode() {
+    AMS_MAKE_SEQ += 1;
+    return `MAKE-${String(AMS_MAKE_SEQ).padStart(6, "0")}`;
+}
+
+function amsBackfillAssetMakeCodes() {
+    const makeMax = AMS_DUMMY_ASSET_MAKES.reduce((m, item) =>
+        Math.max(m, parseInt(String(item.makeCode || "0").replace(/\D/g, ""), 10) || 0), 0);
+    if (makeMax >= AMS_MAKE_SEQ) AMS_MAKE_SEQ = makeMax;
+    let assigned = false;
+    AMS_DUMMY_ASSET_MAKES.forEach(item => {
+        if (!item.makeCode) {
+            item.makeCode = amsNextMakeCode();
+            assigned = true;
+        }
+        if (item.assetType == null) item.assetType = "";
+    });
+    return assigned;
+}
+
+function amsGetMakeOptions(assetType) {
+    if (!assetType) return [];
+    return AMS_DUMMY_ASSET_MAKES.filter(m => m.assetType === assetType && m.active).map(m => m.name);
+}
+
+function amsFillMakeSelect(selectEl, assetType, selected) {
+    if (!selectEl) return;
+    const options = amsGetMakeOptions(assetType);
+    const keep = (selected || "").trim();
+    const names = options.slice();
+    if (keep && !names.some(n => n === keep)) names.unshift(keep);
+    selectEl.innerHTML = names.map(n => `<option value="${amsEsc(n)}">${amsEsc(n)}</option>`).join("");
+    if (keep) selectEl.value = keep;
+}
+
+function amsQuickAddMake(name, assetType) {
+    const trimmed = (name || "").trim();
+    const type = (assetType || "").trim();
+    if (!trimmed || !type) return null;
+    if (AMS_DUMMY_ASSET_MAKES.some(m =>
+        String(m.assetType || "").toLowerCase() === type.toLowerCase()
+        && String(m.name || "").toLowerCase() === trimmed.toLowerCase()
+    )) {
+        return null;
+    }
+    AMS_DUMMY_ASSET_MAKES.push({ makeCode: amsNextMakeCode(), name: trimmed, assetType: type, active: true });
+    amsDbSaveAsync("assetMakes");
+    return trimmed;
+}
+
+const AMS_CATEGORY_USED_ON = ["Assets", "Mobiles", "Both"];
+
+function amsCategoryUsedOn(categoryName) {
+    const c = AMS_DUMMY_ASSET_CATEGORIES.find(x => x.name === categoryName);
+    return (c && c.usedOn) ? c.usedOn : "";
+}
+
+function amsCategoryMatchesPage(categoryName, pageKind) {
+    const used = amsCategoryUsedOn(categoryName);
+    if (!used) return false;
+    if (used === "Both") return true;
+    return used === pageKind;
+}
+
+function amsGetCategoryOptions(pageKind) {
+    return AMS_DUMMY_ASSET_CATEGORIES.filter(c => c.active && amsCategoryMatchesPage(c.name, pageKind)).map(c => c.name);
+}
+
+function amsGetTypeOptions(pageKind, categoryName) {
+    return AMS_DUMMY_ASSET_TYPES.filter(t => {
+        if (!t.active || !t.category) return false;
+        if (!amsCategoryMatchesPage(t.category, pageKind)) return false;
+        if (categoryName && t.category !== categoryName) return false;
+        return true;
+    }).map(t => t.name);
+}
+
+function amsTypeBelongsToPage(typeName, pageKind) {
+    const t = AMS_DUMMY_ASSET_TYPES.find(x => x.name === typeName);
+    if (!t || !t.category) return false;
+    return amsCategoryMatchesPage(t.category, pageKind);
+}
+
+function amsFillNamedSelect(selectEl, names, selected) {
+    if (!selectEl) return;
+    const keep = (selected || "").trim();
+    const list = names.slice();
+    if (keep && !list.some(n => n === keep)) list.unshift(keep);
+    selectEl.innerHTML = list.map(n => `<option value="${amsEsc(n)}">${amsEsc(n)}</option>`).join("");
+    if (keep) selectEl.value = keep;
+}
+
+function amsFillCategorySelect(selectEl, pageKind, selected) {
+    amsFillNamedSelect(selectEl, amsGetCategoryOptions(pageKind), selected);
+}
+
+function amsFillTypeSelect(selectEl, pageKind, categoryName, selected) {
+    amsFillNamedSelect(selectEl, amsGetTypeOptions(pageKind, categoryName), selected);
+}
+
+function amsQuickAddCategory(name, usedOn) {
+    const trimmed = (name || "").trim();
+    const used = (usedOn || "").trim();
+    if (!trimmed || !used) return null;
+    if (AMS_DUMMY_ASSET_CATEGORIES.some(c => c.name.toLowerCase() === trimmed.toLowerCase())) return null;
+    AMS_DUMMY_ASSET_CATEGORIES.push({ name: trimmed, usedOn: used, active: true });
+    amsDbSaveAsync("assetCategories");
+    return trimmed;
+}
+
+function amsQuickAddAssetType(name, shortform, category) {
+    const trimmed = (name || "").trim();
+    const short = (shortform || "").trim().toUpperCase();
+    const cat = (category || "").trim();
+    if (!trimmed || !short || !cat) return null;
+    if (AMS_DUMMY_ASSET_TYPES.some(t => t.name.toLowerCase() === trimmed.toLowerCase())) return null;
+    AMS_DUMMY_ASSET_TYPES.push({ name: trimmed, shortform: short, category: cat, active: true });
+    amsDbSaveAsync("assetTypes");
     return trimmed;
 }
 
@@ -1968,20 +2093,17 @@ function amsAssignmentTypeLabel(directCount, teamCount) {
 }
 
 /* Builds the "Accessories / Items Included" section of a printed form.
-   Lists EVERY active "Common / Supportive Accessory" from the Accessory Master
-   that applies to the asset type(s) of the issued assets (plus the recorded
-   accessories even if no longer in the master), pre-checking the ones actually
-   issued on the asset record. Always ends with an "Other" line. When the master
-   has no matching accessories AND nothing was recorded, falls back to a small
-   standard checklist so the section is never empty. */
-function amsBuildPrintAccessoriesHtml(assets) {
-    const list = (assets || []).filter(oa => oa);
+   Uses only items issued DIRECTLY to the employee (assets, mobiles, SIMs).
+   Lists unique Accessory Master options for those item types (plus recorded
+   accessories even if no longer in the master), pre-checking issued ones.
+   If nothing is issued, the section is omitted (no default checklist). */
+function amsBuildPrintAccessoriesHtml(items) {
+    const list = (items || []).filter(oa => oa);
+    if (!list.length) return "";
 
-    /* Union of asset types on the issued assets (used to pull the master list) */
     const types = [];
     list.forEach(oa => { if (oa.type && !types.includes(oa.type)) types.push(oa.type); });
 
-    /* Every active master accessory for those types, deduplicated by name */
     const masterOptions = [];
     types.forEach(t => {
         amsGetAccessoryOptions(t).forEach(name => {
@@ -1989,11 +2111,10 @@ function amsBuildPrintAccessoriesHtml(assets) {
         });
     });
 
-    /* Accessories actually recorded on the assets (pre-checked) */
     const issued = [];
     list.forEach(oa => {
         (Array.isArray(oa.accessories) ? oa.accessories : []).forEach(name => {
-            if (!issued.includes(name)) issued.push(name);
+            if (name && !issued.includes(name)) issued.push(name);
         });
     });
 
@@ -2002,26 +2123,29 @@ function amsBuildPrintAccessoriesHtml(assets) {
         const checked = issued.includes(name) ? "checked" : "";
         rows.push(`<label class="pf-check-block"><input type="checkbox" ${checked}> ${amsEsc(name)}</label>`);
     });
-    /* Recorded accessories that are no longer in the master still show, checked */
     issued.forEach(name => {
         if (!masterOptions.includes(name)) {
             rows.push(`<label class="pf-check-block"><input type="checkbox" checked> ${amsEsc(name)}</label>`);
         }
     });
-    if (!rows.length) {
-        rows.push(
-            `<label class="pf-check-block"><input type="checkbox"> Power Adaptor / Charger</label>`,
-            `<label class="pf-check-block"><input type="checkbox"> Carrying Bag / Case</label>`,
-            `<label class="pf-check-block"><input type="checkbox"> Mouse / Keyboard (if applicable)</label>`,
-            `<label class="pf-check-block"><input type="checkbox"> Original Box / Documentation</label>`,
-        );
-    }
+    if (!rows.length) return "";
     rows.push(`<label class="pf-check-block" style="grid-column:1 / -1;">Other: ________________________________</label>`);
     return `
         <div class="pf-section-bar">Accessories / Items Included</div>
         <div class="pf-checklist-grid">
             ${rows.join("")}
         </div>`;
+}
+
+function amsPrintDirectHoldingsForAccessories(amsId, extraAssets) {
+    const assets = extraAssets || [];
+    const mobiles = (typeof amsCollectPrintMobilesForEmp === "function")
+        ? (amsCollectPrintMobilesForEmp(amsId).direct || [])
+        : [];
+    const sims = (typeof amsCollectPrintSimsForEmp === "function")
+        ? (amsCollectPrintSimsForEmp(amsId).direct || [])
+        : [];
+    return assets.concat(mobiles, sims);
 }
 
 function amsAssetMakeModel(oa) {

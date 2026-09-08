@@ -338,10 +338,16 @@ function amsCloseModal(id) { document.getElementById(id).classList.remove("open"
 /* =============================================================================
    7) POPULATE FORM DROPDOWNS (Type / Category / Make / Sites / Status)
    ===========================================================================*/
-function amsPopulateAssetDropdowns() {
-    document.getElementById("fType").innerHTML = AMS_DUMMY_ASSET_TYPES.filter(t => t.active).map(t => `<option value="${amsEsc(t.name)}">${amsEsc(t.name)}</option>`).join("");
-    document.getElementById("fCategory").innerHTML = AMS_DUMMY_ASSET_CATEGORIES.filter(c => c.active).map(c => `<option value="${amsEsc(c.name)}">${amsEsc(c.name)}</option>`).join("");
-    document.getElementById("fMake").innerHTML = AMS_DUMMY_ASSET_MAKES.filter(m => m.active).map(m => `<option value="${amsEsc(m.name)}">${amsEsc(m.name)}</option>`).join("");
+function amsPageKind() { return "Assets"; }
+
+function amsPopulateAssetDropdowns(selected) {
+    selected = selected || {};
+    const catEl = document.getElementById("fCategory");
+    const typeEl = document.getElementById("fType");
+    amsFillCategorySelect(catEl, amsPageKind(), selected.category || catEl.value);
+    const category = catEl.value;
+    amsFillTypeSelect(typeEl, amsPageKind(), category, selected.type || typeEl.value);
+    amsFillMakeSelect(document.getElementById("fMake"), typeEl.value, selected.make || document.getElementById("fMake").value);
     const siteOptions = AMS_DUMMY_SITES.filter(s => s.active).map(s => `<option value="${amsEsc(s.name)}">${amsEsc(s.name)}</option>`).join("");
     document.getElementById("fPurchaseSite").innerHTML = siteOptions;
     document.getElementById("fCurrentSite").innerHTML = siteOptions;
@@ -388,12 +394,12 @@ function amsWireQuickAddPopovers() {
     if (qaTypeSave) qaTypeSave.addEventListener("click", () => {
         const name = document.getElementById("qaTypeName").value.trim();
         const shortform = document.getElementById("qaTypeShort").value.trim().toUpperCase();
+        const category = document.getElementById("fCategory").value;
+        if (!category) { alert("Select a Category first."); return; }
         if (!name || !shortform) { alert("Enter both Asset Type Name and Shortform."); return; }
-        if (AMS_DUMMY_ASSET_TYPES.some(t => t.name.toLowerCase() === name.toLowerCase())) { alert("This Asset Type already exists."); return; }
-        AMS_DUMMY_ASSET_TYPES.push({ name, shortform, active: true }); /* same array Asset Type Master manages */
-        amsDbSaveAsync("assetTypes");
-        amsPopulateAssetDropdowns();
-        document.getElementById("fType").value = name;
+        const added = amsQuickAddAssetType(name, shortform, category);
+        if (!added) { alert("This Asset Type already exists."); return; }
+        amsPopulateAssetDropdowns({ category, type: added, make: "" });
         amsUpdateAssetIdPreview();
         document.getElementById("qaTypeName").value = ""; document.getElementById("qaTypeShort").value = "";
         amsCloseAllQuickAdd();
@@ -404,11 +410,10 @@ function amsWireQuickAddPopovers() {
     if (qaCategorySave) qaCategorySave.addEventListener("click", () => {
         const name = document.getElementById("qaCategoryName").value.trim();
         if (!name) { alert("Enter a Category name."); return; }
-        if (AMS_DUMMY_ASSET_CATEGORIES.some(c => c.name.toLowerCase() === name.toLowerCase())) { alert("This Category already exists."); return; }
-        AMS_DUMMY_ASSET_CATEGORIES.push({ name, active: true });
-        amsDbSaveAsync("assetCategories");
-        document.getElementById("fCategory").innerHTML = AMS_DUMMY_ASSET_CATEGORIES.filter(c => c.active).map(c => `<option value="${amsEsc(c.name)}">${amsEsc(c.name)}</option>`).join("");
-        document.getElementById("fCategory").value = name;
+        const added = amsQuickAddCategory(name, amsPageKind());
+        if (!added) { alert("This Category already exists."); return; }
+        amsPopulateAssetDropdowns({ category: added, type: "", make: "" });
+        amsUpdateAssetIdPreview();
         document.getElementById("qaCategoryName").value = "";
         amsCloseAllQuickAdd();
     });
@@ -417,12 +422,12 @@ function amsWireQuickAddPopovers() {
     const qaMakeSave = document.querySelector('[data-qa-save="make"]');
     if (qaMakeSave) qaMakeSave.addEventListener("click", () => {
         const name = document.getElementById("qaMakeName").value.trim();
+        const assetType = document.getElementById("fType").value;
+        if (!assetType) { alert("Select an Asset Type first."); return; }
         if (!name) { alert("Enter a Make/Brand name."); return; }
-        if (AMS_DUMMY_ASSET_MAKES.some(m => m.name.toLowerCase() === name.toLowerCase())) { alert("This Make already exists."); return; }
-        AMS_DUMMY_ASSET_MAKES.push({ name, active: true }); /* same array Asset Make Master manages */
-        amsDbSaveAsync("assetMakes");
-        amsPopulateAssetDropdowns();
-        document.getElementById("fMake").value = name;
+        const added = amsQuickAddMake(name, assetType);
+        if (!added) { alert("This Make already exists for this Asset Type."); return; }
+        amsFillMakeSelect(document.getElementById("fMake"), assetType, added);
         document.getElementById("qaMakeName").value = "";
         amsCloseAllQuickAdd();
     });
@@ -576,12 +581,9 @@ function amsOpenEditModal(key) {
     if (!a) return;
     AST_STATE.editingId = key;
     document.getElementById("formModalTitle").textContent = "Edit Asset";
-    amsPopulateAssetDropdowns();
+    amsPopulateAssetDropdowns({ category: a.category || "", type: a.type, make: a.make });
 
     document.getElementById("fAssetId").value = amsBaseDisplayId(a);
-    document.getElementById("fType").value = a.type;
-    document.getElementById("fCategory").value = a.category || "";
-    document.getElementById("fMake").value = a.make;
     document.getElementById("fName").value = a.name || "";
     document.getElementById("fModel").value = a.model || "";
     document.getElementById("fPurchaseSite").value = a.purchaseSite;
@@ -967,8 +969,7 @@ function amsOpenReplaceModal(key) {
     AST_STATE.replNewKey = null;
     document.getElementById("replaceOldAssetLabel").textContent = `${amsComputeFullId(old)} (${old.type} - ${old.make} ${old.model || ""})`;
 
-    document.getElementById("replType").innerHTML = AMS_DUMMY_ASSET_TYPES.filter(t => t.active).map(t => `<option value="${amsEsc(t.name)}">${amsEsc(t.name)}</option>`).join("");
-    document.getElementById("replType").value = old.type; /* same type by default - switchable if unavailable */
+    amsFillTypeSelect(document.getElementById("replType"), amsPageKind(), "", old.type);
     document.getElementById("replTypeHint").textContent = "Only In-Store (unassigned) assets of this type are listed below. Change the type to browse other In-Store assets.";
 
     amsPopulateReplaceSource();
@@ -1295,16 +1296,12 @@ function amsGenerateAssetIssueFormPrint(key, extraRemarks) {
             </tbody>
         </table>`;
 
+    const accessoryItems = (typeof amsPrintDirectHoldingsForAccessories === "function")
+        ? amsPrintDirectHoldingsForAccessories(emp.amsId || emp.empId, directOwned)
+        : directOwned;
     const accessoriesHtml = (typeof amsBuildPrintAccessoriesHtml === "function")
-        ? amsBuildPrintAccessoriesHtml(directOwned)
-        : `<div class="pf-section-bar">Accessories / Items Included</div>
-        <div class="pf-checklist-grid">
-            <label class="pf-check-block"><input type="checkbox" disabled> Power Adaptor / Charger</label>
-            <label class="pf-check-block"><input type="checkbox" disabled> Carrying Bag / Case</label>
-            <label class="pf-check-block"><input type="checkbox" disabled> Mouse / Keyboard (if applicable)</label>
-            <label class="pf-check-block"><input type="checkbox" disabled> Original Box / Documentation</label>
-            <label class="pf-check-block" style="grid-column:1 / -1;">Other: ________________________________</label>
-        </div>`;
+        ? amsBuildPrintAccessoriesHtml(accessoryItems)
+        : "";
 
     const mobileSimPrint = mobileSimPreview;
 
@@ -1473,9 +1470,10 @@ function amsImportAssetsFile(file) {
             const record = obj.displayId || obj.type || "(unnamed)";
 
             /* ---- Reference validation (same lookup tables as the Add form) ---- */
-            const typeValid = obj.type && AMS_DUMMY_ASSET_TYPES.some(t => t.name === obj.type);
+            const typeValid = obj.type && amsTypeBelongsToPage(obj.type, amsPageKind())
+                && AMS_DUMMY_ASSET_TYPES.some(t => t.name === obj.type && (!obj.category || t.category === obj.category));
             const siteValid = obj.currentSite && AMS_DUMMY_SITES.some(s => s.name === obj.currentSite);
-            const categoryValid = obj.category && AMS_DUMMY_ASSET_CATEGORIES.some(c => c.name === obj.category);
+            const categoryValid = obj.category && amsCategoryMatchesPage(obj.category, amsPageKind());
             if (!typeValid || !siteValid || !categoryValid) {
                 const bad = [];
                 if (!typeValid) bad.push(`Type "${obj.type}" not in Asset Type Master`);
@@ -1588,7 +1586,15 @@ async function initAssets() {
     amsWireAccessoryAndDeptQuickAdds();
 
     /* Add/Edit form */
-    document.getElementById("fType").addEventListener("change", amsUpdateAssetIdPreview);
+    document.getElementById("fCategory").addEventListener("change", () => {
+        amsFillTypeSelect(document.getElementById("fType"), amsPageKind(), document.getElementById("fCategory").value, "");
+        amsFillMakeSelect(document.getElementById("fMake"), document.getElementById("fType").value, "");
+        amsUpdateAssetIdPreview();
+    });
+    document.getElementById("fType").addEventListener("change", () => {
+        amsFillMakeSelect(document.getElementById("fMake"), document.getElementById("fType").value, "");
+        amsUpdateAssetIdPreview();
+    });
     document.getElementById("assetForm").addEventListener("submit", amsSubmitAssetForm);
 
     /* Assign / Asset Edit */

@@ -92,15 +92,17 @@ BEGIN
     CREATE TABLE dbo.ams_user_profiles (
         row_id       BIGINT IDENTITY(1,1) NOT NULL,
         record_key   NVARCHAR(100) NOT NULL,
-        username     NVARCHAR(100) NULL,
-        role         NVARCHAR(50)  NULL,
-        display_name NVARCHAR(200) NULL,
-        email        NVARCHAR(200) NULL,
-        contact_no   NVARCHAR(50)  NULL,
-        address      NVARCHAR(500) NULL,
-        dob          NVARCHAR(20)  NULL,
-        gender       NVARCHAR(20)  NULL,
-        active       BIT           NOT NULL DEFAULT 1,
+        username         NVARCHAR(100) NULL,
+        role             NVARCHAR(50)  NULL,
+        display_name     NVARCHAR(200) NULL,
+        email            NVARCHAR(200) NULL,
+        contact_no       NVARCHAR(50)  NULL,
+        address          NVARCHAR(500) NULL,
+        dob              NVARCHAR(20)  NULL,
+        gender           NVARCHAR(20)  NULL,
+        linked_employee  NVARCHAR(100) NULL,
+        remarks          NVARCHAR(500) NULL,
+        active           BIT           NOT NULL DEFAULT 1,
         data_json    NVARCHAR(MAX) NOT NULL,
         updated_at   DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT PK_ams_user_profiles PRIMARY KEY (record_key)
@@ -120,6 +122,7 @@ BEGIN
         record_key NVARCHAR(200) NOT NULL,
         name       NVARCHAR(200) NULL,
         shortform  NVARCHAR(20)  NULL,
+        category   NVARCHAR(200) NULL,
         active     BIT           NOT NULL DEFAULT 1,
         data_json  NVARCHAR(MAX) NOT NULL,
         updated_at DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
@@ -134,7 +137,9 @@ BEGIN
     CREATE TABLE dbo.ams_asset_makes (
         row_id     BIGINT IDENTITY(1,1) NOT NULL,
         record_key NVARCHAR(200) NOT NULL,
+        make_code  NVARCHAR(50)  NULL,
         name       NVARCHAR(200) NULL,
+        asset_type NVARCHAR(200) NULL,
         active     BIT           NOT NULL DEFAULT 1,
         data_json  NVARCHAR(MAX) NOT NULL,
         updated_at DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
@@ -150,6 +155,7 @@ BEGIN
         row_id     BIGINT IDENTITY(1,1) NOT NULL,
         record_key NVARCHAR(200) NOT NULL,
         name       NVARCHAR(200) NULL,
+        used_on    NVARCHAR(50)  NULL,
         active     BIT           NOT NULL DEFAULT 1,
         data_json  NVARCHAR(MAX) NOT NULL,
         updated_at DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
@@ -365,6 +371,7 @@ BEGIN
         make           NVARCHAR(200) NULL,
         site           NVARCHAR(200) NULL,
         current_site   NVARCHAR(200) NULL,
+        purchase_site  NVARCHAR(200) NULL,
         assigned_to    NVARCHAR(200) NULL,
         model          NVARCHAR(200) NULL,
         serial_number  NVARCHAR(200) NULL,
@@ -414,6 +421,7 @@ BEGIN
         make           NVARCHAR(200) NULL,
         site           NVARCHAR(200) NULL,
         current_site   NVARCHAR(200) NULL,
+        purchase_site  NVARCHAR(200) NULL,
         assigned_to    NVARCHAR(200) NULL,
         model          NVARCHAR(200) NULL,
         serial_number  NVARCHAR(200) NULL,
@@ -455,9 +463,10 @@ BEGIN
     CREATE TABLE dbo.ams_employees (
         row_id      BIGINT IDENTITY(1,1) NOT NULL,
         record_key  NVARCHAR(200) NOT NULL,
-        ams_id      NVARCHAR(100) NULL,
-        emp_id      NVARCHAR(100) NULL,
-        full_name   NVARCHAR(300) NULL,
+        ams_id         NVARCHAR(100) NULL,
+        emp_id         NVARCHAR(100) NULL,
+        emp_id_company NVARCHAR(100) NULL,
+        full_name      NVARCHAR(300) NULL,
         department  NVARCHAR(200) NULL,
         designation NVARCHAR(200) NULL,
         site           NVARCHAR(200) NULL,
@@ -501,6 +510,11 @@ BEGIN
         site          NVARCHAR(200) NULL,
         qty           INT           NULL,
         reorder_level INT           NULL,
+        restock_date  NVARCHAR(20)  NULL,
+        warranty_date NVARCHAR(20)  NULL,
+        unit_cost     NVARCHAR(50)  NULL,
+        vendor        NVARCHAR(200) NULL,
+        remarks       NVARCHAR(500) NULL,
         data_json     NVARCHAR(MAX) NOT NULL,
         updated_at    DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT PK_ams_consumables PRIMARY KEY (record_key)
@@ -518,10 +532,18 @@ GO
 IF OBJECT_ID(N'dbo.ams_consumable_log', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.ams_consumable_log (
-        row_id     BIGINT IDENTITY(1,1) NOT NULL,
-        record_key NVARCHAR(200) NOT NULL,
-        data_json  NVARCHAR(MAX) NOT NULL,
-        updated_at DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
+        row_id        BIGINT IDENTITY(1,1) NOT NULL,
+        record_key    NVARCHAR(200) NOT NULL,
+        log_date      NVARCHAR(20)  NULL,
+        consumable_id NVARCHAR(50)  NULL,
+        name          NVARCHAR(300) NULL,
+        site          NVARCHAR(200) NULL,
+        log_type      NVARCHAR(50)  NULL,
+        qty           INT           NULL,
+        by_whom       NVARCHAR(300) NULL,
+        remarks       NVARCHAR(500) NULL,
+        data_json     NVARCHAR(MAX) NOT NULL,
+        updated_at    DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT PK_ams_consumable_log PRIMARY KEY (row_id)
     );
 END
@@ -540,6 +562,11 @@ BEGIN
         site          NVARCHAR(200) NULL,
         qty           INT           NULL,
         reorder_level INT           NULL,
+        restock_date  NVARCHAR(20)  NULL,
+        warranty_date NVARCHAR(20)  NULL,
+        unit_cost     NVARCHAR(50)  NULL,
+        vendor        NVARCHAR(200) NULL,
+        remarks       NVARCHAR(500) NULL,
         data_json     NVARCHAR(MAX) NOT NULL,
         updated_at    DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT PK_ams_spare_parts PRIMARY KEY (record_key)
@@ -557,10 +584,20 @@ GO
 IF OBJECT_ID(N'dbo.ams_spare_part_log', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.ams_spare_part_log (
-        row_id     BIGINT IDENTITY(1,1) NOT NULL,
-        record_key NVARCHAR(200) NOT NULL,
-        data_json  NVARCHAR(MAX) NOT NULL,
-        updated_at DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
+        row_id            BIGINT IDENTITY(1,1) NOT NULL,
+        record_key        NVARCHAR(200) NOT NULL,
+        log_date          NVARCHAR(20)  NULL,
+        part_id           NVARCHAR(50)  NULL,
+        name              NVARCHAR(300) NULL,
+        site              NVARCHAR(200) NULL,
+        log_type          NVARCHAR(50)  NULL,
+        qty               INT           NULL,
+        by_whom           NVARCHAR(300) NULL,
+        remarks           NVARCHAR(500) NULL,
+        asset_base_id     NVARCHAR(200) NULL,
+        asset_id_snapshot NVARCHAR(200) NULL,
+        data_json         NVARCHAR(MAX) NOT NULL,
+        updated_at        DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT PK_ams_spare_part_log PRIMARY KEY (row_id)
     );
 END
@@ -586,6 +623,7 @@ BEGIN
         linked_mobile_id NVARCHAR(200) NULL,
         personal_mobile  BIT           NULL,
         site             NVARCHAR(200) NULL,
+        remarks          NVARCHAR(500) NULL,
         data_json        NVARCHAR(MAX) NOT NULL,
         updated_at       DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT PK_ams_sim_cards PRIMARY KEY (record_key)
@@ -786,6 +824,179 @@ IF OBJECT_ID(N'dbo.ams_accessories', N'U') IS NOT NULL
    AND COL_LENGTH(N'dbo.ams_accessories', N'site') IS NULL
    ALTER TABLE dbo.ams_accessories ADD site NVARCHAR(200) NULL;
 GO
+IF OBJECT_ID(N'dbo.ams_asset_makes', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_asset_makes', N'make_code') IS NULL
+   ALTER TABLE dbo.ams_asset_makes ADD make_code NVARCHAR(50) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_asset_makes', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_asset_makes', N'asset_type') IS NULL
+   ALTER TABLE dbo.ams_asset_makes ADD asset_type NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_asset_types', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_asset_types', N'category') IS NULL
+   ALTER TABLE dbo.ams_asset_types ADD category NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_asset_categories', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_asset_categories', N'used_on') IS NULL
+   ALTER TABLE dbo.ams_asset_categories ADD used_on NVARCHAR(50) NULL;
+GO
+
+IF OBJECT_ID(N'dbo.ams_assets', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_assets', N'purchase_site') IS NULL
+   ALTER TABLE dbo.ams_assets ADD purchase_site NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_mobiles', N'purchase_site') IS NULL
+   ALTER TABLE dbo.ams_mobiles ADD purchase_site NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_employees', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_employees', N'emp_id_company') IS NULL
+   ALTER TABLE dbo.ams_employees ADD emp_id_company NVARCHAR(100) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_sim_cards', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_sim_cards', N'remarks') IS NULL
+   ALTER TABLE dbo.ams_sim_cards ADD remarks NVARCHAR(500) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_consumables', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_consumables', N'restock_date') IS NULL
+   ALTER TABLE dbo.ams_consumables ADD restock_date NVARCHAR(20) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_consumables', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_consumables', N'warranty_date') IS NULL
+   ALTER TABLE dbo.ams_consumables ADD warranty_date NVARCHAR(20) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_consumables', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_consumables', N'unit_cost') IS NULL
+   ALTER TABLE dbo.ams_consumables ADD unit_cost NVARCHAR(50) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_consumables', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_consumables', N'vendor') IS NULL
+   ALTER TABLE dbo.ams_consumables ADD vendor NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_consumables', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_consumables', N'remarks') IS NULL
+   ALTER TABLE dbo.ams_consumables ADD remarks NVARCHAR(500) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_spare_parts', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_spare_parts', N'restock_date') IS NULL
+   ALTER TABLE dbo.ams_spare_parts ADD restock_date NVARCHAR(20) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_spare_parts', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_spare_parts', N'warranty_date') IS NULL
+   ALTER TABLE dbo.ams_spare_parts ADD warranty_date NVARCHAR(20) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_spare_parts', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_spare_parts', N'unit_cost') IS NULL
+   ALTER TABLE dbo.ams_spare_parts ADD unit_cost NVARCHAR(50) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_spare_parts', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_spare_parts', N'vendor') IS NULL
+   ALTER TABLE dbo.ams_spare_parts ADD vendor NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_spare_parts', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_spare_parts', N'remarks') IS NULL
+   ALTER TABLE dbo.ams_spare_parts ADD remarks NVARCHAR(500) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_consumable_log', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_consumable_log', N'log_date') IS NULL
+   ALTER TABLE dbo.ams_consumable_log ADD log_date NVARCHAR(20) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_consumable_log', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_consumable_log', N'consumable_id') IS NULL
+   ALTER TABLE dbo.ams_consumable_log ADD consumable_id NVARCHAR(50) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_consumable_log', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_consumable_log', N'name') IS NULL
+   ALTER TABLE dbo.ams_consumable_log ADD name NVARCHAR(300) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_consumable_log', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_consumable_log', N'site') IS NULL
+   ALTER TABLE dbo.ams_consumable_log ADD site NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_consumable_log', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_consumable_log', N'log_type') IS NULL
+   ALTER TABLE dbo.ams_consumable_log ADD log_type NVARCHAR(50) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_consumable_log', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_consumable_log', N'qty') IS NULL
+   ALTER TABLE dbo.ams_consumable_log ADD qty INT NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_consumable_log', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_consumable_log', N'by_whom') IS NULL
+   ALTER TABLE dbo.ams_consumable_log ADD by_whom NVARCHAR(300) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_consumable_log', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_consumable_log', N'remarks') IS NULL
+   ALTER TABLE dbo.ams_consumable_log ADD remarks NVARCHAR(500) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_spare_part_log', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_spare_part_log', N'log_date') IS NULL
+   ALTER TABLE dbo.ams_spare_part_log ADD log_date NVARCHAR(20) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_spare_part_log', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_spare_part_log', N'part_id') IS NULL
+   ALTER TABLE dbo.ams_spare_part_log ADD part_id NVARCHAR(50) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_spare_part_log', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_spare_part_log', N'name') IS NULL
+   ALTER TABLE dbo.ams_spare_part_log ADD name NVARCHAR(300) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_spare_part_log', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_spare_part_log', N'site') IS NULL
+   ALTER TABLE dbo.ams_spare_part_log ADD site NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_spare_part_log', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_spare_part_log', N'log_type') IS NULL
+   ALTER TABLE dbo.ams_spare_part_log ADD log_type NVARCHAR(50) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_spare_part_log', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_spare_part_log', N'qty') IS NULL
+   ALTER TABLE dbo.ams_spare_part_log ADD qty INT NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_spare_part_log', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_spare_part_log', N'by_whom') IS NULL
+   ALTER TABLE dbo.ams_spare_part_log ADD by_whom NVARCHAR(300) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_spare_part_log', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_spare_part_log', N'remarks') IS NULL
+   ALTER TABLE dbo.ams_spare_part_log ADD remarks NVARCHAR(500) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_spare_part_log', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_spare_part_log', N'asset_base_id') IS NULL
+   ALTER TABLE dbo.ams_spare_part_log ADD asset_base_id NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_spare_part_log', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_spare_part_log', N'asset_id_snapshot') IS NULL
+   ALTER TABLE dbo.ams_spare_part_log ADD asset_id_snapshot NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_company', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_company', N'address') IS NULL
+   ALTER TABLE dbo.ams_company ADD address NVARCHAR(500) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_company', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_company', N'slogan') IS NULL
+   ALTER TABLE dbo.ams_company ADD slogan NVARCHAR(300) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_company', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_company', N'hr_admin_contact') IS NULL
+   ALTER TABLE dbo.ams_company ADD hr_admin_contact NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_company', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_company', N'head_title') IS NULL
+   ALTER TABLE dbo.ams_company ADD head_title NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_company', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_company', N'head_contact') IS NULL
+   ALTER TABLE dbo.ams_company ADD head_contact NVARCHAR(200) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_user_profiles', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_user_profiles', N'linked_employee') IS NULL
+   ALTER TABLE dbo.ams_user_profiles ADD linked_employee NVARCHAR(100) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_user_profiles', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_user_profiles', N'remarks') IS NULL
+   ALTER TABLE dbo.ams_user_profiles ADD remarks NVARCHAR(500) NULL;
+GO
 
 /* Indexes on columns that older databases only get via the ALTER block above.
    Create them here so a single script run on an existing DB both adds the
@@ -820,6 +1031,41 @@ IF OBJECT_ID(N'dbo.ams_accessories', N'U') IS NOT NULL
     AND COL_LENGTH(N'dbo.ams_accessories', N'site') IS NOT NULL
     AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_accessories_site' AND object_id = OBJECT_ID(N'dbo.ams_accessories'))
     CREATE INDEX IX_ams_accessories_site ON dbo.ams_accessories(site);
+GO
+IF OBJECT_ID(N'dbo.ams_asset_makes', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_asset_makes', N'asset_type') IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_asset_makes_asset_type' AND object_id = OBJECT_ID(N'dbo.ams_asset_makes'))
+    CREATE INDEX IX_ams_asset_makes_asset_type ON dbo.ams_asset_makes(asset_type);
+GO
+IF OBJECT_ID(N'dbo.ams_asset_types', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_asset_types', N'category') IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_asset_types_category' AND object_id = OBJECT_ID(N'dbo.ams_asset_types'))
+    CREATE INDEX IX_ams_asset_types_category ON dbo.ams_asset_types(category);
+GO
+IF OBJECT_ID(N'dbo.ams_asset_categories', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_asset_categories', N'used_on') IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_asset_categories_used_on' AND object_id = OBJECT_ID(N'dbo.ams_asset_categories'))
+    CREATE INDEX IX_ams_asset_categories_used_on ON dbo.ams_asset_categories(used_on);
+GO
+IF OBJECT_ID(N'dbo.ams_assets', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_assets', N'purchase_site') IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_assets_purchase_site' AND object_id = OBJECT_ID(N'dbo.ams_assets'))
+    CREATE INDEX IX_ams_assets_purchase_site ON dbo.ams_assets(purchase_site);
+GO
+IF OBJECT_ID(N'dbo.ams_mobiles', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_mobiles', N'purchase_site') IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_mobiles_purchase_site' AND object_id = OBJECT_ID(N'dbo.ams_mobiles'))
+    CREATE INDEX IX_ams_mobiles_purchase_site ON dbo.ams_mobiles(purchase_site);
+GO
+IF OBJECT_ID(N'dbo.ams_consumable_log', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_consumable_log', N'consumable_id') IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_consumable_log_consumable_id' AND object_id = OBJECT_ID(N'dbo.ams_consumable_log'))
+    CREATE INDEX IX_ams_consumable_log_consumable_id ON dbo.ams_consumable_log(consumable_id);
+GO
+IF OBJECT_ID(N'dbo.ams_spare_part_log', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_spare_part_log', N'part_id') IS NOT NULL
+    AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'IX_ams_spare_part_log_part_id' AND object_id = OBJECT_ID(N'dbo.ams_spare_part_log'))
+    CREATE INDEX IX_ams_spare_part_log_part_id ON dbo.ams_spare_part_log(part_id);
 GO
 
 /* Profile columns for dbo.ams_users. Databases created by an older script
@@ -895,11 +1141,16 @@ GO
 IF OBJECT_ID(N'dbo.ams_company', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.ams_company (
-        row_id     BIGINT IDENTITY(1,1) NOT NULL,
-        record_key NVARCHAR(100) NOT NULL,
-        name       NVARCHAR(300) NULL,
-        data_json  NVARCHAR(MAX) NOT NULL,
-        updated_at DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
+        row_id           BIGINT IDENTITY(1,1) NOT NULL,
+        record_key       NVARCHAR(100) NOT NULL,
+        name             NVARCHAR(300) NULL,
+        address          NVARCHAR(500) NULL,
+        slogan           NVARCHAR(300) NULL,
+        hr_admin_contact NVARCHAR(200) NULL,
+        head_title       NVARCHAR(200) NULL,
+        head_contact     NVARCHAR(200) NULL,
+        data_json        NVARCHAR(MAX) NOT NULL,
+        updated_at       DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
         CONSTRAINT PK_ams_company PRIMARY KEY (record_key)
     );
 END

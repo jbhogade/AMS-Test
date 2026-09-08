@@ -180,17 +180,12 @@ function amsGenerateReport(amsId, type, extraRemarks) {
             </tbody>
         </table>`;
 
-    const accessoriesHtml = isIssue ? ((typeof amsBuildPrintAccessoriesHtml === "function")
-        ? amsBuildPrintAccessoriesHtml(directOwned)
-        : `
-        <div class="pf-section-bar">Accessories / Items Included</div>
-        <div class="pf-checklist-grid">
-            <label class="pf-check-block"><input type="checkbox" disabled> Power Adaptor / Charger</label>
-            <label class="pf-check-block"><input type="checkbox" disabled> Carrying Bag / Case</label>
-            <label class="pf-check-block"><input type="checkbox" disabled> Mouse / Keyboard (if applicable)</label>
-            <label class="pf-check-block"><input type="checkbox" disabled> Original Box / Documentation</label>
-            <label class="pf-check-block" style="grid-column:1 / -1;">Other: ________________________________</label>
-        </div>`) : "";
+    const accessoryItems = isIssue && (typeof amsPrintDirectHoldingsForAccessories === "function")
+        ? amsPrintDirectHoldingsForAccessories(amsId, directOwned)
+        : directOwned;
+    const accessoriesHtml = isIssue && (typeof amsBuildPrintAccessoriesHtml === "function")
+        ? amsBuildPrintAccessoriesHtml(accessoryItems)
+        : "";
 
     const mobileSimPrint = mobileSimPreview;
 

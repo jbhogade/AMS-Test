@@ -44,6 +44,39 @@ function amsEsc(str) {
  */
 const AMS_MT_STATE = { editingKey: null };
 
+function amsMtMatchKeys() {
+    const cfg = AMS_MASTER_CONFIG;
+    return (cfg.importMatchKeys && cfg.importMatchKeys.length) ? cfg.importMatchKeys : null;
+}
+
+function amsMtDuplicateOf(values, excludeKey) {
+    const cfg = AMS_MASTER_CONFIG;
+    const keys = amsMtMatchKeys();
+    if (keys) {
+        return cfg.dataArray.find(i =>
+            i[cfg.idKey] !== excludeKey
+            && keys.every(k => String(i[k] || "").toLowerCase() === String(values[k] || "").toLowerCase())
+        ) || null;
+    }
+    const idVal = values[cfg.idKey];
+    if (!idVal) return null;
+    return cfg.dataArray.find(i =>
+        i[cfg.idKey] !== excludeKey
+        && String(i[cfg.idKey] || "").toLowerCase() === String(idVal).toLowerCase()
+    ) || null;
+}
+
+function amsMtDuplicateMessage() {
+    const cfg = AMS_MASTER_CONFIG;
+    const keys = amsMtMatchKeys();
+    if (!keys) return `A record with this ${cfg.idKey} already exists.`;
+    const labels = keys.map(k => {
+        const field = (cfg.fields || []).find(f => f.key === k);
+        return field ? field.label : k;
+    });
+    return `A record with this ${labels.join(" + ")} already exists.`;
+}
+
 /* ---- EXPORT: current records as real .xlsx --------------------------------- */
 function amsExportMaster() {
     const cfg = AMS_MASTER_CONFIG;
@@ -314,9 +347,15 @@ function amsMtBuildFormFields() {
                     ${selectHtml}
                     <button type="button" class="btn-quickadd" data-mt-quickadd="${f.key}" title="Add new">+</button>
                     <div class="quickadd-popover" id="mtQaPopover-${f.key}">
-                        ${f.quickAdd.fields.map(qf => `
-                            <label class="qa-label">${amsEsc(qf.label)}</label>
-                            <input type="text" id="mtQa-${f.key}-${qf.key}" ${qf.maxLength ? `maxlength="${qf.maxLength}"` : ""} ${qf.upper ? 'style="text-transform:uppercase;"' : ""}>`).join("")}
+                        ${f.quickAdd.fields.map(qf => {
+                            if (qf.type === "select") {
+                                const qopts = qf.optionsFrom ? qf.optionsFrom() : (qf.options || []);
+                                return `<label class="qa-label">${amsEsc(qf.label)}</label>
+                            <select id="mtQa-${f.key}-${qf.key}">${qopts.map(o => `<option value="${amsEsc(o)}">${amsEsc(o)}</option>`).join("")}</select>`;
+                            }
+                            return `<label class="qa-label">${amsEsc(qf.label)}</label>
+                            <input type="text" id="mtQa-${f.key}-${qf.key}" ${qf.maxLength ? `maxlength="${qf.maxLength}"` : ""} ${qf.upper ? 'style="text-transform:uppercase;"' : ""}>`;
+                        }).join("")}
                         <div class="qa-actions">
                             <button type="button" class="btn btn-secondary" data-mt-qa-cancel="${f.key}">Cancel</button>
                             <button type="button" class="btn" data-mt-qa-save="${f.key}">Add</button>
@@ -403,12 +442,12 @@ document.getElementById("mtForm").addEventListener("submit", async (e) => {
         if (guard && !guard.allowed) { amsToast(guard.reason || "You don't have permission to save this record.", "warning"); return; }
     }
 
+    if (amsMtDuplicateOf(values, AMS_MT_STATE.editingKey)) {
+        amsToast(amsMtDuplicateMessage(), "warning");
+        return;
+    }
     if (cfg.autoIdField && !AMS_MT_STATE.editingKey) {
-        values[cfg.autoIdField] = cfg.autoIdGenerate(values); // auto IDs are always unique
-    } else {
-        const dupExists = cfg.dataArray.some(i =>
-            i[cfg.idKey].toLowerCase() === values[cfg.idKey].toLowerCase() && i[cfg.idKey] !== AMS_MT_STATE.editingKey);
-        if (dupExists) { amsToast(`A record with this ${cfg.idKey} already exists.`, "warning"); return; }
+        values[cfg.autoIdField] = cfg.autoIdGenerate(values);
     }
 
     /* Optional page hook: e.g. User Master syncs the login (with password) to

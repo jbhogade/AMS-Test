@@ -24,35 +24,71 @@
 const AMS_MASTER_CONFIGS = {
     "asset-type": {
         pageTitle: "Asset Type Master",
-        pageSub: "Manage asset types and their shortform codes used in Smart Asset IDs",
+        pageSub: "Manage asset types, their shortform codes, and which Asset Category each one belongs to",
         dataArray: AMS_DUMMY_ASSET_TYPES,
         idKey: "name",
         fields: [
             { key: "name",      label: "Asset Type Name",          required: true },
             { key: "shortform", label: "Shortform (for Asset ID)", required: true, upper: true, maxLength: 4 },
+            { key: "category", label: "Asset Category", required: true, type: "select",
+                optionsFrom: () => AMS_DUMMY_ASSET_CATEGORIES.filter(c => c.active).map(c => c.name),
+                quickAdd: { fields: [
+                    { key: "name", label: "New Category Name" },
+                    { key: "usedOn", label: "Used On", type: "select", options: AMS_CATEGORY_USED_ON },
+                ],
+                    onAdd: (v) => {
+                        const added = amsQuickAddCategory(v.name, v.usedOn || "Both");
+                        if (!added) { alert("Enter a Category name - or it may already exist."); return null; }
+                        return added;
+                    } } },
         ],
+        usageCount: (item) => DUMMY_ASSETS.filter(a => a.type === item.name).length
+            + DUMMY_MOBILES.filter(a => a.type === item.name).length,
     },
 
     "asset-make": {
         pageTitle: "Asset Make Master",
-        pageSub: "Manage brands / makes available when adding an asset",
+        pageSub: "Manage brands / makes and which Asset Type each one applies to",
         dataArray: AMS_DUMMY_ASSET_MAKES,
-        idKey: "name",
+        idKey: "makeCode",
+        autoIdField: "makeCode",
+        autoIdGenerate: () => amsNextMakeCode(),
+        importMatchKeys: ["name", "assetType"],
         fields: [
             { key: "name", label: "Make Name", required: true },
+            { key: "assetType", label: "Asset Type", required: true, type: "select",
+                optionsFrom: () => AMS_DUMMY_ASSET_TYPES.filter(t => t.active).map(t => t.name),
+                quickAdd: { fields: [
+                    { key: "name", label: "New Asset Type Name" },
+                    { key: "shortform", label: "Shortform (for Asset ID)", upper: true, maxLength: 4 },
+                    { key: "category", label: "Asset Category", type: "select",
+                        optionsFrom: () => AMS_DUMMY_ASSET_CATEGORIES.filter(c => c.active).map(c => c.name) },
+                ],
+                    onAdd: (v) => {
+                        const added = amsQuickAddAssetType(v.name, v.shortform, v.category);
+                        if (!added) { alert("Enter Asset Type Name, Shortform, and Category - or the Type already exists."); return null; }
+                        return added;
+                    } } },
         ],
+        usageCount: (item) => {
+            const type = item.assetType || "";
+            const name = item.name || "";
+            const match = (a) => a.type === type && a.make === name;
+            return DUMMY_ASSETS.filter(match).length + DUMMY_MOBILES.filter(match).length;
+        },
     },
 
     "asset-category": {
         pageTitle: "Asset Category Master",
-        pageSub: "Broader grouping of assets (e.g. IT Hardware, Vehicle)",
+        pageSub: "Broader grouping of assets, and whether each category is used on Assets, Mobiles, or Both",
         dataArray: AMS_DUMMY_ASSET_CATEGORIES,
         idKey: "name",
         fields: [
             { key: "name", label: "Category Name", required: true },
+            { key: "usedOn", label: "Used On", required: true, type: "select", options: AMS_CATEGORY_USED_ON },
         ],
-        /* Blocks delete while any asset uses this category */
-        usageCount: (item) => DUMMY_ASSETS.filter(a => a.category === item.name).length,
+        usageCount: (item) => DUMMY_ASSETS.filter(a => a.category === item.name).length
+            + DUMMY_MOBILES.filter(a => a.category === item.name).length,
     },
 
     "site": {
