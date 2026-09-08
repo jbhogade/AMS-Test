@@ -187,6 +187,7 @@ async function amsDbLoadAll() {
         amsMigrateEmployeeNames();
         await amsMergeLoginUsersIntoProfiles();
         AMS_DB_READY = true;
+        if (typeof amsMigrateRoleAccessDocument === "function") amsMigrateRoleAccessDocument();
         if (makesBackfilled) amsDbSaveAsync("assetMakes");
     })();
     return AMS_DB_LOADING;
@@ -194,8 +195,14 @@ async function amsDbLoadAll() {
 function amsDbEnsureLoaded() { return amsDbLoadAll(); }
 function amsDbIsReady() { return AMS_DB_READY; }
 
+function amsWritesBlocked() {
+    if (typeof amsUserCanWriteCurrentPage !== "function") return false;
+    return !amsUserCanWriteCurrentPage();
+}
+
 /* Persist an array collection back to SQL Server (wholesale replace). */
 async function amsDbSave(key) {
+    if (amsWritesBlocked()) return;
     const getter = AMS_COLLECTIONS[key];
     if (!getter) return;
     try { await amsApiPut("/api/collection/" + key, getter()); }
@@ -204,6 +211,7 @@ async function amsDbSave(key) {
 
 /* Persist a document collection (object) back to SQL Server. */
 async function amsDbSaveDoc(key) {
+    if (amsWritesBlocked() && key !== "roleAccess") return;
     const getter = AMS_DOC_COLLECTIONS[key];
     if (!getter) return;
     try { await amsApiPut("/api/collection/" + key, getter()); }
@@ -2382,23 +2390,106 @@ const AMS_DUMMY_USERS = [];
 
 
 /* Role Access defaults - what a role can see when a user has no per-user override.
-   Supreme-Root-exclusive pages (accessRights, roleAccess, log) are enforced in code too. */
+   Levels: "none" | "view" | "full" (legacy true/false still accepted).
+   Supreme-Root-exclusive pages (accessRights, roleAccess, log) are enforced in code too.
+   Matrix matches docs/AMS-Role-Access-Matrix.xlsx Recommended sheet. */
 const AMS_ROLE_ACCESS_STORAGE_KEY = "ams_role_access_defaults";
+const AMS_ACCESS_NONE = "none";
+const AMS_ACCESS_VIEW = "view";
+const AMS_ACCESS_FULL = "full";
+
+const AMS_ROLE_ACCESS_RECOMMENDED = {
+    dashboard:              { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    employee:               { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    asset:                  { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    mobile:                 { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    simCards:               { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    consumable:             { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    spareParts:             { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    accessory:              { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    assetDistribution:      { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    vendors:                { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    reports:                { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    settings:               { "Standard User": "full", "Viewer (Read-Only)": "full", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    systemAdmin:            { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    userMaster:             { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    company:                { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "none", "Super Root": "full", "Supreme Root": "full" },
+    assetType:              { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    assetMake:              { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    assetCategory:          { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    site:                   { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    department:             { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    designation:            { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    simOperator:            { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    simPlan:                { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    consumableCategory:     { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    unitOfMeasure:          { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    sparePartCategory:      { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    vendorCategory:         { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    accessRights:           { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "none", "Super Root": "none", "Supreme Root": "full" },
+    roleAccess:             { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "none", "Super Root": "none", "Supreme Root": "full" },
+    log:                    { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "none", "Super Root": "full", "Supreme Root": "full" },
+    "report.assetLifecycle":    { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    "report.assetIssue":        { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    "report.assetHandover":     { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    "report.consumableRestock": { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    "report.consumableUsed":    { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    "report.sparePartsRestock": { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    "report.sparePartsUsed":    { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    "report.assetDistribution": { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+};
+
+function amsNormalizeAccessLevel(value) {
+    if (value === AMS_ACCESS_NONE || value === false || value === "false" || value === 0 || value === "0" || value === "N" || value === "NO") return AMS_ACCESS_NONE;
+    if (value === AMS_ACCESS_VIEW || value === "VIEW" || value === "read") return AMS_ACCESS_VIEW;
+    if (value === AMS_ACCESS_FULL || value === true || value === "true" || value === 1 || value === "1" || value === "Y" || value === "YES") return AMS_ACCESS_FULL;
+    if (value == null || value === "") return AMS_ACCESS_NONE;
+    return AMS_ACCESS_FULL;
+}
 
 function amsDefaultRoleAccessMap() {
     const map = {};
     AMS_USER_ROLES.forEach(role => { map[role] = {}; });
     AMS_PAGE_REGISTRY.forEach(p => {
-        const key = p.key;
+        const rec = AMS_ROLE_ACCESS_RECOMMENDED[p.key] || {};
         AMS_USER_ROLES.forEach(role => {
-            let allowed = true;
-            if (role === "Standard User") allowed = !["systemAdmin", "accessRights", "roleAccess", "userMaster", "company", "accessory", "log"].includes(key);
-            if (key === "accessRights" || key === "roleAccess") allowed = role === "Supreme Root";
-            if (key === "log") allowed = role === "Super Root" || role === "Supreme Root";
-            map[role][key] = allowed;
+            let level = rec[role] || AMS_ACCESS_NONE;
+            if (p.key === "accessRights" || p.key === "roleAccess") {
+                level = role === "Supreme Root" ? AMS_ACCESS_FULL : AMS_ACCESS_NONE;
+            }
+            if (p.key === "log") {
+                level = (role === "Super Root" || role === "Supreme Root") ? AMS_ACCESS_FULL : AMS_ACCESS_NONE;
+            }
+            map[role][p.key] = level;
         });
     });
     return map;
+}
+
+function amsRoleAccessMapLooksLegacy(map) {
+    if (!map || typeof map !== "object") return true;
+    const roles = Object.keys(map);
+    if (!roles.length) return true;
+    for (let i = 0; i < roles.length; i++) {
+        const pages = map[roles[i]];
+        if (!pages || typeof pages !== "object") continue;
+        const keys = Object.keys(pages);
+        for (let j = 0; j < keys.length; j++) {
+            const v = pages[keys[j]];
+            if (v === true || v === false) return true;
+        }
+    }
+    return false;
+}
+
+function amsMigrateRoleAccessDocument() {
+    const current = AMS_ROLE_ACCESS_DEFAULTS;
+    if (!amsRoleAccessMapLooksLegacy(current)) return;
+    const next = amsDefaultRoleAccessMap();
+    Object.keys(AMS_ROLE_ACCESS_DEFAULTS).forEach(k => delete AMS_ROLE_ACCESS_DEFAULTS[k]);
+    Object.assign(AMS_ROLE_ACCESS_DEFAULTS, next);
+    try { localStorage.setItem(AMS_ROLE_ACCESS_STORAGE_KEY, JSON.stringify(next)); } catch (e) { /* storage full */ }
+    amsDbSaveDocAsync("roleAccess");
 }
 
 function amsGetRoleAccessDefaults() {
@@ -2408,6 +2499,27 @@ function amsGetRoleAccessDefaults() {
         if (raw) return JSON.parse(raw);
     } catch (e) { /* corrupt storage - fall back to defaults */ }
     return amsDefaultRoleAccessMap();
+}
+
+function amsAccessLevelForUserPage(user, registryKey) {
+    if (!registryKey) return AMS_ACCESS_FULL;
+    const role = (user && user.role) || ((typeof amsGetViewingAsRole === "function") ? amsGetViewingAsRole() : "Standard User");
+    if (registryKey === "accessRights" || registryKey === "roleAccess") {
+        if (role !== "Supreme Root") return AMS_ACCESS_NONE;
+    }
+    if (registryKey === "log") {
+        if (role !== "Supreme Root" && role !== "Super Root") return AMS_ACCESS_NONE;
+    }
+    if (user && user.allowedPages !== null && user.allowedPages !== undefined) {
+        if (Array.isArray(user.allowedPages)) {
+            return user.allowedPages.indexOf(registryKey) !== -1 ? AMS_ACCESS_FULL : AMS_ACCESS_NONE;
+        }
+        if (typeof user.allowedPages === "object") {
+            return amsNormalizeAccessLevel(user.allowedPages[registryKey]);
+        }
+    }
+    const roleMap = amsGetRoleAccessDefaults()[role] || {};
+    return amsNormalizeAccessLevel(roleMap[registryKey]);
 }
 function amsSaveRoleAccessDefaults(map) {
     Object.assign(AMS_ROLE_ACCESS_DEFAULTS, map);
@@ -2503,29 +2615,61 @@ async function amsMergeLoginUsersIntoProfiles() {
 
 function amsResolveAllowedPages(user) {
     if (!user) return AMS_PAGE_REGISTRY.map(p => p.key);
-    if (user.allowedPages !== null && user.allowedPages !== undefined) return user.allowedPages;
-    const roleMap = amsGetRoleAccessDefaults()[user.role] || {};
-    return AMS_PAGE_REGISTRY.filter(p => roleMap[p.key] !== false).map(p => p.key);
+    return AMS_PAGE_REGISTRY.filter(p => amsAccessLevelForUserPage(user, p.key) !== AMS_ACCESS_NONE).map(p => p.key);
 }
 
 function amsUserCanAccessPage(registryKey) {
     if (!registryKey) return true;
     const role = (typeof amsGetViewingAsRole === "function") ? amsGetViewingAsRole() : "Standard User";
-    if (registryKey === "accessRights" || registryKey === "roleAccess") {
-        if (role !== "Supreme Root") return false;
-    }
-    if (registryKey === "log") {
-        if (role !== "Supreme Root" && role !== "Super Root") return false;
-    }
     const user = amsGetCurrentUserRecord() || { username: "", role: role, allowedPages: null };
-    const allowed = amsResolveAllowedPages(user);
-    return allowed.indexOf(registryKey) !== -1;
+    return amsAccessLevelForUserPage(user, registryKey) !== AMS_ACCESS_NONE;
 }
 
 function amsUserCanAccessNavPage(pageId) {
     const key = AMS_NAV_TO_REGISTRY[pageId];
     if (!key) return true;
     return amsUserCanAccessPage(key);
+}
+
+function amsCurrentPageRegistryKey() {
+    if (typeof AMS_NAV_TO_REGISTRY !== "object") return "";
+    const path = (window.location.pathname || "").replace(/\\/g, "/");
+    const file = path.split("/").pop() || "";
+    if (file === "" || file === "index.html") return "dashboard";
+    const pageId = file.replace(/\.html$/, "");
+    if (pageId === "masters") {
+        const type = new URLSearchParams(window.location.search).get("type") || "";
+        return AMS_NAV_TO_REGISTRY["master-" + type] || "";
+    }
+    return AMS_NAV_TO_REGISTRY[pageId] || "";
+}
+
+function amsUserCanWriteCurrentPage() {
+    const key = amsCurrentPageRegistryKey();
+    if (!key) return true;
+    const role = (typeof amsGetViewingAsRole === "function") ? amsGetViewingAsRole() : "Standard User";
+    const user = amsGetCurrentUserRecord() || { username: "", role: role, allowedPages: null };
+    return amsAccessLevelForUserPage(user, key) === AMS_ACCESS_FULL;
+}
+
+function amsGuardViewOnlyWrite() {
+    if (amsUserCanWriteCurrentPage()) return false;
+    if (typeof amsToast === "function") amsToast("View only - you cannot change records on this page.", "warning");
+    return true;
+}
+
+function amsApplyViewOnlyChrome() {
+    if (typeof amsUserCanWriteCurrentPage !== "function") return;
+    if (amsUserCanWriteCurrentPage()) return;
+    document.body.classList.add("ams-view-only");
+    const heading = document.querySelector(".page-heading");
+    if (heading && !document.getElementById("amsViewOnlyBanner")) {
+        const banner = document.createElement("p");
+        banner.id = "amsViewOnlyBanner";
+        banner.className = "form-hint";
+        banner.textContent = "View only - you can open records on this page but cannot save, import, or delete.";
+        heading.appendChild(banner);
+    }
 }
 
 /* =============================================================================

@@ -9,7 +9,7 @@
 #    1. Reset & Base           - normalize spacing, fonts, colors
 #    2. App Shell Layout       - sidebar + header + content grid
 #    3. Sidebar                - navigation panel on the left
-#    4. Top Header Bar         - page title, search, theme switcher
+#    4. Top Header Bar         - page title, theme switcher, user chip
 #    5. Cards & KPI Cards      - content panels and statistic tiles
 #    6. Tables                 - data grids (assets, logs, etc.)
 #    7. Buttons & Forms        - actions, inputs, dropdowns
@@ -263,55 +263,8 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     color: var(--text-muted);
 }
 
-/* Push search box and controls to the right side */
+/* Push controls to the right side */
 .topbar-spacer { flex: 1; }
-
-/* Header search input */
-.topbar-search {
-    position: relative;
-}
-
-.topbar-search input {
-    background-color: var(--bg-input);
-    border: 1px solid var(--border);
-    color: var(--text-primary);
-    border-radius: 8px;
-    padding: 8px 14px 8px 34px;
-    width: 220px;
-    font-size: 13px;
-    outline: none;
-    transition: border-color 0.15s ease, width 0.2s ease;
-}
-
-.topbar-search input:focus {
-    border-color: var(--accent);
-    width: 260px;
-}
-
-/* Magnifying-glass icon drawn with pure CSS */
-.topbar-search .search-icon {
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 14px;
-    height: 14px;
-    border: 2px solid var(--text-muted);
-    border-radius: 50%;
-    pointer-events: none;
-}
-
-.topbar-search .search-icon::after {
-    content: '';
-    position: absolute;
-    width: 2px;
-    height: 7px;
-    background: var(--text-muted);
-    bottom: -6px;
-    right: -3px;
-    transform: rotate(45deg);
-    border-radius: 1px;
-}
 
 /* User chip on the right of the header */
 .user-chip {
@@ -888,10 +841,59 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
 .text-secondary { color: var(--text-secondary); }
 .text-right { text-align: right; }
 
-/* Page heading shown at the top of each page's content */
-.page-heading { margin-bottom: 22px; }
+/* Page heading shown at the top of each page's content.
+   List pages drop the in-page h1 (topbar already shows PAGE_TITLES);
+   the subtitle is a single muted line so stats + toolbar sit higher. */
+.page-heading { margin: 0 0 12px; }
 .page-heading h1 { font-size: 22px; font-weight: 700; }
-.page-heading p { color: var(--text-secondary); font-size: 14px; margin-top: 4px; }
+.page-heading p { color: var(--text-secondary); font-size: 14px; margin-top: 0; }
+
+/* Shared list-page toolbar: filters left, actions right.
+   .asset-toolbar / .emp-toolbar keep their class names and inherit these. */
+.list-toolbar,
+.asset-toolbar,
+.emp-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.list-toolbar-left,
+.asset-toolbar-left,
+.emp-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.stock-by-type {
+    margin-bottom: 16px;
+}
+
+.stock-by-type > summary {
+    cursor: pointer;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding: 8px 0;
+    list-style: none;
+}
+
+.stock-by-type > summary::-webkit-details-marker { display: none; }
+
+.stock-by-type > summary::before {
+    content: "\25B6";
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.stock-by-type[open] > summary::before { content: "\25BC"; }
 
 /* Quick action buttons row */
 .quick-actions { display: flex; flex-wrap: wrap; gap: 12px; }
@@ -1016,8 +1018,7 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     .app-main { margin-left: 0; }
     .topbar-toggle { display: inline-block; }
     .grid-2 { grid-template-columns: 1fr; }
-    .topbar-search input { width: 140px; }
-    .topbar-search input:focus { width: 170px; }
+    .topbar-breadcrumb { display: none; }
     .app-content { padding: 18px 16px 40px; }
 }
 
@@ -1027,6 +1028,9 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     .chart-bar-row { grid-template-columns: 90px 1fr 40px; }
     .form-grid { grid-template-columns: 1fr; }
     .modal-overlay { padding: 16px 12px; }
+    .list-toolbar .search-input,
+    .asset-toolbar .search-input,
+    .emp-toolbar .emp-search { width: 100%; min-width: 0; }
 }
 
 /* Short / landscape-ish viewports: trim vertical chrome so tables, dashboards
@@ -1044,6 +1048,17 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
 /* Landscape / wide monitors: give content the full width it needs. */
 @media (min-width: 1800px) {
     .app-content { max-width: 1920px; }
+}
+
+body.ams-view-only .btn-primary,
+body.ams-view-only [id^="btnAdd"],
+body.ams-view-only [id$="-add-btn"],
+body.ams-view-only [id$="Import"],
+body.ams-view-only [id$="-import-btn"],
+body.ams-view-only #btnAddMaster,
+body.ams-view-only #btnImport {
+    pointer-events: none;
+    opacity: 0.45;
 }
 
 /*------------------------------------------------------------------------------

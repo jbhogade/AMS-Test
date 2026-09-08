@@ -7,16 +7,9 @@
 
 /* =============================================================================
    1) PAGE TOOLBAR  (search, filters, credential level, add button)
+   Layout comes from .list-toolbar / .emp-toolbar in css/main.css.
    ===========================================================================*/
-.emp-toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 20px;
-}
-
-.emp-toolbar .emp-search { flex: 1; min-width: 200px; }
+.emp-toolbar .emp-search { width: 220px; min-width: 200px; }
 
 /* Credential level picker - controls AMS Employee ID visibility (demo) */
 .cred-level {

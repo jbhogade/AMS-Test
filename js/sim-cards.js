@@ -308,6 +308,7 @@ function amsSimOpenEditModal(key) {
 
 function amsSimSubmitForm(e) {
     e.preventDefault();
+    if (typeof amsGuardViewOnlyWrite === "function" && amsGuardViewOnlyWrite()) return;
     const mobile = document.getElementById("fSimMobile").value.trim();
     if (!mobile) { alert("Mobile Number is required."); return; }
 

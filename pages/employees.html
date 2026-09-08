@@ -41,18 +41,8 @@
 
             <div class="app-content">
                 <!-- ==================== PAGE HEADING ==================== -->
-                <div class="page-heading flex items-center justify-between">
-                    <div>
-                        <h1>Employee Master</h1>
-                        <p>Manage employees, their assets and handover records.</p>
-                    </div>
-                    <div class="quick-actions">
-                        <button class="btn btn-primary" id="emp-add-btn">&#43; Add Employee</button>
-                        <button class="btn btn-secondary" id="emp-template-btn" title="Download a CSV template for bulk import">Template</button>
-                        <button class="btn btn-secondary" id="emp-import-btn" title="Import employees from a CSV file">Import</button>
-                        <button class="btn btn-secondary" id="emp-export-btn" title="Export the current list to CSV">Export</button>
-                        <input type="file" id="emp-import-file" accept=".csv,.xlsx" style="display:none;">
-                    </div>
+                <div class="page-heading">
+                    <p>Manage employees, their assets and handover records.</p>
                 </div>
 
                 <!-- ==================== IMPORT SUMMARY ==================== -->
@@ -68,23 +58,32 @@
 
                 <!-- ==================== TOOLBAR ==================== -->
                 <div class="emp-toolbar">
-                    <input type="search" class="input emp-search" id="emp-search" placeholder="Search name, ID, designation...">
+                    <div class="emp-toolbar-left">
+                        <input type="search" class="input emp-search" id="emp-search" placeholder="Search name, ID, designation...">
 
-                    <select class="select" id="emp-dept-filter" style="width:auto;">
-                        <option value="All">All Departments</option>
-                    </select>
+                        <select class="select" id="emp-dept-filter" style="width:auto;">
+                            <option value="All">All Departments</option>
+                        </select>
 
-                    <select class="select" id="emp-site-filter" style="width:auto;">
-                        <option value="All">All Sites</option>
-                    </select>
+                        <select class="select" id="emp-site-filter" style="width:auto;">
+                            <option value="All">All Sites</option>
+                        </select>
 
-                    <select class="select" id="emp-status-filter" style="width:auto;">
-                        <option value="All">All Status</option>
-                        <option value="Active">Active</option>
-                        <option value="Inactive">Inactive</option>
-                    </select>
+                        <select class="select" id="emp-status-filter" style="width:auto;">
+                            <option value="All">All Status</option>
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
 
-                    <span class="ams-hint" id="ams-hint">AMS Employee IDs are hidden</span>
+                        <span class="ams-hint" id="ams-hint">AMS Employee IDs are hidden</span>
+                    </div>
+                    <div class="flex items-center gap-8">
+                        <button class="btn btn-primary" id="emp-add-btn">&#43; Add Employee</button>
+                        <button class="btn btn-secondary" id="emp-template-btn" title="Download a CSV template for bulk import">Template</button>
+                        <button class="btn btn-secondary" id="emp-import-btn" title="Import employees from a CSV file">Import</button>
+                        <button class="btn btn-secondary" id="emp-export-btn" title="Export the current list to CSV">Export</button>
+                        <input type="file" id="emp-import-file" accept=".csv,.xlsx" style="display:none;">
+                    </div>
                 </div>
 
                 <!-- ==================== EMPLOYEE TABLE ==================== -->

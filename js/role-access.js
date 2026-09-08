@@ -49,6 +49,18 @@ function amsApplyRoleAccessGate() {
 /*-------------- End of the code ------------------------------------------------*/
 
 /*-------------- Start Code for RENDER MATRIX ------------------------------------*/
+function ramLevelOptions(selected, locked) {
+    const cur = (typeof amsNormalizeAccessLevel === "function")
+        ? amsNormalizeAccessLevel(selected)
+        : (selected === false ? "none" : (selected === "view" ? "view" : "full"));
+    const opts = [
+        { v: "none", l: "None" },
+        { v: "view", l: "View" },
+        { v: "full", l: "Full" },
+    ];
+    return opts.map(o => `<option value="${o.v}" ${cur === o.v ? "selected" : ""}>${o.l}</option>`).join("");
+}
+
 function renderRoleAccessTable() {
     const map = amsGetRoleAccessDefaults();
     const pages = AMS_PAGE_REGISTRY.filter(p => !p.key.startsWith("report."));
@@ -57,9 +69,9 @@ function renderRoleAccessTable() {
     const rowHtml = (p) => {
         const locked = RAM_LOCKED_KEYS[p.key];
         const cells = AMS_USER_ROLES.map(role => {
-            const checked = map[role] && map[role][p.key] !== false;
-            return `<td><input type="checkbox" class="ram-check ${locked ? "ram-locked-check" : ""}"
-                data-role="${amsEsc(role)}" data-page="${p.key}" ${checked ? "checked" : ""} ${locked ? "disabled" : ""}></td>`;
+            const raw = map[role] ? map[role][p.key] : "none";
+            return `<td><select class="ram-level ${locked ? "ram-locked-check" : ""}"
+                data-role="${amsEsc(role)}" data-page="${p.key}" ${locked ? "disabled" : ""}>${ramLevelOptions(raw)}</select></td>`;
         }).join("");
         return `<tr>
             <td><div class="ram-page-label">${amsEsc(p.label.split(" (")[0])}${locked ? `<span class="ram-page-note">${locked}</span>` : ""}</div></td>
@@ -84,17 +96,17 @@ function renderRoleAccessTable() {
 function amsCollectRoleAccessMap() {
     const map = {};
     AMS_USER_ROLES.forEach(role => { map[role] = {}; });
-    document.querySelectorAll(".ram-check").forEach(cb => {
-        if (cb.disabled) return; /* locked rows always resolve from the role/gate check itself, not this map */
-        map[cb.getAttribute("data-role")][cb.getAttribute("data-page")] = cb.checked;
+    document.querySelectorAll(".ram-level").forEach(sel => {
+        if (sel.disabled) return;
+        const level = (typeof amsNormalizeAccessLevel === "function")
+            ? amsNormalizeAccessLevel(sel.value)
+            : sel.value;
+        map[sel.getAttribute("data-role")][sel.getAttribute("data-page")] = level;
     });
-    /* Locked keys still need SOME value stored so amsResolveAllowedPages() has
-       something to read for non-Supreme-Root/Super-Root roles - carry over
-       whatever the current defaults already say. */
-    const existing = amsGetRoleAccessDefaults();
+    const defaults = amsDefaultRoleAccessMap();
     Object.keys(RAM_LOCKED_KEYS).forEach(key => {
         AMS_USER_ROLES.forEach(role => {
-            map[role][key] = existing[role] ? existing[role][key] : false;
+            map[role][key] = defaults[role] ? defaults[role][key] : "none";
         });
     });
     return map;
@@ -106,7 +118,7 @@ document.getElementById("btnSaveRoleDefaults").addEventListener("click", () => {
 });
 
 document.getElementById("btnResetRoleDefaults").addEventListener("click", () => {
-    if (!confirm("Reset every role's default page access back to the suggested starting point? This does not affect any per-user overrides in Access Rights Control Master.")) return;
+    if (!confirm("Reset every role's default page access back to the Recommended matrix (None / View / Full)? This does not affect any per-user overrides in Access Rights Control Master.")) return;
     amsSaveRoleAccessDefaults(amsDefaultRoleAccessMap());
     renderRoleAccessTable();
     amsNotify("Role Access Master: defaults reset", "info");

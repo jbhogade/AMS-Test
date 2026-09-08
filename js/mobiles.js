@@ -638,6 +638,7 @@ function amsOpenEditModal(key) {
 
 function amsSubmitAssetForm(e) {
     e.preventDefault();
+    if (typeof amsGuardViewOnlyWrite === "function" && amsGuardViewOnlyWrite()) return;
     const typeShort = amsTypeShort(document.getElementById("fType").value);
     let displayId = document.getElementById("fAssetId").value.trim();
     const isLegacyId = !!displayId; /* any manually-entered ID is treated as legacy/custom format */

@@ -113,6 +113,7 @@ function amsDownloadTemplate() {
 
 /* ---- IMPORT: bulk upload (upserts by idKey - existing update, new get added) */
 function amsHandleImportFile(file) {
+    if (typeof amsGuardViewOnlyWrite === "function" && amsGuardViewOnlyWrite()) return;
     const cfg = AMS_MASTER_CONFIG;
     amsReadImportRows(file).then((rows) => {
         rows = rows.filter(r => !(r[0] || "").trim().startsWith("#")); // drop instruction lines
@@ -422,6 +423,7 @@ function amsMtOpenEdit(key) {
 
 document.getElementById("mtForm").addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (typeof amsGuardViewOnlyWrite === "function" && amsGuardViewOnlyWrite()) return;
     const cfg = AMS_MASTER_CONFIG;
 
     const values = {};
@@ -482,6 +484,7 @@ document.getElementById("mtForm").addEventListener("submit", async (e) => {
 
 /* ---- TOGGLE active / deactivate --------------------------------------------- */
 async function amsMtToggleActive(key) {
+    if (typeof amsGuardViewOnlyWrite === "function" && amsGuardViewOnlyWrite()) return;
     const cfg = AMS_MASTER_CONFIG;
     const item = cfg.dataArray.find(i => i[cfg.idKey] === key);
     const newActive = !item.active;
@@ -502,6 +505,7 @@ async function amsMtToggleActive(key) {
 
 /* ---- DELETE (blocked if currently in use) ----------------------------------- */
 async function amsMtDelete(key) {
+    if (typeof amsGuardViewOnlyWrite === "function" && amsGuardViewOnlyWrite()) return;
     const cfg = AMS_MASTER_CONFIG;
     const item = cfg.dataArray.find(i => i[cfg.idKey] === key);
     const usage = cfg.usageCount ? cfg.usageCount(item) : 0;

@@ -43,11 +43,8 @@
 
             <div class="app-content">
                 <!-- ==================== PAGE HEADING ==================== -->
-                <div class="page-heading flex items-center justify-between">
-                    <div>
-                        <h1>Asset Master</h1>
-                        <p>Manage assets and their full lifecycle - assignment, transfer, repair, retirement.</p>
-                    </div>
+                <div class="page-heading">
+                    <p>Manage assets and their full lifecycle - assignment, transfer, repair, retirement.</p>
                 </div>
 
                 <!-- ==================== STOCK SUMMARY ==================== -->
@@ -55,12 +52,14 @@
                     <!-- Filled by assets.js -> renderAssetStockSummary() -->
                 </section>
 
-                <div class="card card-compact" style="margin-bottom:16px;">
-                    <div class="card-header"><h3>Stock by Asset Type</h3></div>
-                    <div class="table-wrap">
-                        <table class="table" id="assetStockByTypeTable"></table>
+                <details class="stock-by-type">
+                    <summary>Stock by Asset Type</summary>
+                    <div class="card card-compact">
+                        <div class="table-wrap">
+                            <table class="table" id="assetStockByTypeTable"></table>
+                        </div>
                     </div>
-                </div>
+                </details>
 
                 <!-- ==================== TOOLBAR ==================== -->
                 <div class="asset-toolbar">

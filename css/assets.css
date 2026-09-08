@@ -102,18 +102,8 @@
 
 /* =============================================================================
    2) TOOLBAR (search + status filter + super root toggle + add/import buttons)
+   Layout comes from .list-toolbar / .asset-toolbar in css/main.css.
    ===========================================================================*/
-.asset-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 16px;
-    flex-wrap: wrap;
-}
-
-.asset-toolbar-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-
 .asset-toolbar .search-input {
     background: var(--bg-input);
     border: 1px solid var(--border);

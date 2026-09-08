@@ -295,6 +295,7 @@ function onDeptChange() {
 }
 
 function saveEmployee() {
+    if (typeof amsGuardViewOnlyWrite === "function" && amsGuardViewOnlyWrite()) return;
     const data = {
         empId: document.getElementById("f-empid").value.trim(),
         name: document.getElementById("f-name").value.trim().replace(/\s+/g, " "),
@@ -911,6 +912,7 @@ function amsShowEmpImportSummary(results) {
 }
 
 function amsImportEmployeesFile(file) {
+    if (typeof amsGuardViewOnlyWrite === "function" && amsGuardViewOnlyWrite()) return;
     amsReadImportRows(file).then((rows) => {
         rows = rows.filter(r => !(r[0] || "").trim().startsWith("#")); /* drop instruction/comment lines */
         if (!rows.length) { alert("File is empty or unreadable."); return; }

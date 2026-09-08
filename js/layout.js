@@ -138,10 +138,6 @@ function renderTopbar(currentPage) {
             <div class="topbar-breadcrumb">Home &rsaquo; ${escapeHtml(pageInfo.title)} ${pageInfo.sub ? '&rsaquo; ' + escapeHtml(pageInfo.sub) : ''}</div>
         </div>
         <div class="topbar-spacer"></div>
-        <div class="topbar-search">
-            <span class="search-icon"></span>
-            <input type="search" placeholder="Quick search..." id="global-search" aria-label="Search">
-        </div>
         <div class="notif-bell-wrap">
             <button class="notif-bell-trigger" id="notifBellTrigger" title="Notifications">&#128276;</button>
             <span class="notif-bell-badge" id="notifBellBadge"></span>
@@ -248,6 +244,7 @@ function initLayout(currentPage) {
             amsLayoutRedirectIfDenied(currentPage);
             renderSidebar(currentPage);
             setActiveNav(currentPage);
+            if (typeof amsApplyViewOnlyChrome === "function") amsApplyViewOnlyChrome();
         });
     }
 }
