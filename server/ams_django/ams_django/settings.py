@@ -92,7 +92,7 @@ DATABASES = {
     "default": {
         "ENGINE": "mssql",
         "NAME": os.environ.get("AMS_DB_NAME", "AMS-TEST"),
-        "OPTIONS": {"conn_string": _build_connection_string(), "extra_params": "TrustServerCertificate=yes"},
+        "OPTIONS": {"conn_string": _build_connection_string(),'extra_params': 'TrustServerCertificate=yes'},
     }
 }
 
