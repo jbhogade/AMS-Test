@@ -30,6 +30,7 @@
 
     <link rel="stylesheet" href="../css/themes.css">
     <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/ui-styles.css">
     <link rel="stylesheet" href="../css/assets.css">
 </head>
 <body>
@@ -65,12 +66,6 @@
                 <div class="asset-toolbar">
                     <div class="asset-toolbar-left">
                         <input type="search" id="searchBox" class="search-input" placeholder="Search Asset ID, type, make, serial...">
-                        <select id="typeFilter" class="select" style="width:auto;">
-                            <option value="">All Types</option>
-                        </select>
-                        <select id="makeFilter" class="select" style="width:auto;">
-                            <option value="">All Makes</option>
-                        </select>
                         <select id="siteFilter" class="select" style="width:auto;">
                             <option value="">All Sites</option>
                         </select>
@@ -84,6 +79,7 @@
                             <option value="Retired / Scrapped">Retired / Scrapped</option>
                             <option value="Replaced">Replaced</option>
                         </select>
+                        <button type="button" class="btn btn-secondary btn-clear-filters" id="btnClearFilters" title="Clear column filters">Clear filters</button>
                     </div>
                     <div class="flex items-center gap-8">
                         <button class="btn btn-primary" id="btnAddAsset">&#43; Add Asset</button>

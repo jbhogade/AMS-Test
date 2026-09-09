@@ -150,6 +150,7 @@ function renderTopbar(currentPage) {
             </div>
         </div>
         <select class="select" id="theme-select" aria-label="Theme" style="width:auto;padding:8px 10px;font-size:13px;"></select>
+        <select class="select" id="style-select" aria-label="Style" style="width:auto;padding:8px 10px;font-size:13px;"></select>
         ${(function () {
             const session = (typeof amsGetSession === "function") ? amsGetSession() : null;
             const name = (session && (session.displayName || session.name)) ? (session.displayName || session.name) : "Operator";
@@ -168,8 +169,9 @@ function renderTopbar(currentPage) {
         })()}
     `;
 
-    /* Wire up the theme dropdown that was just created */
+    /* Wire up the theme and style dropdowns that were just created */
     buildThemeMenu("theme-select");
+    buildStyleMenu("style-select");
 
     /* User chip dropdown: My Profile / Logout */
     const chip = document.getElementById("user-chip");

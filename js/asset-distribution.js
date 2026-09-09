@@ -124,10 +124,8 @@ function distBuildRows() {
 
 function distFilteredRows() {
     const search = (document.getElementById("distSearch").value || "").toLowerCase();
-    const dept = document.getElementById("distDeptFilter").value;
     const onlyWithAssets = document.getElementById("distOnlyWithAssets").checked;
     return DIST_STATE.rows.filter(r => {
-        if (dept && r.dept !== dept) return false;
         if (onlyWithAssets && r.total === 0) return false;
         if (search) {
             const hay = `${r.name} ${r.displayId} ${r.empId} ${r.dept} ${r.designation}`.toLowerCase();
@@ -169,7 +167,8 @@ function distRenderTable() {
         total: r => r.total,
         records: r => r.recordCount,
     };
-    const sorted = amsSortRows("distTable", rows, getters);
+    const colFiltered = amsFilterRows("distTable", rows, getters);
+    const sorted = amsSortRows("distTable", colFiltered, getters);
 
     const body = sorted.length
         ? sorted.map(r => `<tr>
@@ -198,8 +197,9 @@ function distRenderTable() {
             ${amsSortableTh("distTable", "total", "Total")}
             ${amsSortableTh("distTable", "records", "Records")}
             <th></th>
-        </tr></thead>
+        </tr>${amsFilterHeadRow("distTable", ["empId", "name", "dept", "designation", "direct", "team", "total", "records", ""])}</thead>
         <tbody>${body}</tbody>`;
+    if (typeof amsFilterRestoreFocus === "function") amsFilterRestoreFocus("distTable");
 
     const shownTotal = sorted.reduce((n, r) => n + r.total, 0);
     const shownRecords = sorted.reduce((n, r) => n + r.recordCount, 0);
@@ -277,16 +277,31 @@ function distOpenDetail(empId) {
 /* =============================================================================
    5) EXPORT
    ===========================================================================*/
+function distExportSource() {
+    const getters = {
+        empId: r => r.displayId,
+        name: r => r.name,
+        dept: r => r.dept,
+        designation: r => r.designation,
+        direct: r => r.directCount,
+        team: r => r.teamCount,
+        total: r => r.total,
+        records: r => r.recordCount,
+    };
+    const rows = distFilteredRows();
+    return typeof amsFilterRows === "function" ? amsFilterRows("distTable", rows, getters) : rows;
+}
+
 function distExportCsv() {
     const headers = ["Emp ID", "Employee Name", "Department", "Designation", "Direct Assets", "Team Assets", "Total Assets", "Lifecycle Records"];
-    const rows = distFilteredRows().map(r => [r.displayId, r.name, r.dept, r.designation, r.directCount, r.teamCount, r.total, r.recordCount]);
+    const rows = distExportSource().map(r => [r.displayId, r.name, r.dept, r.designation, r.directCount, r.teamCount, r.total, r.recordCount]);
     const csv = [headers.map(amsCsvCell).join(",")].concat(rows.map(r => r.map(amsCsvCell).join(","))).join("\r\n");
     amsDownloadFile(csv, "Asset_Distribution.csv", "text/csv;charset=utf-8;");
 }
 
 function distExportXlsx() {
     const headers = ["Emp ID", "Employee Name", "Department", "Designation", "Direct Assets", "Team Assets", "Total Assets", "Lifecycle Records"];
-    const rows = distFilteredRows().map(r => [r.displayId, r.name, r.dept, r.designation, r.directCount, r.teamCount, r.total, r.recordCount]);
+    const rows = distExportSource().map(r => [r.displayId, r.name, r.dept, r.designation, r.directCount, r.teamCount, r.total, r.recordCount]);
     amsExportXlsx("Asset_Distribution", headers, rows);
 }
 
@@ -329,16 +344,12 @@ function initAssetDistribution() {
         DIST_STATE.rows = distBuildRows();
         DIST_STATE.loaded = true;
 
-        const depts = [];
-        DIST_STATE.rows.forEach(r => { if (r.dept && !depts.includes(r.dept)) depts.push(r.dept); });
-        depts.sort((a, b) => a.localeCompare(b));
-        document.getElementById("distDeptFilter").innerHTML = `<option value="">All Departments</option>` + depts.map(d => `<option value="${amsEsc(d)}">${amsEsc(d)}</option>`).join("");
-
         amsSortRegisterRenderer("distTable", distRenderTable);
 
         document.getElementById("distSearch").addEventListener("input", distRenderTable);
-        document.getElementById("distDeptFilter").addEventListener("change", distRenderTable);
         document.getElementById("distOnlyWithAssets").addEventListener("change", distRenderTable);
+        const distClear = document.getElementById("btnDistClearFilters");
+        if (distClear) distClear.addEventListener("click", () => amsFilterClearAndRender("distTable"));
         document.getElementById("btnDistCsv").addEventListener("click", distExportCsv);
         document.getElementById("btnDistXlsx").addEventListener("click", distExportXlsx);
         document.getElementById("btnDistDetailCsv").addEventListener("click", distExportDetail);

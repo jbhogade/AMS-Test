@@ -28,6 +28,7 @@
 
     <link rel="stylesheet" href="../css/themes.css">
     <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/ui-styles.css">
     <link rel="stylesheet" href="../css/employees.css">
 </head>
 <body>
@@ -61,10 +62,6 @@
                     <div class="emp-toolbar-left">
                         <input type="search" class="input emp-search" id="emp-search" placeholder="Search name, ID, designation...">
 
-                        <select class="select" id="emp-dept-filter" style="width:auto;">
-                            <option value="All">All Departments</option>
-                        </select>
-
                         <select class="select" id="emp-site-filter" style="width:auto;">
                             <option value="All">All Sites</option>
                         </select>
@@ -74,6 +71,7 @@
                             <option value="Active">Active</option>
                             <option value="Inactive">Inactive</option>
                         </select>
+                        <button type="button" class="btn btn-secondary btn-clear-filters" id="emp-clear-filters" title="Clear column filters">Clear filters</button>
 
                         <span class="ams-hint" id="ams-hint">AMS Employee IDs are hidden</span>
                     </div>

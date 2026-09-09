@@ -59,14 +59,23 @@ function amsVisibleLogEntries() {
 /*-------------- End of the code ------------------------------------------------*/
 
 /*-------------- Start Code for RENDER LOG TABLE ---------------------------------*/
-function renderLogTable() {
+function amsLogTableGetters() {
+    return {
+        time: e => e.time || "",
+        actor: e => e.actorRole || "",
+        page: e => e.page || "",
+        type: e => e.type || "",
+        message: e => e.message || "",
+    };
+}
+
+function amsToolbarFilteredLogs() {
     const search = (document.getElementById("logSearch").value || "").toLowerCase();
     const actorRole = document.getElementById("logActorRole").value;
     const pageFilter = document.getElementById("logPage").value;
     const fromDate = document.getElementById("logFromDate").value;
     const toDate = document.getElementById("logToDate").value;
-
-    const rows = amsVisibleLogEntries().filter(e => {
+    return amsVisibleLogEntries().filter(e => {
         if (search && !`${e.message} ${e.page}`.toLowerCase().includes(search)) return false;
         if (actorRole && e.actorRole !== actorRole) return false;
         if (pageFilter && e.page !== pageFilter) return false;
@@ -75,6 +84,14 @@ function renderLogTable() {
         if (toDate && entryDate > toDate) return false;
         return true;
     });
+}
+
+function renderLogTable() {
+    const filtered = amsToolbarFilteredLogs();
+    const getters = amsLogTableGetters();
+    amsSortRegisterRenderer("logTable", renderLogTable);
+    const colFiltered = typeof amsFilterRows === "function" ? amsFilterRows("logTable", filtered, getters) : filtered;
+    const rows = typeof amsSortRows === "function" ? amsSortRows("logTable", colFiltered, getters) : colFiltered;
 
     const typeBadge = (type) => {
         const cls = { success: "badge-success", warning: "badge-warning", danger: "badge-danger", info: "badge-grey" }[type] || "badge-grey";
@@ -85,8 +102,12 @@ function renderLogTable() {
         return `<span class="actor-badge ${cls}">${amsEsc(role || "Unknown")}</span>`;
     };
 
+    const th = (key, label) => (typeof amsSortableTh === "function")
+        ? amsSortableTh("logTable", key, label)
+        : `<th>${label}</th>`;
     document.getElementById("logTable").innerHTML = `
-        <thead><tr><th>Time</th><th>Actor Role</th><th>Page</th><th>Type</th><th>Message</th></tr></thead>
+        <thead><tr>${th("time", "Time")}${th("actor", "Actor Role")}${th("page", "Page")}${th("type", "Type")}${th("message", "Message")}</tr>
+        ${typeof amsFilterHeadRow === "function" ? amsFilterHeadRow("logTable", ["time", "actor", "page", "type", "message"]) : ""}</thead>
         <tbody>${rows.length ? rows.map(e => `
             <tr>
                 <td class="mono">${amsEsc(amsFormatDate((e.time || "").slice(0, 10)))} ${amsEsc((e.time || "").slice(11, 16))}</td>
@@ -95,13 +116,18 @@ function renderLogTable() {
                 <td>${typeBadge(e.type)}</td>
                 <td>${amsEsc(e.message)}</td>
             </tr>`).join("") : `<tr><td colspan="5" style="color:var(--text-muted)">No activity recorded yet, or none match these filters</td></tr>`}</tbody>`;
+    if (typeof amsFilterRestoreFocus === "function") amsFilterRestoreFocus("logTable");
 }
 /*-------------- End of the code ------------------------------------------------*/
 
 /*-------------- Start Code for EXPORT CSV ---------------------------------------*/
 function amsExportLogCsv() {
     const header = amsCsvRow(["Time", "Actor Role", "Page", "Type", "Message"]);
-    const rows = amsVisibleLogEntries().map(e => amsCsvRow([e.time, e.actorRole, e.page, e.type, e.message]));
+    const toolbar = amsToolbarFilteredLogs();
+    const source = typeof amsFilterRows === "function"
+        ? amsFilterRows("logTable", toolbar, amsLogTableGetters())
+        : toolbar;
+    const rows = source.map(e => amsCsvRow([e.time, e.actorRole, e.page, e.type, e.message]));
     amsDownloadFile([header, ...rows].join("\n"), "log-report.csv", "text/csv");
 }
 /*-------------- End of the code ------------------------------------------------*/
@@ -126,6 +152,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     document.getElementById("logSearch").addEventListener("input", renderLogTable);
     document.getElementById("btnLogFilter").addEventListener("click", renderLogTable);
+    const logClear = document.getElementById("btnLogClearFilters");
+    if (logClear) logClear.addEventListener("click", () => amsFilterClearAndRender("logTable"));
     document.getElementById("btnLogCsv").addEventListener("click", amsExportLogCsv);
     document.getElementById("btnLogClear").addEventListener("click", amsClearLog);
 

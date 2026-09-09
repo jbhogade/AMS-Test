@@ -1,5 +1,62 @@
 # AMS-Test change log
 
+## 2026-09-09 — Excel filters: type-in only
+
+Column filters keep the type-in row under headers. The funnel dropdown
+button and unique-values checklist are removed. Click-to-sort on the
+header is unchanged. Clear filters still empties the type-in row.
+Hard-refresh (Ctrl+F5).
+
+## 2026-09-09 — Appearance Style (surface look)
+
+Color Theme and Style are independent. Mix any of the 11 themes with a
+surface look: Default, Liquid Glass, Glassmorphism, Claymorphism,
+Neomorphism, Skeuomorphism, Minimalism.
+
+- Topbar: Style dropdown next to Theme. Settings > Appearance: Style gallery.
+- Saved in the browser as `ams-ui-style`. Default is the current solid look.
+- Layout, tables, Excel filters, and Role Access are unchanged.
+- Quick-add (+) popovers stay opaque. Excel type-in filter inputs
+  follow Theme and Style.
+- Spec: `docs/superpowers/specs/2026-09-09-appearance-style-design.md`.
+
+Hard-refresh (Ctrl+F5). Try Dark Grey + Glassmorphism, then Default.
+
+## 2026-09-08 — Excel-style column filters
+
+Every list table can be filtered by any data column.
+
+- Type-in row under headers (contains; numbers also accept = > < >= <= != and n-m).
+- Funnel on each header: unique-values checklist, like Excel AutoFilter.
+- Toolbar keeps Status + Site (Active on lookup masters). Extra dropdowns
+  (Department, Type, Make, Operator, Plan) moved into the columns.
+- Click-to-sort is unchanged. Actions columns are not filterable.
+- Settings, Company, Profile, Add/Edit forms, and Role Access (edit
+  matrix) are unchanged. Spec:
+  `docs/superpowers/specs/2026-09-08-excel-column-filters-design.md`.
+
+Hard-refresh (Ctrl+F5). On Employees, type a designation or use the
+funnel on Owned / Team. Clear filters resets the column row. Funnel
+Select All / OK uses the full unique list (not only the search-visible
+boxes). Unchecking every value hides all rows. Exports and report print
+follow the on-screen column filters. Log, Access Rights, and each
+Report panel have Clear filters.
+
+## 2026-09-08 — Opaque quick-add (+) popovers
+
+Department / Designation (+) on Add/Edit Employee used `--bg-surface`,
+which was removed in the theme rename. The popover had no background and
+showed the form through it.
+
+- Employee popover and import banner now use `--bg-elevated`.
+- Same solid panel on Assets, Mobiles, SIM, Vendor, and master-table (+)
+  popovers so they sit above the modal instead of blending into it.
+- Replace-modal selected-asset box: leftover `--primary` / `--bg-soft`
+  mapped to `--accent` / `--bg-elevated`.
+
+Hard-refresh (Ctrl+F5). Open Add Employee and click + beside Department
+or Designation; the small panel should be fully opaque.
+
 ## 2026-09-08 — Role Access Recommended matrix (None / View / Full)
 
 Role Access Master uses the Recommended sheet from

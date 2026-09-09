@@ -56,30 +56,11 @@ function amsPopulateSimSiteSelect(el, allLabel) {
 }
 
 function amsPopulateSimFilters() {
-    const sims = SIM_STATE.sims || [];
-    amsFillSelectOptions(document.getElementById("simOperatorFilter"), "All Operators", amsUniqueSorted(sims.map(s => s.operator)));
-    amsFillSelectOptions(document.getElementById("simPlanFilter"), "All Plans", amsUniqueSorted(sims.map(s => s.plan)));
     amsPopulateSimSiteSelect(document.getElementById("simSiteFilter"), "All Sites");
 }
 
-function renderSimTable() {
-    amsPopulateSimFilters();
-    const searchTerm = (document.getElementById("simSearchBox").value || "").toLowerCase();
-    const statusFilterVal = document.getElementById("simStatusFilter").value;
-    const operatorFilterVal = (document.getElementById("simOperatorFilter") || {}).value || "";
-    const planFilterVal = (document.getElementById("simPlanFilter") || {}).value || "";
-    const siteFilterVal = (document.getElementById("simSiteFilter") || {}).value || "";
-
-    const filtered = SIM_STATE.sims.filter(s => {
-        if (statusFilterVal && s.status !== statusFilterVal) return false;
-        if (operatorFilterVal && s.operator !== operatorFilterVal) return false;
-        if (planFilterVal && s.plan !== planFilterVal) return false;
-        if (siteFilterVal && (s.site || "") !== siteFilterVal) return false;
-        if (!searchTerm) return true;
-        return [s.simId, s.mobileNumber, s.operator, s.plan, s.iccid, s.site].some(v => String(v || "").toLowerCase().includes(searchTerm));
-    });
-
-    const getters = {
+function amsSimTableGetters() {
+    return {
         simId: s => s.simId,
         mobile: s => s.mobileNumber || "",
         operator: s => s.operator || "",
@@ -92,7 +73,26 @@ function renderSimTable() {
         site: s => s.site || "",
         usedIn: s => amsSimUsedInLabel(s),
     };
-    const sortedFiltered = amsSortRows("simTable", filtered, getters);
+}
+
+function amsToolbarFilteredSims() {
+    const searchTerm = (document.getElementById("simSearchBox").value || "").toLowerCase();
+    const statusFilterVal = (document.getElementById("simStatusFilter") || {}).value || "";
+    const siteFilterVal = (document.getElementById("simSiteFilter") || {}).value || "";
+    return SIM_STATE.sims.filter(s => {
+        if (statusFilterVal && s.status !== statusFilterVal) return false;
+        if (siteFilterVal && (s.site || "") !== siteFilterVal) return false;
+        if (!searchTerm) return true;
+        return [s.simId, s.mobileNumber, s.operator, s.plan, s.iccid, s.site].some(v => String(v || "").toLowerCase().includes(searchTerm));
+    });
+}
+
+function renderSimTable() {
+    amsPopulateSimFilters();
+    const filtered = amsToolbarFilteredSims();
+    const getters = amsSimTableGetters();
+    const colFiltered = amsFilterRows("simTable", filtered, getters);
+    const sortedFiltered = amsSortRows("simTable", colFiltered, getters);
 
     const rows = sortedFiltered.map(s => {
         const emp = s.assignedTo ? amsGetEmployeeByAmsId(s.assignedTo) : null;
@@ -137,12 +137,13 @@ function renderSimTable() {
             ${amsSortableTh("simTable", "site", "Site")}
             ${amsSortableTh("simTable", "usedIn", "Used In")}
             <th></th>
-        </tr></thead>
+        </tr>${amsFilterHeadRow("simTable", ["simId", "mobile", "operator", "plan", "status", "assigned", "site", "usedIn", ""])}</thead>
         <tbody>${rows.join("") || `<tr><td colspan="9" class="empty-note" style="text-align:center;padding:28px;">No SIM cards found</td></tr>`}</tbody>`;
+    if (typeof amsFilterRestoreFocus === "function") amsFilterRestoreFocus("simTable");
 
     const footer = document.getElementById("simTableFooter");
     if (footer) {
-        const totalMatches = filtered.length;
+        const totalMatches = colFiltered.length;
         footer.innerHTML = totalMatches
             ? `<span>${totalMatches} SIM card${totalMatches === 1 ? "" : "s"}</span>`
             : "";
@@ -883,7 +884,10 @@ function amsDownloadSimTemplate() {
 }
 
 function amsExportSims() {
-    const rows = SIM_STATE.sims.map(s => [
+    const source = typeof amsFilterRows === "function"
+        ? amsFilterRows("simTable", amsToolbarFilteredSims(), amsSimTableGetters())
+        : amsToolbarFilteredSims();
+    const rows = source.map(s => [
         s.simId, s.iccid || "", s.mobileNumber || "", s.operator || "", s.plan || "",
         s.status, s.site || "", amsFormatDate(s.activationDate), s.vendor || "", s.cost || "", s.remarks || "",
     ]);
@@ -1004,10 +1008,12 @@ async function initSimCards() {
 
     /* Toolbar */
     document.getElementById("simSearchBox").addEventListener("input", renderSimTable);
-    ["simOperatorFilter", "simPlanFilter", "simStatusFilter", "simSiteFilter"].forEach(id => {
+    ["simStatusFilter", "simSiteFilter"].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.addEventListener("change", renderSimTable);
     });
+    const simClear = document.getElementById("btnSimClearFilters");
+    if (simClear) simClear.addEventListener("click", () => amsFilterClearAndRender("simTable"));
     document.getElementById("btnAddSim").addEventListener("click", amsSimOpenAddModal);
     document.getElementById("btnSimExport").addEventListener("click", amsExportSims);
     document.getElementById("btnSimTemplate").addEventListener("click", amsDownloadSimTemplate);

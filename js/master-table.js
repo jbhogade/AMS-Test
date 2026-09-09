@@ -82,7 +82,15 @@ function amsExportMaster() {
     const cfg = AMS_MASTER_CONFIG;
     const headers = [...cfg.fields.map(f => f.key), ...(cfg.autoIdField ? [cfg.autoIdField] : []), "active"];
     const source = (typeof cfg.rowFilter === "function") ? cfg.dataArray.filter(cfg.rowFilter) : cfg.dataArray;
-    const rows = source.map(item => [
+    const getterMap = {};
+    cfg.fields.forEach(f => {
+        if (f.hideInTable) return;
+        getterMap[f.key] = item => f.type === "date" ? amsFormatDate(item[f.key]) : item[f.key];
+    });
+    if (cfg.usageCount) getterMap["__usage"] = item => cfg.usageCount(item);
+    getterMap["__active"] = item => item.active ? "Active" : "Inactive";
+    const filtered = typeof amsFilterRows === "function" ? amsFilterRows("masterTable", source, getterMap) : source;
+    const rows = filtered.map(item => [
         ...cfg.fields.map(f => f.type === "date" ? amsFormatDate(item[f.key]) : item[f.key]),
         ...(cfg.autoIdField ? [item[cfg.autoIdField]] : []), item.active ? "true" : "false",
     ]);
@@ -215,11 +223,6 @@ function amsHandleImportFile(file) {
     });
 }
 
-function amsMtFilterFields() {
-    const cfg = AMS_MASTER_CONFIG;
-    return (cfg.fields || []).filter(f => f.type === "select" && !f.hideInTable);
-}
-
 function amsMtEnsureFilters() {
     const searchBox = document.getElementById("searchBox");
     if (!searchBox) return;
@@ -230,26 +233,15 @@ function amsMtEnsureFilters() {
         bar.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;align-items:center;";
         searchBox.insertAdjacentElement("afterend", bar);
     }
-    const fields = amsMtFilterFields();
-    const needed = fields.map(f => `mtFilter-${f.key}`).concat(["mtFilter-active"]);
-    const existing = Array.from(bar.querySelectorAll("select")).map(el => el.id);
-    if (existing.join(",") === needed.join(",")) return;
-    bar.innerHTML = fields.map(f =>
-        `<select id="mtFilter-${amsEsc(f.key)}" class="select" style="width:auto;"><option value="">All ${amsEsc(f.label)}</option></select>`
-    ).join("") + `<select id="mtFilter-active" class="select" style="width:auto;">
+    if (bar.querySelector("#mtFilter-active")) return;
+    bar.innerHTML = `<select id="mtFilter-active" class="select" style="width:auto;">
         <option value="">All Status</option>
         <option value="true">Active</option>
         <option value="false">Inactive</option>
-    </select>`;
-    bar.querySelectorAll("select").forEach(el => el.addEventListener("change", amsRenderMasterTable));
-}
-
-function amsMtPopulateFilters(source) {
-    amsMtFilterFields().forEach(f => {
-        const el = document.getElementById(`mtFilter-${f.key}`);
-        if (!el) return;
-        amsFillSelectOptions(el, `All ${f.label}`, amsUniqueSorted((source || []).map(item => item[f.key])));
-    });
+    </select>
+    <button type="button" class="btn btn-secondary btn-clear-filters" id="btnMtClearFilters" title="Clear column filters">Clear filters</button>`;
+    document.getElementById("mtFilter-active").addEventListener("change", amsRenderMasterTable);
+    document.getElementById("btnMtClearFilters").addEventListener("click", () => amsFilterClearAndRender("masterTable"));
 }
 
 /* ---- RENDER: the master table ---------------------------------------------- */
@@ -260,16 +252,11 @@ async function amsRenderMasterTable() {
     amsMtEnsureFilters();
 
     const source = (typeof cfg.rowFilter === "function") ? cfg.dataArray.filter(cfg.rowFilter) : cfg.dataArray;
-    amsMtPopulateFilters(source);
     const filtered = source
         .filter(item => {
             const activeFilter = (document.getElementById("mtFilter-active") || {}).value || "";
             if (activeFilter === "true" && !item.active) return false;
             if (activeFilter === "false" && item.active) return false;
-            for (const f of amsMtFilterFields()) {
-                const val = (document.getElementById(`mtFilter-${f.key}`) || {}).value || "";
-                if (val && String(item[f.key] || "") !== val) return false;
-            }
             if (!searchTerm) return true;
             return cfg.fields.some(f => String(item[f.key] || "").toLowerCase().includes(searchTerm));
         });
@@ -282,7 +269,8 @@ async function amsRenderMasterTable() {
     });
     if (cfg.usageCount) getterMap["__usage"] = item => cfg.usageCount(item);
     getterMap["__active"] = item => item.active ? "Active" : "Inactive";
-    const sorted = amsSortRows("masterTable", filtered, getterMap);
+    const colFiltered = amsFilterRows("masterTable", filtered, getterMap);
+    const sorted = amsSortRows("masterTable", colFiltered, getterMap);
 
     const rows = sorted
         .map(item => {
@@ -322,9 +310,14 @@ async function amsRenderMasterTable() {
     const visibleFields = cfg.fields.filter(f => !f.hideInTable);
     const headCells = visibleFields.map(f => amsSortableTh("masterTable", f.key, f.label)).join("");
     const extraColCount = (cfg.rowBadge ? 1 : 0) + (cfg.usageCount ? 1 : 0);
+    const filterKeys = visibleFields.map(f => f.key)
+        .concat(cfg.rowBadge ? [""] : [])
+        .concat(cfg.usageCount ? ["__usage"] : [])
+        .concat(["__active", ""]);
     document.getElementById("masterTable").innerHTML = `
-        <thead><tr>${headCells}${cfg.rowBadge ? `<th>${amsEsc(cfg.rowBadgeLabel || "Flag")}</th>` : ""}${cfg.usageCount ? amsSortableTh("masterTable", "__usage", "Used By") : ""}${amsSortableTh("masterTable", "__active", "Status")}<th></th></tr></thead>
+        <thead><tr>${headCells}${cfg.rowBadge ? `<th>${amsEsc(cfg.rowBadgeLabel || "Flag")}</th>` : ""}${cfg.usageCount ? amsSortableTh("masterTable", "__usage", "Used By") : ""}${amsSortableTh("masterTable", "__active", "Status")}<th></th></tr>${amsFilterHeadRow("masterTable", filterKeys)}</thead>
         <tbody>${rows || `<tr><td colspan="${visibleFields.length + extraColCount + 2}" style="color:var(--text-muted)">No records found</td></tr>`}</tbody>`;
+    if (typeof amsFilterRestoreFocus === "function") amsFilterRestoreFocus("masterTable");
 }
 
 /* ---- MODAL open/close ------------------------------------------------------- */

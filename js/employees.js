@@ -50,7 +50,6 @@ function hideCurrentModal() {
 /* Reads the toolbar filters and returns the matching employees */
 function getFilteredEmployees() {
     const search = (document.getElementById("emp-search").value || "").toLowerCase();
-    const dept = document.getElementById("emp-dept-filter").value;
     const site = (document.getElementById("emp-site-filter") || {}).value || "All";
     const status = document.getElementById("emp-status-filter").value;
 
@@ -62,10 +61,9 @@ function getFilteredEmployees() {
             emp.designation.toLowerCase().includes(search) ||
             emp.amsId.toLowerCase().includes(search) ||
             (emp.site || "").toLowerCase().includes(search);
-        const matchesDept = dept === "All" || emp.department === dept;
         const matchesSite = site === "All" || site === "" || (emp.site || "") === site;
         const matchesStatus = status === "All" || emp.status === status;
-        return matchesSearch && matchesDept && matchesSite && matchesStatus;
+        return matchesSearch && matchesSite && matchesStatus;
     });
 }
 
@@ -76,7 +74,7 @@ function renderEmployeeTable() {
     const amsVisible = isAmsVisible();
     const employees = getFilteredEmployees();
 
-    /* Sortable header (shared js/sortable.js engine) */
+    /* Sortable + Excel-style column filters (shared js/sortable.js engine) */
     const getters = {
         amsId: emp => emp.amsId,
         name: emp => getEmployeeFullName(emp),
@@ -89,7 +87,8 @@ function renderEmployeeTable() {
         site: emp => emp.site || "",
         status: emp => emp.status,
     };
-    const sorted = amsSortRows("employeeTable", employees, getters);
+    const filtered = amsFilterRows("employeeTable", employees, getters);
+    const sorted = amsSortRows("employeeTable", filtered, getters);
     if (thead) {
         thead.innerHTML = `<tr>
             ${amsSortableTh("employeeTable", "amsId", "AMS ID", "ams-col")}
@@ -103,11 +102,16 @@ function renderEmployeeTable() {
             ${amsSortableTh("employeeTable", "team", "Team")}
             ${amsSortableTh("employeeTable", "status", "Status")}
             <th>Actions</th>
-        </tr>`;
+        </tr>${amsFilterHeadRow("employeeTable", [
+            { key: "amsId", htmlId: "ams-col-filter" },
+            "name", "dept", "site", "designation", "contact", "email", "owned", "team", "status", ""
+        ])}`;
     }
 
     /* AMS Employee ID column is Supreme Root only (knowledge / internal key). */
     document.getElementById("ams-col").style.display = amsVisible ? "" : "none";
+    const amsColFilter = document.getElementById("ams-col-filter");
+    if (amsColFilter) amsColFilter.style.display = amsVisible ? "" : "none";
     const amsHint = document.getElementById("ams-hint");
     if (amsHint) amsHint.style.display = "none";
 
@@ -118,6 +122,7 @@ function renderEmployeeTable() {
                     No employees found. Adjust the search / filters, or add a new employee.
                 </td>
             </tr>`;
+        if (typeof amsFilterRestoreFocus === "function") amsFilterRestoreFocus("employeeTable");
         return;
     }
 
@@ -153,6 +158,7 @@ function renderEmployeeTable() {
             </tr>
         `;
     }).join("");
+    if (typeof amsFilterRestoreFocus === "function") amsFilterRestoreFocus("employeeTable");
 }
 
 /* Builds the "Actions" dropdown for one employee row */
@@ -725,7 +731,6 @@ function allDesigOptions() {
 }
 
 function populateSelects() {
-    const deptFilter = document.getElementById("emp-dept-filter");
     const deptForm = document.getElementById("f-dept");
     const managerSelect = document.getElementById("f-manager");
     const desigList = document.getElementById("designation-list");
@@ -737,10 +742,6 @@ function populateSelects() {
     const siteNames = (AMS_DUMMY_SITES || []).filter(s => s.active !== false).map(s => s.name);
     const empSites = DUMMY_EMPLOYEES.map(e => e.site).filter(Boolean);
     const allSites = amsUniqueSorted(siteNames.concat(empSites));
-
-    /* Department filter options */
-    deptFilter.innerHTML = `<option value="All">All Departments</option>` +
-        deptOptions.map(d => `<option value="${escapeHtml(d.name)}">${escapeHtml(d.name)}</option>`).join("");
 
     /* Department field inside the form */
     deptForm.innerHTML = deptOptions.map(d => `<option value="${escapeHtml(d.name)}">${escapeHtml(d.name)}</option>`).join("");
@@ -885,7 +886,22 @@ function amsDownloadEmployeeTemplate() {
 }
 
 function amsExportEmployees() {
-    const rows = getFilteredEmployees().map(e => {
+    const getters = {
+        amsId: emp => emp.amsId,
+        name: emp => getEmployeeFullName(emp),
+        dept: emp => emp.department,
+        designation: emp => emp.designation,
+        contact: emp => emp.contact || "",
+        email: emp => emp.email || "",
+        owned: emp => amsOwnedEmployeeHoldings(emp.amsId).length,
+        team: emp => amsTeamEmployeeHoldings(emp.amsId).length,
+        site: emp => emp.site || "",
+        status: emp => emp.status,
+    };
+    const exportRows = typeof amsFilterRows === "function"
+        ? amsFilterRows("employeeTable", getFilteredEmployees(), getters)
+        : getFilteredEmployees();
+    const rows = exportRows.map(e => {
         const mgr = e.managerAmsId ? findEmployee(e.managerAmsId) : null;
         return [
             e.empId, getEmployeeFullName(e), e.department, e.designation, e.site || "",
@@ -1051,10 +1067,11 @@ async function initEmployees() {
 
     /* Toolbar events */
     document.getElementById("emp-search").addEventListener("input", renderEmployeeTable);
-    document.getElementById("emp-dept-filter").addEventListener("change", renderEmployeeTable);
     const siteFilterEl = document.getElementById("emp-site-filter");
     if (siteFilterEl) siteFilterEl.addEventListener("change", renderEmployeeTable);
     document.getElementById("emp-status-filter").addEventListener("change", renderEmployeeTable);
+    const empClear = document.getElementById("emp-clear-filters");
+    if (empClear) empClear.addEventListener("click", () => amsFilterClearAndRender("employeeTable"));
     document.getElementById("emp-add-btn").addEventListener("click", openAddModal);
 
     /* Employee form events */

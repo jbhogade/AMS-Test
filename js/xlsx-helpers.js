@@ -27,7 +27,8 @@ function amsExportXlsx(filename, headers, rows) {
 
 /* Exports a rendered DOM <table> as a real .xlsx workbook. */
 function amsExportTableToXlsx(filename, tableEl) {
-    const rows = [...tableEl.querySelectorAll("tr")].map(tr => [...tr.children].map(cell => cell.textContent.trim()));
+    const rows = (typeof amsTableDataRows === "function" ? amsTableDataRows(tableEl) : [...tableEl.querySelectorAll("tr")])
+        .map(tr => [...tr.children].map(cell => cell.textContent.trim()));
     if (!rows.length) return;
     amsExportXlsx(filename, rows[0], rows.slice(1));
 }

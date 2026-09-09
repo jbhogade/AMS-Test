@@ -27,6 +27,7 @@
 
     <link rel="stylesheet" href="../css/themes.css">
     <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/ui-styles.css">
     <link rel="stylesheet" href="../css/assets.css">
 </head>
 <body>
@@ -56,12 +57,10 @@
                 <div class="asset-toolbar">
                     <div class="asset-toolbar-left">
                         <input type="search" id="distSearch" class="search-input" placeholder="Search employee name, ID, department...">
-                        <select id="distDeptFilter" class="select" style="width:auto;">
-                            <option value="">All Departments</option>
-                        </select>
                         <label class="form-checkbox" style="white-space:nowrap;">
                             <input type="checkbox" id="distOnlyWithAssets"> Only employees with assets
                         </label>
+                        <button type="button" class="btn btn-secondary btn-clear-filters" id="btnDistClearFilters" title="Clear column filters">Clear filters</button>
                     </div>
                     <div class="flex items-center gap-8">
                         <button class="btn btn-secondary" id="btnDistCsv">Export CSV</button>

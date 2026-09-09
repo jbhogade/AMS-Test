@@ -406,13 +406,13 @@
     position: absolute;
     top: calc(100% + 6px);
     left: 0;
-    z-index: 40;
+    z-index: 220;
     width: 260px;
     padding: 12px;
-    background: var(--bg-surface);
+    background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-radius: 10px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+    box-shadow: var(--shadow);
 }
 .quickadd-popover.open { display: block; }
 
@@ -436,7 +436,7 @@
    9) IMPORT SUMMARY BANNER
    ===========================================================================*/
 .import-banner {
-    background: var(--bg-surface);
+    background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-left: 3px solid var(--accent);
     border-radius: 8px;

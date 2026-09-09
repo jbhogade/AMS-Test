@@ -643,12 +643,12 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     top: calc(100% + 6px);
     right: 0;
     width: 240px;
-    background: var(--bg-card);
+    background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 12px;
     box-shadow: var(--shadow);
-    z-index: 210;
+    z-index: 220;
     display: none;
 }
 
@@ -1072,6 +1072,32 @@ th.sortable {
 th.sortable:hover { color: var(--accent, #4da3ff); }
 th.sort-active { color: var(--accent, #4da3ff); }
 .sort-arrow { font-size: 11px; margin-left: 4px; opacity: 0.7; }
+
+.col-filter-row th.col-filter-cell {
+    padding: 6px 8px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.col-filter-input {
+    width: 100%;
+    min-width: 64px;
+    padding: 5px 7px;
+    font-size: 12px;
+    font-weight: 400;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.col-filter-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.btn-clear-filters { white-space: nowrap; }
 
 /*------------------------------------------------------------------------------
 #-------------- End of the code : MAIN LAYOUT & COMPONENTS --------------------

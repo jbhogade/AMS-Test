@@ -29,6 +29,7 @@
 
     <link rel="stylesheet" href="../css/themes.css">
     <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/ui-styles.css">
     <link rel="stylesheet" href="../css/assets.css">
 </head>
 <body>
@@ -55,12 +56,6 @@
                 <div class="asset-toolbar">
                     <div class="asset-toolbar-left">
                         <input type="search" id="simSearchBox" class="search-input" placeholder="Search SIM ID, mobile number, operator, ICCID...">
-                        <select id="simOperatorFilter" class="select" style="width:auto;">
-                            <option value="">All Operators</option>
-                        </select>
-                        <select id="simPlanFilter" class="select" style="width:auto;">
-                            <option value="">All Plans</option>
-                        </select>
                         <select id="simStatusFilter" class="select" style="width:auto;">
                             <option value="">All Statuses</option>
                             <option value="In Store">In Store</option>
@@ -71,6 +66,7 @@
                         <select id="simSiteFilter" class="select" style="width:auto;">
                             <option value="">All Sites</option>
                         </select>
+                        <button type="button" class="btn btn-secondary btn-clear-filters" id="btnSimClearFilters" title="Clear column filters">Clear filters</button>
                     </div>
                     <div class="flex items-center gap-8">
                         <button class="btn btn-primary" id="btnAddSim">&#43; Add SIM Card</button>

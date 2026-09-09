@@ -15,6 +15,12 @@
 #              clicking another column resets to ascending on that column.
 #              Numeric getters compare numerically; everything else compares
 #              case-insensitively with numeric-aware collation.
+#
+#  FILTERS   : Excel-style type-in row per data column (contains; numbers
+#              also accept = > < >= <= != and n-m). After toolbar filters:
+#                  rows = amsFilterRows(tableId, rows, getterMap);
+#                  rows = amsSortRows(tableId, rows, getterMap);
+#              Paint the type-in row with amsFilterHeadRow(tableId, keys).
 #------------------------------------------------------------------------------*/
 
 /* ---- Per-table sort state: { key, dir } ----------------------------------- */
@@ -75,4 +81,120 @@ function amsSortRows(tableId, rows, getterMap) {
    current column is meaningless). */
 function amsSortReset(tableId) {
     delete AMS_SORT[tableId];
+}
+
+/* ---- Excel-style column filters ------------------------------------------- */
+const AMS_FILTER = {};
+let AMS_FILTER_FOCUS = null;
+
+function amsFilterState(tableId) {
+    return AMS_FILTER[tableId] || (AMS_FILTER[tableId] = { text: {} });
+}
+
+function amsFilterHasAny(tableId) {
+    const st = AMS_FILTER[tableId];
+    if (!st) return false;
+    return Object.keys(st.text).some(k => (st.text[k] || "").trim());
+}
+
+function amsParseNumericFilter(text) {
+    const t = String(text || "").trim();
+    if (!t) return null;
+    const range = t.match(/^(-?\d+(?:\.\d+)?)\s*[-–]\s*(-?\d+(?:\.\d+)?)$/);
+    if (range) return { op: "range", a: Number(range[1]), b: Number(range[2]) };
+    const cmp = t.match(/^(>=|<=|!=|=|>|<)\s*(-?\d+(?:\.\d+)?)$/);
+    if (cmp) return { op: cmp[1], n: Number(cmp[2]) };
+    return { op: "contains", raw: t };
+}
+
+function amsFilterValueMatches(value, text) {
+    const isBlank = value == null || value === "";
+    const display = isBlank ? "" : String(value);
+    const t = String(text || "").trim();
+    if (!t) return true;
+    if (typeof value === "number") {
+        const parsed = amsParseNumericFilter(t);
+        if (parsed && parsed.op !== "contains") {
+            if (parsed.op === "range") {
+                const lo = Math.min(parsed.a, parsed.b);
+                const hi = Math.max(parsed.a, parsed.b);
+                return value >= lo && value <= hi;
+            }
+            if (parsed.op === ">=") return value >= parsed.n;
+            if (parsed.op === "<=") return value <= parsed.n;
+            if (parsed.op === ">") return value > parsed.n;
+            if (parsed.op === "<") return value < parsed.n;
+            if (parsed.op === "=") return value === parsed.n;
+            if (parsed.op === "!=") return value !== parsed.n;
+        }
+    }
+    if (isBlank) return false;
+    return display.toLowerCase().includes(t.toLowerCase());
+}
+
+function amsFilterRows(tableId, rows, getterMap) {
+    const st = AMS_FILTER[tableId];
+    if (!st) return rows;
+    const keys = Object.keys(getterMap || {});
+    return (rows || []).filter(row => {
+        for (let i = 0; i < keys.length; i++) {
+            const key = keys[i];
+            const text = st.text[key] || "";
+            if (!text.trim()) continue;
+            const getter = getterMap[key];
+            const val = getter ? getter(row) : "";
+            if (!amsFilterValueMatches(val, text)) return false;
+        }
+        return true;
+    });
+}
+
+function amsFilterHeadRow(tableId, keys) {
+    const st = amsFilterState(tableId);
+    const cells = (keys || []).map(k => {
+        if (!k) return `<th class="col-filter-cell"></th>`;
+        const spec = typeof k === "string" ? { key: k } : k;
+        const idAttr = spec.htmlId ? ` id="${amsEsc(spec.htmlId)}"` : "";
+        const val = st.text[spec.key] || "";
+        return `<th class="col-filter-cell"${idAttr}><input type="text" class="input col-filter-input" data-col-filter-table="${amsEsc(tableId)}" data-col-filter-key="${amsEsc(spec.key)}" value="${amsEsc(val)}" placeholder="Filter" oninput="amsColFilterText(this)" onclick="event.stopPropagation()"></th>`;
+    }).join("");
+    return `<tr class="col-filter-row">${cells}</tr>`;
+}
+
+function amsColFilterText(input) {
+    const tableId = input.getAttribute("data-col-filter-table");
+    const key = input.getAttribute("data-col-filter-key");
+    const st = amsFilterState(tableId);
+    st.text[key] = input.value;
+    AMS_FILTER_FOCUS = { tableId, key, pos: input.selectionStart };
+    const renderer = AMS_SORT_RENDERERS[tableId];
+    if (typeof renderer === "function") renderer();
+}
+
+function amsFilterRestoreFocus(tableId) {
+    const pending = AMS_FILTER_FOCUS;
+    if (!pending || pending.tableId !== tableId) return;
+    const el = document.querySelector(`input.col-filter-input[data-col-filter-table="${tableId}"][data-col-filter-key="${pending.key}"]`);
+    if (!el) return;
+    el.focus();
+    if (typeof el.setSelectionRange === "function") {
+        const pos = pending.pos == null ? el.value.length : pending.pos;
+        try { el.setSelectionRange(pos, pos); } catch (err) { /* ignore */ }
+    }
+}
+
+function amsFilterClear(tableId) {
+    AMS_FILTER[tableId] = { text: {} };
+    AMS_FILTER_FOCUS = null;
+}
+
+function amsFilterClearAndRender(tableId) {
+    amsFilterClear(tableId);
+    const renderer = AMS_SORT_RENDERERS[tableId];
+    if (typeof renderer === "function") renderer();
+}
+
+function amsTableDataRows(tableEl) {
+    if (!tableEl) return [];
+    return [...tableEl.querySelectorAll("tr")].filter(tr => !tr.classList.contains("col-filter-row"));
 }

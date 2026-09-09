@@ -71,31 +71,11 @@ const AST_STATUS_BADGE = {
 
 function amsPopulateAssetFilters() {
     const assets = AST_STATE.assets || [];
-    amsFillSelectOptions(document.getElementById("typeFilter"), "All Types", amsUniqueSorted(assets.map(a => a.type)));
-    amsFillSelectOptions(document.getElementById("makeFilter"), "All Makes", amsUniqueSorted(assets.map(a => a.make)));
     amsFillSelectOptions(document.getElementById("siteFilter"), "All Sites", amsUniqueSorted(assets.map(a => a.currentSite || a.site)));
 }
 
-function renderAssetTable() {
-    amsPopulateAssetFilters();
-    const searchTerm = (document.getElementById("searchBox").value || "").toLowerCase();
-    const statusFilterVal = document.getElementById("statusFilter").value;
-    const typeFilterVal = (document.getElementById("typeFilter") || {}).value || "";
-    const makeFilterVal = (document.getElementById("makeFilter") || {}).value || "";
-    const siteFilterVal = (document.getElementById("siteFilter") || {}).value || "";
-    const showAmsId = (typeof amsIsSupremeRoot === "function" && amsIsSupremeRoot());
-
-    const filtered = AST_STATE.assets
-        .filter(a => {
-            if (statusFilterVal && a.status !== statusFilterVal) return false;
-            if (typeFilterVal && a.type !== typeFilterVal) return false;
-            if (makeFilterVal && a.make !== makeFilterVal) return false;
-            if (siteFilterVal && (a.currentSite || a.site) !== siteFilterVal) return false;
-            if (!searchTerm) return true;
-            return [a.id, a.type, a.make, a.model, a.serialNumber, a.imei1, a.imei2, a.batteryNo, a.chargerNo, a.simMobileNo].some(v => String(v || "").toLowerCase().includes(searchTerm));
-        });
-
-    const getters = {
+function amsAssetTableGetters() {
+    return {
         amsAssetId: a => a.amsAssetId || "",
         id: a => amsComputeFullId(a),
         type: a => a.type,
@@ -108,7 +88,27 @@ function renderAssetTable() {
         },
         warranty: a => a.warrantyEnd || "",
     };
-    const sortedFiltered = amsSortRows("assetTable", filtered, getters);
+}
+
+function amsToolbarFilteredAssets() {
+    const searchTerm = (document.getElementById("searchBox").value || "").toLowerCase();
+    const statusFilterVal = (document.getElementById("statusFilter") || {}).value || "";
+    const siteFilterVal = (document.getElementById("siteFilter") || {}).value || "";
+    return (AST_STATE.assets || []).filter(a => {
+        if (statusFilterVal && a.status !== statusFilterVal) return false;
+        if (siteFilterVal && (a.currentSite || a.site) !== siteFilterVal) return false;
+        if (!searchTerm) return true;
+        return [a.id, a.type, a.make, a.model, a.serialNumber, a.imei1, a.imei2, a.batteryNo, a.chargerNo, a.simMobileNo].some(v => String(v || "").toLowerCase().includes(searchTerm));
+    });
+}
+
+function renderAssetTable() {
+    amsPopulateAssetFilters();
+    const showAmsId = (typeof amsIsSupremeRoot === "function" && amsIsSupremeRoot());
+    const filtered = amsToolbarFilteredAssets();
+    const getters = amsAssetTableGetters();
+    const colFiltered = amsFilterRows("assetTable", filtered, getters);
+    const sortedFiltered = amsSortRows("assetTable", colFiltered, getters);
 
     const rows = sortedFiltered
         .map(a => {
@@ -155,7 +155,10 @@ function renderAssetTable() {
         });
 
     const headExtra = showAmsId ? amsSortableTh("assetTable", "amsAssetId", "AMS Asset ID") : "";
-    const totalMatches = filtered.length;
+    const filterKeys = showAmsId
+        ? ["amsAssetId", "id", "type", "make", "site", "status", "assigned", "warranty", ""]
+        : ["id", "type", "make", "site", "status", "assigned", "warranty", ""];
+    const totalMatches = colFiltered.length;
     document.getElementById("assetTable").innerHTML = `
         <thead><tr>
             ${headExtra}
@@ -167,8 +170,9 @@ function renderAssetTable() {
             ${amsSortableTh("assetTable", "assigned", "Assigned To")}
             ${amsSortableTh("assetTable", "warranty", "Warranty End")}
             <th></th>
-        </tr></thead>
+        </tr>${amsFilterHeadRow("assetTable", filterKeys)}</thead>
         <tbody>${rows.join("") || `<tr><td colspan="9" class="empty-note" style="text-align:center;padding:28px;">No assets found</td></tr>`}</tbody>`;
+    if (typeof amsFilterRestoreFocus === "function") amsFilterRestoreFocus("assetTable");
 
     const footer = document.getElementById("assetTableFooter");
     if (footer) {
@@ -1549,7 +1553,10 @@ const AST_IMPORT_HEADERS = [
 ];
 
 function amsExportAssets() {
-    const rows = AST_STATE.assets.map(a => [
+    const source = typeof amsFilterRows === "function"
+        ? amsFilterRows("assetTable", amsToolbarFilteredAssets(), amsAssetTableGetters())
+        : amsToolbarFilteredAssets();
+    const rows = source.map(a => [
         amsBaseDisplayId(a), a.amsAssetId, a.type, a.category || "", a.make, a.model || "", a.name || "", a.serialNumber || "",
         a.imei1 || "", a.imei2 || "", a.batteryNo || "", a.chargerNo || "", a.simMobileNo || "0",
         a.purchaseSite, a.currentSite || a.site, amsFormatDate(a.purchaseDate), amsFormatDate(a.warrantyEnd), a.status,
@@ -1719,10 +1726,12 @@ async function initMobiles() {
 
     /* Toolbar */
     document.getElementById("searchBox").addEventListener("input", renderAssetTable);
-    ["typeFilter", "makeFilter", "siteFilter", "statusFilter"].forEach(id => {
+    ["siteFilter", "statusFilter"].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.addEventListener("change", renderAssetTable);
     });
+    const astClear = document.getElementById("btnClearFilters");
+    if (astClear) astClear.addEventListener("click", () => amsFilterClearAndRender("assetTable"));
 
     document.getElementById("btnAddAsset").addEventListener("click", amsOpenAddModal);
     document.getElementById("btnAssetExport").addEventListener("click", amsExportAssets);

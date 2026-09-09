@@ -47,9 +47,21 @@ function renderAccessTable() {
     const searchTerm = (document.getElementById("searchBox").value || "").toLowerCase();
     const total = AMS_PAGE_REGISTRY.length;
 
-    const rows = AMS_DUMMY_USERS
-        .filter(u => !searchTerm || u.username.toLowerCase().includes(searchTerm) || u.role.toLowerCase().includes(searchTerm))
-        .map(u => {
+    const users = AMS_DUMMY_USERS
+        .filter(u => !searchTerm || u.username.toLowerCase().includes(searchTerm) || u.role.toLowerCase().includes(searchTerm));
+    const getters = {
+        username: u => u.username,
+        role: u => u.role,
+        access: u => {
+            const isDefault = u.allowedPages === null || u.allowedPages === undefined;
+            const granted = amsResolveAllowedPages(u).length;
+            return isDefault ? `${granted} Role Default` : `${granted} Custom`;
+        },
+    };
+    if (typeof amsSortRegisterRenderer === "function") amsSortRegisterRenderer("accessTable", renderAccessTable);
+    const colFiltered = typeof amsFilterRows === "function" ? amsFilterRows("accessTable", users, getters) : users;
+    const sorted = typeof amsSortRows === "function" ? amsSortRows("accessTable", colFiltered, getters) : colFiltered;
+    const rows = sorted.map(u => {
             const isDefault = u.allowedPages === null || u.allowedPages === undefined;
             const effective = amsResolveAllowedPages(u);
             const granted = effective.length;
@@ -68,9 +80,14 @@ function renderAccessTable() {
             </tr>`;
         }).join("");
 
+    const th = (key, label) => (typeof amsSortableTh === "function")
+        ? amsSortableTh("accessTable", key, label)
+        : `<th>${label}</th>`;
     document.getElementById("accessTable").innerHTML = `
-        <thead><tr><th>Username</th><th>Role</th><th>Access</th><th></th></tr></thead>
+        <thead><tr>${th("username", "Username")}${th("role", "Role")}${th("access", "Access")}<th></th></tr>
+        ${typeof amsFilterHeadRow === "function" ? amsFilterHeadRow("accessTable", ["username", "role", "access", ""]) : ""}</thead>
         <tbody>${rows || `<tr><td colspan="4" style="color:var(--text-muted)">No users found</td></tr>`}</tbody>`;
+    if (typeof amsFilterRestoreFocus === "function") amsFilterRestoreFocus("accessTable");
 }
 /*-------------- End of the code ------------------------------------------------*/
 
@@ -134,6 +151,8 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     document.getElementById("searchBox").addEventListener("input", renderAccessTable);
+    const accessClear = document.getElementById("btnAccessClearFilters");
+    if (accessClear) accessClear.addEventListener("click", () => amsFilterClearAndRender("accessTable"));
 
     amsWireAccessGate();
     (typeof amsDbEnsureLoaded === "function" ? amsDbEnsureLoaded() : Promise.resolve()).then(() => amsApplyAccessGate());

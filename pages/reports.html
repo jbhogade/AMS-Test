@@ -33,6 +33,7 @@
 
     <link rel="stylesheet" href="../css/themes.css">
     <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/ui-styles.css">
     <link rel="stylesheet" href="../css/reports.css">
 </head>
 <body>
@@ -120,6 +121,7 @@
                             <input type="date" id="alToDate">
                         </div>
                         <button class="btn btn-primary" id="btnAlFilter">Apply</button>
+                        <button type="button" class="btn btn-secondary btn-clear-filters" data-clear-filters="alTable" title="Clear column filters">Clear filters</button>
                         <button class="btn" id="btnAlPrint">Print</button>
                         <button class="btn" id="btnAlCsv">Export CSV</button>
                         <button class="btn" id="btnAlXls">Export Excel</button>
@@ -159,6 +161,7 @@
                             <input type="date" id="issueToDate">
                         </div>
                         <button class="btn btn-primary" id="btnIssueFilter">Apply</button>
+                        <button type="button" class="btn btn-secondary btn-clear-filters" data-clear-filters="issueTable" title="Clear column filters">Clear filters</button>
                         <button class="btn" id="btnIssuePrint">Print All</button>
                         <button class="btn" id="btnIssueCsv">Export CSV</button>
                         <button class="btn" id="btnIssueXls">Export Excel</button>
@@ -199,6 +202,7 @@
                             <input type="date" id="handoverToDate">
                         </div>
                         <button class="btn btn-primary" id="btnHandoverFilter">Apply</button>
+                        <button type="button" class="btn btn-secondary btn-clear-filters" data-clear-filters="handoverTable" title="Clear column filters">Clear filters</button>
                         <button class="btn" id="btnHandoverPrint">Print All</button>
                         <button class="btn" id="btnHandoverCsv">Export CSV</button>
                         <button class="btn" id="btnHandoverXls">Export Excel</button>
@@ -218,6 +222,7 @@
                         <div class="form-field"><label>From Date</label><input type="date" id="crFromDate"></div>
                         <div class="form-field"><label>To Date</label><input type="date" id="crToDate"></div>
                         <button class="btn btn-primary" id="btnCrFilter">Apply</button>
+                        <button type="button" class="btn btn-secondary btn-clear-filters" data-clear-filters="crTable" title="Clear column filters">Clear filters</button>
                         <button class="btn" id="btnCrPrint">Print</button>
                         <button class="btn" id="btnCrCsv">Export CSV</button>
                         <button class="btn" id="btnCrXls">Export Excel</button>
@@ -233,6 +238,7 @@
                         <div class="form-field"><label>From Date</label><input type="date" id="cuFromDate"></div>
                         <div class="form-field"><label>To Date</label><input type="date" id="cuToDate"></div>
                         <button class="btn btn-primary" id="btnCuFilter">Apply</button>
+                        <button type="button" class="btn btn-secondary btn-clear-filters" data-clear-filters="cuTable" title="Clear column filters">Clear filters</button>
                         <button class="btn" id="btnCuPrint">Print</button>
                         <button class="btn" id="btnCuCsv">Export CSV</button>
                         <button class="btn" id="btnCuXls">Export Excel</button>
@@ -249,6 +255,7 @@
                         <div class="form-field"><label>From Date</label><input type="date" id="srFromDate"></div>
                         <div class="form-field"><label>To Date</label><input type="date" id="srToDate"></div>
                         <button class="btn btn-primary" id="btnSrFilter">Apply</button>
+                        <button type="button" class="btn btn-secondary btn-clear-filters" data-clear-filters="srTable" title="Clear column filters">Clear filters</button>
                         <button class="btn" id="btnSrPrint">Print</button>
                         <button class="btn" id="btnSrCsv">Export CSV</button>
                         <button class="btn" id="btnSrXls">Export Excel</button>
@@ -264,6 +271,7 @@
                         <div class="form-field"><label>From Date</label><input type="date" id="suFromDate"></div>
                         <div class="form-field"><label>To Date</label><input type="date" id="suToDate"></div>
                         <button class="btn btn-primary" id="btnSuFilter">Apply</button>
+                        <button type="button" class="btn btn-secondary btn-clear-filters" data-clear-filters="suTable" title="Clear column filters">Clear filters</button>
                         <button class="btn" id="btnSuPrint">Print</button>
                         <button class="btn" id="btnSuCsv">Export CSV</button>
                         <button class="btn" id="btnSuXls">Export Excel</button>
@@ -280,11 +288,8 @@
                             <label>Search</label>
                             <input type="text" id="distReportSearch" placeholder="Employee name, code, department...">
                         </div>
-                        <div class="form-field">
-                            <label>Department</label>
-                            <select id="distReportDept"><option value="">All</option></select>
-                        </div>
                         <button class="btn btn-primary" id="btnDistReportFilter">Apply</button>
+                        <button type="button" class="btn btn-secondary btn-clear-filters" data-clear-filters="distReportTable" title="Clear column filters">Clear filters</button>
                         <button class="btn" id="btnDistReportCsv">Export CSV</button>
                         <button class="btn" id="btnDistReportXls">Export Excel</button>
                     </div>
