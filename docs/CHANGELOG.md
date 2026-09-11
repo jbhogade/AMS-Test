@@ -1,5 +1,32 @@
 # AMS-Test change log
 
+## 2026-09-11 — Desktop sidebar hide (icon-only)
+
+Desktop sidebar can collapse to a 64px icon rail so lists get more width.
+Hover or keyboard focus peeks master names over the page; the peek
+closes on leave unless Show is pinned (`localStorage` `ams-sidebar-show`).
+Collapsed and peek keep Main / People / Inventory / Admin as a short
+line so icons do not jump. Default is collapsed. Mobile hamburger
+drawer is unchanged.
+
+Hard-refresh (Ctrl+F5). Use the topbar rail button next to the page title.
+
+## 2026-09-10 — Load speed + light chrome (Approach C)
+
+List pages skip SheetJS until Import / Export / Template. Shared scripts
+use `defer`. Type-in column filters wait ~150ms before re-drawing.
+
+- Menu, bell, caret, lock, and dashboard KPI icons are SVG, not emoji.
+- List toolbar and stock/KPI tiles are a little tighter.
+- Dashboard KPI row shows a skeleton until numbers load.
+- Import / Export / Template headers were checked against form fields;
+  no header changes. Spec:
+  `docs/superpowers/specs/2026-09-10-ui-performance-c-design.md`.
+
+Hard-refresh (Ctrl+F5). Open Assets, type in a column filter, then use
+Template / Export once (first Excel click may pause while the library
+loads).
+
 ## 2026-09-09 — Excel filters: type-in only
 
 Column filters keep the type-in row under headers. The funnel dropdown

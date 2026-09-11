@@ -86,12 +86,12 @@
    Only the Dashboard overrides the global card / KPI spacing so the whole page
    fits without scrolling on a typical laptop viewport. */
 .kpi-grid {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 14px;
-    margin-bottom: 14px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 12px;
 }
 
-.kpi-card { padding: 14px 16px; gap: 12px; }
+.kpi-card { padding: 12px 14px; gap: 10px; }
 .kpi-icon { width: 42px; height: 42px; font-size: 19px; border-radius: 10px; }
 .kpi-value { font-size: 22px; }
 .kpi-label { font-size: 12px; }

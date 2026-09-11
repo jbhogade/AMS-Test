@@ -133,7 +133,7 @@ function renderAssetTable() {
                 <td>${assignedDisplay}</td>
                 <td class="mono-cell">${amsFormatDate(a.warrantyEnd) || "-"}</td>
                 <td class="actions-cell">
-                    <button class="actions-trigger" data-actions-for="${amsEsc(a.id)}" title="Actions">Actions &#9662;</button>
+                    <button class="actions-trigger" data-actions-for="${amsEsc(a.id)}" title="Actions">Actions ${typeof amsUiIcon === "function" ? amsUiIcon("caret") : ""}</button>
                     <div class="actions-menu" id="menu-${amsEsc(a.id)}">
                         <button data-action="view" data-key="${amsEsc(a.id)}">View</button>
                         <button data-action="edit" data-key="${amsEsc(a.id)}">Edit</button>
@@ -1567,29 +1567,22 @@ function amsExportAssets() {
 }
 
 function amsDownloadAssetTemplate() {
-    if (typeof XLSX === "undefined") {
-        alert("Excel export library not loaded. Check js/vendor/xlsx.full.min.js is present.");
-        return;
-    }
     const sample = [
         "LT00099", "Laptop", "IT Hardware", "Dell", "Latitude 5430", "", "SN-EXAMPLE-001",
         "", "", "", "", "0",
         "Mumbai HO", "Mumbai HO", "13-07-2026", "13-07-2028", "In Store",
         "", "", "Dell India Pvt Ltd", "65000", "Example row - delete before importing",
     ];
-    const wb = XLSX.utils.book_new();
-    const instr = XLSX.utils.aoa_to_sheet([
-        ["Asset Master Import Template - Instructions"],
-        ["Fields marked with * are required."],
-        ["AMS Asset ID and Full Asset ID are always auto-generated - do not add them."],
-        ["displayId blank = auto-generated, or type an existing legacy ID."],
-        ["Dates use DD-MM-YYYY format."],
+    amsWriteWorkbook("Mobile_Master_import_template.xlsx", [
+        { name: "Instructions", cols: [{ wch: 90 }], aoa: [
+            ["Mobile Master Import Template - Instructions"],
+            ["Fields marked with * are required."],
+            ["AMS Asset ID and Full Asset ID are always auto-generated - do not add them."],
+            ["displayId blank = auto-generated, or type an existing legacy ID."],
+            ["Dates use DD-MM-YYYY format."],
+        ] },
+        { name: "Template", aoa: [AST_IMPORT_HEADERS, sample] },
     ]);
-    instr["!cols"] = [{ wch: 90 }];
-    XLSX.utils.book_append_sheet(wb, instr, "Instructions");
-    const tpl = XLSX.utils.aoa_to_sheet([AST_IMPORT_HEADERS, sample]);
-    XLSX.utils.book_append_sheet(wb, tpl, "Template");
-    XLSX.writeFile(wb, "Asset_Master_import_template.xlsx");
 }
 
 function amsShowImportSummary(results) {

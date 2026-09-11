@@ -161,14 +161,22 @@ function amsFilterHeadRow(tableId, keys) {
     return `<tr class="col-filter-row">${cells}</tr>`;
 }
 
+let AMS_FILTER_DEBOUNCE = {};
+const AMS_FILTER_DEBOUNCE_MS = 150;
+
 function amsColFilterText(input) {
     const tableId = input.getAttribute("data-col-filter-table");
     const key = input.getAttribute("data-col-filter-key");
     const st = amsFilterState(tableId);
     st.text[key] = input.value;
     AMS_FILTER_FOCUS = { tableId, key, pos: input.selectionStart };
-    const renderer = AMS_SORT_RENDERERS[tableId];
-    if (typeof renderer === "function") renderer();
+    const prev = AMS_FILTER_DEBOUNCE[tableId];
+    if (prev) clearTimeout(prev);
+    AMS_FILTER_DEBOUNCE[tableId] = setTimeout(() => {
+        delete AMS_FILTER_DEBOUNCE[tableId];
+        const renderer = AMS_SORT_RENDERERS[tableId];
+        if (typeof renderer === "function") renderer();
+    }, AMS_FILTER_DEBOUNCE_MS);
 }
 
 function amsFilterRestoreFocus(tableId) {
@@ -189,6 +197,10 @@ function amsFilterClear(tableId) {
 }
 
 function amsFilterClearAndRender(tableId) {
+    if (AMS_FILTER_DEBOUNCE[tableId]) {
+        clearTimeout(AMS_FILTER_DEBOUNCE[tableId]);
+        delete AMS_FILTER_DEBOUNCE[tableId];
+    }
     amsFilterClear(tableId);
     const renderer = AMS_SORT_RENDERERS[tableId];
     if (typeof renderer === "function") renderer();

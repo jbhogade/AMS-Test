@@ -107,7 +107,7 @@ function renderSimTable() {
             <td>${amsEsc(s.site) || "-"}</td>
             <td>${usedIn && usedIn !== "None" ? amsEsc(usedIn) : "-"}</td>
             <td class="actions-cell">
-                <button class="actions-trigger" data-sim-actions-for="${amsEsc(s.simId)}" title="Actions">Actions &#9662;</button>
+                <button class="actions-trigger" data-sim-actions-for="${amsEsc(s.simId)}" title="Actions">Actions ${typeof amsUiIcon === "function" ? amsUiIcon("caret") : ""}</button>
                 <div class="actions-menu" id="sim-menu-${amsEsc(s.simId)}">
                     <button data-sim-action="view" data-key="${amsEsc(s.simId)}">View</button>
                     <button data-sim-action="edit" data-key="${amsEsc(s.simId)}">Edit</button>
@@ -863,24 +863,18 @@ function amsSimRetire(key) {
 const SIM_CSV_HEADERS = ["simId", "iccid", "mobileNumber*", "operator", "plan", "status", "site", "activationDate", "vendor", "cost", "remarks"];
 
 function amsDownloadSimTemplate() {
-    if (typeof XLSX === "undefined") {
-        alert("Excel export library not loaded. Check js/vendor/xlsx.full.min.js is present.");
-        return;
-    }
     const sample = ["", "8991XXXXX", "9876543210", "Jio", "Postpaid", "In Store", "", "13-07-2026", "", "", "Example row - delete before importing"];
-    const wb = XLSX.utils.book_new();
-    const instr = XLSX.utils.aoa_to_sheet([
-        ["SIM Card Import Template - Instructions"],
-        ["Fields marked with * are required: mobileNumber."],
-        ["simId blank = auto-generated."],
-        ["status = In Store, Issued, Blocked or Retired (default In Store)."],
-        ["site = a Site Master name (optional)."],
-        ["activationDate format dd-mm-yyyy."],
+    amsWriteWorkbook("SIM_Cards_import_template.xlsx", [
+        { name: "Instructions", cols: [{ wch: 90 }], aoa: [
+            ["SIM Card Import Template - Instructions"],
+            ["Fields marked with * are required: mobileNumber."],
+            ["simId blank = auto-generated."],
+            ["status = In Store, Issued, Blocked or Retired (default In Store)."],
+            ["site = a Site Master name (optional)."],
+            ["activationDate format dd-mm-yyyy."],
+        ] },
+        { name: "Template", aoa: [SIM_CSV_HEADERS, sample] },
     ]);
-    instr["!cols"] = [{ wch: 90 }];
-    XLSX.utils.book_append_sheet(wb, instr, "Instructions");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([SIM_CSV_HEADERS, sample]), "Template");
-    XLSX.writeFile(wb, "SIM_Cards_import_template.xlsx");
 }
 
 function amsExportSims() {

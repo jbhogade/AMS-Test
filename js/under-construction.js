@@ -18,7 +18,7 @@ function renderUnderConstruction(pageTitle) {
         </div>
         <div class="card">
             <div class="card-body" style="text-align:center;padding:56px 20px;">
-                <div style="font-size:48px;color:var(--accent);margin-bottom:12px;">&#8986;</div>
+                <div style="color:var(--accent);margin-bottom:12px;">${typeof amsUiIcon === "function" ? amsUiIcon("clock") : ""}</div>
                 <h2 style="margin-bottom:8px;">Under Construction</h2>
                 <p class="text-secondary" style="max-width:460px;margin:0 auto;">
                     We are building this portal page by page. The Dashboard is live now;

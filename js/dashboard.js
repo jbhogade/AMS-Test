@@ -14,27 +14,28 @@
 function renderKpiCards() {
     const summary = getAssetSummary();
 
+    const icon = (name) => (typeof amsUiIcon === "function" ? amsUiIcon(name) : "");
     const kpis = [
         {
-            icon: "blue", iconText: "&#9901;",
+            icon: "blue", iconText: icon("box"),
             value: summary.total,
             label: "Total Assets",
             trend: "12% vs last month", trendClass: "up"
         },
         {
-            icon: "green", iconText: "&#10003;",
+            icon: "green", iconText: icon("check"),
             value: summary.operational,
             label: "Operational",
             trend: "Healthy fleet", trendClass: "up"
         },
         {
-            icon: "amber-warn", iconText: "&#9881;",
+            icon: "amber-warn", iconText: icon("wrench"),
             value: summary.maintenance,
             label: "Under Maintenance",
             trend: "Needs attention", trendClass: "down"
         },
         {
-            icon: "cyan", iconText: "&#8377;",
+            icon: "cyan", iconText: icon("rupee"),
             value: formatCurrency(summary.totalValue),
             label: "Total Asset Value",
             trend: "Book value", trendClass: "up"
@@ -168,7 +169,7 @@ function renderLowStock() {
         <div class="low-stock-grid">
             ${items.map(item => `
                 <div class="activity-item">
-                    <div class="activity-icon" style="background:rgba(245,158,11,0.12);color:var(--warning);">&#9888;</div>
+                    <div class="activity-icon" style="background:rgba(245,158,11,0.12);color:var(--warning);">${typeof amsUiIcon === "function" ? amsUiIcon("warn") : "!"}</div>
                     <div class="activity-body">
                         <div class="activity-title">${escapeHtml(item.name)}</div>
                         <div class="activity-meta">${escapeHtml(item.type)} &middot; Stock: ${item.stock} unit(s)</div>
@@ -184,11 +185,12 @@ function renderActivityLog() {
     const container = document.getElementById("activity-list");
     if (!container) return;
 
+    const ic = (name) => (typeof amsUiIcon === "function" ? amsUiIcon(name) : "");
     const iconMap = {
-        success: ["green", "&#10003;"],
-        info:    ["blue",  "&#8226;"],
-        warning: ["amber-warn", "&#9888;"],
-        danger:  ["red",  "&#9888;"]
+        success: ["green", ic("check")],
+        info:    ["blue",  ic("dot")],
+        warning: ["amber-warn", ic("warn")],
+        danger:  ["red",  ic("warn")]
     };
 
     /* Real activity from the shared audit log (amsNotify writes to it), not dummy data. */
@@ -201,7 +203,7 @@ function renderActivityLog() {
     }
 
     container.innerHTML = entries.map(item => {
-        const icon = iconMap[item.type] || ["grey", "&#8226;"];
+        const icon = iconMap[item.type] || ["grey", ic("dot")];
         const bg = icon[0] === 'green' ? 'rgba(34,197,94,0.12)'
             : icon[0] === 'red' ? 'rgba(239,68,68,0.12)'
             : icon[0] === 'amber-warn' ? 'rgba(245,158,11,0.12)'

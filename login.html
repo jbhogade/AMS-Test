@@ -154,14 +154,8 @@
         </div>
     </div>
 
-    <script src="js/dummy-data.js"></script>
-    <script src="js/theme.js"></script>
-    <script>
-        /* Respect the Appearance prefs chosen in Settings, even on the login
-           page: apply the saved theme + font size before anything renders. */
-        initTheme();
-        if (typeof amsApplyPortalPrefs === "function") amsApplyPortalPrefs();
-    </script>
-    <script src="js/login.js"></script>
+    <script defer src="js/dummy-data.js"></script>
+    <script defer src="js/theme.js"></script>
+    <script defer src="js/login.js"></script>
 </body>
 </html>

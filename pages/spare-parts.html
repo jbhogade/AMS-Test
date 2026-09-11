@@ -198,18 +198,19 @@
         </div>
     </div>
 
-    <script src="../js/dummy-data.js"></script>
-    <script src="../js/theme.js"></script>
-    <script src="../js/app.js"></script>
-    <script src="../js/layout.js"></script>
-    <script src="../js/sortable.js"></script>
-    <script src="../js/vendor/xlsx.full.min.js"></script>
-    <script src="../js/xlsx-helpers.js"></script>
-    <script src="../js/master-table.js"></script>
-    <script src="../js/spare-parts.js"></script>
+    <script defer src="../js/dummy-data.js"></script>
+    <script defer src="../js/theme.js"></script>
+    <script defer src="../js/app.js"></script>
+    <script defer src="../js/layout.js"></script>
+    <script defer src="../js/sortable.js"></script>
+    <script defer src="../js/xlsx-helpers.js"></script>
+    <script defer src="../js/master-table.js"></script>
+    <script defer src="../js/spare-parts.js"></script>
     <script>
-        amsPopulateVendorSelects();
-        amsWireVendorQuickAdds();
+        document.addEventListener("DOMContentLoaded", function () {
+            amsPopulateVendorSelects();
+            amsWireVendorQuickAdds();
+        });
     </script>
 </body>
 </html>

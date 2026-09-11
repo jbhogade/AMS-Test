@@ -42,7 +42,7 @@ function amsEsc(str) {
  *   usageCount: (item) => AMS_DUMMY_ASSETS.filter(a => a.type === item.name).length,
  * }
  */
-const AMS_MT_STATE = { editingKey: null };
+const AMS_MT_STATE = { editingKey: null, booted: false };
 
 function amsMtMatchKeys() {
     const cfg = AMS_MASTER_CONFIG;
@@ -100,23 +100,17 @@ function amsExportMaster() {
 /* ---- TEMPLATE: .xlsx workbook with Instructions + header/example sheet ----- */
 function amsDownloadTemplate() {
     const cfg = AMS_MASTER_CONFIG;
-    if (typeof XLSX === "undefined") {
-        amsToast("Excel export library not loaded. Check js/vendor/xlsx.full.min.js is present.", "warning");
-        return;
-    }
     const headers = [...cfg.fields.map(f => f.key + (f.required ? "*" : "")), "active"];
     const sample = cfg.fields.map(f => f.upper ? "EX" : f.type === "date" ? "13-07-2026" : `Example ${f.label}`);
-    const wb = XLSX.utils.book_new();
-    const instr = XLSX.utils.aoa_to_sheet([
-        [`${cfg.pageTitle} Import Template - Instructions`],
-        ["Fields marked with * are required."],
-        ["Do not delete the header row (row 2)."],
-        ['"active" = true/false.'],
+    amsWriteWorkbook(`${cfg.pageTitle.replace(/\s+/g, "_")}_import_template.xlsx`, [
+        { name: "Instructions", cols: [{ wch: 80 }], aoa: [
+            [`${cfg.pageTitle} Import Template - Instructions`],
+            ["Fields marked with * are required."],
+            ["Do not delete the header row (row 2)."],
+            ['"active" = true/false.'],
+        ] },
+        { name: "Template", aoa: [headers, [...sample, "true"]] },
     ]);
-    instr["!cols"] = [{ wch: 80 }];
-    XLSX.utils.book_append_sheet(wb, instr, "Instructions");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers, [...sample, "true"]]), "Template");
-    XLSX.writeFile(wb, `${cfg.pageTitle.replace(/\s+/g, "_")}_import_template.xlsx`);
 }
 
 /* ---- IMPORT: bulk upload (upserts by idKey - existing update, new get added) */
@@ -295,7 +289,7 @@ async function amsRenderMasterTable() {
                 ${cfg.usageCount ? `<td class="mono">${usage}</td>` : ""}
                 <td>${statusBadge}</td>
                 <td class="actions-cell">
-                    <button class="actions-trigger" data-actions-for="${amsEsc(item[cfg.idKey])}" title="Actions">Actions &#9662;</button>
+                    <button class="actions-trigger" data-actions-for="${amsEsc(item[cfg.idKey])}" title="Actions">Actions ${typeof amsUiIcon === "function" ? amsUiIcon("caret") : ""}</button>
                     <div class="actions-menu" id="menu-${amsEsc(item[cfg.idKey])}">
                         <button data-mt-action="edit" data-key="${amsEsc(item[cfg.idKey])}">Edit</button>
                         <button data-mt-action="toggle" data-key="${amsEsc(item[cfg.idKey])}">${item.active ? "Deactivate" : "Activate"}</button>
@@ -637,11 +631,16 @@ document.addEventListener("click", (e) => {
     if (!e.target.closest(".quickadd-popover")) amsMtCloseAllQuickAdd();
 });
 
-/* ---- PAGE INIT ---------------------------------------------------------------- */
-document.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("pageTitle").textContent = AMS_MASTER_CONFIG.pageTitle;
-    document.getElementById("pageSub").textContent = AMS_MASTER_CONFIG.pageSub;
-    document.getElementById("btnAddMaster").textContent = `+ Add ${AMS_MASTER_CONFIG.pageTitle.replace(" Master", "")}`;
+/* ---- PAGE INIT ----------------------------------------------------------------
+   Config is often assigned in another DOMContentLoaded listener (inline page
+   script). Run after those so AMS_MASTER_CONFIG is in place. */
+function amsInitMasterTable() {
+    const cfg = window.AMS_MASTER_CONFIG;
+    if (!cfg || AMS_MT_STATE.booted) return;
+    AMS_MT_STATE.booted = true;
+    document.getElementById("pageTitle").textContent = cfg.pageTitle;
+    document.getElementById("pageSub").textContent = cfg.pageSub;
+    document.getElementById("btnAddMaster").textContent = `+ Add ${cfg.pageTitle.replace(" Master", "")}`;
 
     amsSortRegisterRenderer("masterTable", amsRenderMasterTable);
     amsRenderMasterTable();
@@ -654,7 +653,9 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("importFileInput").addEventListener("change", (e) => {
         if (e.target.files[0]) amsHandleImportFile(e.target.files[0]);
     });
-});
+}
+
+document.addEventListener("DOMContentLoaded", () => setTimeout(amsInitMasterTable, 0));
 
 /*------------------------------------------------------------------------------
 #-------------- End of the code : MASTER TABLE ENGINE --------------------------

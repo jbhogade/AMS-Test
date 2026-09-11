@@ -100,20 +100,19 @@
         </div>
     </div>
 
-    <script src="../js/dummy-data.js"></script>
-    <script src="../js/theme.js"></script>
-    <script src="../js/app.js"></script>
-    <script src="../js/layout.js"></script>
-    <script src="../js/sortable.js"></script>
-    <script src="../js/vendor/xlsx.full.min.js"></script>
-    <script src="../js/xlsx-helpers.js"></script>
-    <script src="../js/master-table.js"></script>
+    <script defer src="../js/dummy-data.js"></script>
+    <script defer src="../js/theme.js"></script>
+    <script defer src="../js/app.js"></script>
+    <script defer src="../js/layout.js"></script>
+    <script defer src="../js/sortable.js"></script>
+    <script defer src="../js/xlsx-helpers.js"></script>
+    <script defer src="../js/master-table.js"></script>
 
     <!-- ====================================================================
          THIS PAGE'S MASTER CONFIG (only part unique to Vendor Master)
          ==================================================================== -->
     <script>
-        (function () {
+        document.addEventListener("DOMContentLoaded", function () {
             window.AMS_MASTER_CONFIG = {
                 pageTitle: "Vendor Master",
                 pageSub: "Manage suppliers / vendors referenced across Assets, Consumables, Spare Parts and Services",
@@ -145,7 +144,7 @@
                     AMS_DUMMY_SPARE_PARTS.filter(p => (p.vendor || "").toLowerCase() === item.name.toLowerCase()).length,
             };
             initLayout("vendors");
-        })();
+        });
     </script>
 </body>
 </html>

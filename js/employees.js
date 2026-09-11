@@ -170,16 +170,16 @@ function buildActionsMenu(emp) {
         || getEmployeeSimCards(emp.amsId).length > 0 || getSubordinateSimCards(emp.amsId).length > 0;
     return `
         <div class="row-actions">
-            <button class="actions-btn" onclick="toggleRowActions(this)">Actions &#9662;</button>
+            <button class="actions-btn" onclick="toggleRowActions(this)">Actions ${typeof amsUiIcon === "function" ? amsUiIcon("caret") : ""}</button>
             <div class="actions-menu">
-                <a onclick="viewEmployee('${emp.amsId}')">&#128065; View</a>
-                <a onclick="openEditModal('${emp.amsId}')">&#9998; Edit</a>
+                <a onclick="viewEmployee('${emp.amsId}')">View</a>
+                <a onclick="openEditModal('${emp.amsId}')">Edit</a>
                 ${active ? `<div class="menu-sep"></div>
-                <a class="${holdsAssets ? "" : "menu-disabled"}" onclick="${holdsAssets ? `openIssueForm('${emp.amsId}')` : `alert('No Assign Report can be generated - this employee is not holding any assets.')`}">&#128203; Assign Report (Asset Issue Form)</a>
+                <a class="${holdsAssets ? "" : "menu-disabled"}" onclick="${holdsAssets ? `openIssueForm('${emp.amsId}')` : `alert('No Assign Report can be generated - this employee is not holding any assets.')`}">Assign Report (Asset Issue Form)</a>
                 <div class="menu-sep"></div>
-                <a class="danger" onclick="openExitModal('${emp.amsId}')">&#10006; Exit</a>`
+                <a class="danger" onclick="openExitModal('${emp.amsId}')">Exit</a>`
                 : exited ? `<div class="menu-sep"></div>
-                <a onclick="openHandoverForm('${emp.amsId}')">&#128202; Exit Report (Handover Form)</a>` : ""}
+                <a onclick="openHandoverForm('${emp.amsId}')">Exit Report (Handover Form)</a>` : ""}
             </div>
         </div>
     `;
@@ -860,10 +860,6 @@ function saveQuickAddDesig() {
 const EMP_CSV_HEADERS = ["empId*", "name*", "dept*", "designation*", "site", "reportsTo", "managerId", "contact", "email", "status"];
 
 function amsDownloadEmployeeTemplate() {
-    if (typeof XLSX === "undefined") {
-        alert("Excel export library not loaded. Check js/vendor/xlsx.full.min.js is present.");
-        return;
-    }
     const instructionRows = [
         ["Employee Master Import Template - Instructions"],
         ["Fields marked with * are required: empId, name, dept, designation."],
@@ -877,12 +873,10 @@ function amsDownloadEmployeeTemplate() {
         ["status = Active or Inactive (default Active)."],
     ];
     const sample = ["EMP-000001", "Example Employee", "IT", "Engineer", "Mumbai HO", "", "", "+91 99999 99999", "example@company.com", "Active"];
-    const wb = XLSX.utils.book_new();
-    const instr = XLSX.utils.aoa_to_sheet(instructionRows);
-    instr["!cols"] = [{ wch: 100 }];
-    XLSX.utils.book_append_sheet(wb, instr, "Instructions");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([EMP_CSV_HEADERS, sample]), "Template");
-    XLSX.writeFile(wb, "Employee_Master_import_template.xlsx");
+    amsWriteWorkbook("Employee_Master_import_template.xlsx", [
+        { name: "Instructions", cols: [{ wch: 100 }], aoa: instructionRows },
+        { name: "Template", aoa: [EMP_CSV_HEADERS, sample] },
+    ]);
 }
 
 function amsExportEmployees() {

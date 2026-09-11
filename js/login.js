@@ -15,6 +15,9 @@
     var msgEl = document.getElementById("login-msg");
     var btn = document.getElementById("login-btn");
 
+    if (typeof initTheme === "function") initTheme();
+    if (typeof amsApplyPortalPrefs === "function") amsApplyPortalPrefs();
+
     /* If a live session already exists, skip the login page entirely. */
     function alreadySignedIn() {
         var session = (typeof amsGetSession === "function") ? amsGetSession() : null;

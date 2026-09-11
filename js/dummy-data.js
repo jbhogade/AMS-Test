@@ -2786,7 +2786,7 @@ function amsSaveReportHeaderPrefs(prefs) {
    The in-memory seed arrays are untouched, so a page reload brings the demo
    data back exactly as shipped. */
 function amsResetDemoData() {
-    ["ams-theme", "ams-ui-style", "ams_notifications", "ams_activity_log", "ams_viewing_as_role",
+    ["ams-theme", "ams-ui-style", "ams-sidebar-show", "ams_notifications", "ams_activity_log", "ams_viewing_as_role",
      "ams_role_access_defaults", "ams_company_details",
      AMS_PORTAL_NAME_STORAGE_KEY, AMS_FONT_SIZE_STORAGE_KEY,
      AMS_PAGE_SIZE_STORAGE_KEY, AMS_TOAST_STORAGE_KEY,

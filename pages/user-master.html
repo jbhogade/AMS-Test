@@ -104,20 +104,19 @@
         </div>
     </div>
 
-    <script src="../js/dummy-data.js"></script>
-    <script src="../js/theme.js"></script>
-    <script src="../js/app.js"></script>
-    <script src="../js/layout.js"></script>
-    <script src="../js/sortable.js"></script>
-    <script src="../js/vendor/xlsx.full.min.js"></script>
-    <script src="../js/xlsx-helpers.js"></script>
-    <script src="../js/master-table.js"></script>
+    <script defer src="../js/dummy-data.js"></script>
+    <script defer src="../js/theme.js"></script>
+    <script defer src="../js/app.js"></script>
+    <script defer src="../js/layout.js"></script>
+    <script defer src="../js/sortable.js"></script>
+    <script defer src="../js/xlsx-helpers.js"></script>
+    <script defer src="../js/master-table.js"></script>
 
     <!-- ====================================================================
          THIS PAGE'S MASTER CONFIG + ROLE GUARDS (only part unique to User Master)
          ==================================================================== -->
     <script>
-        (function () {
+        document.addEventListener("DOMContentLoaded", function () {
             /* Role rank: you may assign / see your own level and below. */
             const AMS_USER_ROLE_RANK = {
                 "Standard User": 0,
@@ -262,8 +261,8 @@
                 amsUpdateUserRoleHint();
             }
 
-            document.addEventListener("DOMContentLoaded", initUserMaster);
-        })();
+            initUserMaster();
+        });
     </script>
 </body>
 </html>

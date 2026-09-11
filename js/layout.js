@@ -100,9 +100,9 @@ function renderSidebar(currentPage) {
 
         const active = item.page === currentPage ? "active" : "";
         sectionsHtml += `
-            <a class="sidebar-link ${active}" href="${item.href}" data-page="${item.page}">
+            <a class="sidebar-link ${active}" href="${item.href}" data-page="${item.page}" title="${escapeHtml(item.label)}">
                 <span class="icon">${item.icon}</span>
-                <span>${escapeHtml(item.label)}</span>
+                <span class="sidebar-link-label">${escapeHtml(item.label)}</span>
             </a>
         `;
     });
@@ -110,7 +110,7 @@ function renderSidebar(currentPage) {
     mount.innerHTML = `
         <div class="sidebar-brand">
             <div class="sidebar-logo">AM</div>
-            <div>
+            <div class="sidebar-brand-text">
                 <div class="sidebar-brand-name">${escapeHtml((typeof amsGetPortalName === "function") ? amsGetPortalName() : "Asset Manager")}</div>
                 <div class="sidebar-brand-sub">Management Portal v4.0</div>
             </div>
@@ -132,14 +132,15 @@ function renderTopbar(currentPage) {
     const pageInfo = PAGE_TITLES[currentPage] || { title: "Portal", sub: "" };
 
     mount.innerHTML = `
-        <button class="topbar-toggle" id="sidebar-toggle" aria-label="Open menu">&#9776;</button>
+        <button class="topbar-toggle" id="sidebar-toggle" aria-label="Open menu">${typeof amsUiIcon === "function" ? amsUiIcon("menu") : "Menu"}</button>
+        <button type="button" class="sidebar-desk-toggle" id="sidebar-desk-toggle" aria-label="Hide sidebar">${typeof amsUiIcon === "function" ? amsUiIcon("sidebarHide") : "Hide"}</button>
         <div>
             <div class="topbar-title">${escapeHtml(pageInfo.title)}</div>
             <div class="topbar-breadcrumb">Home &rsaquo; ${escapeHtml(pageInfo.title)} ${pageInfo.sub ? '&rsaquo; ' + escapeHtml(pageInfo.sub) : ''}</div>
         </div>
         <div class="topbar-spacer"></div>
         <div class="notif-bell-wrap">
-            <button class="notif-bell-trigger" id="notifBellTrigger" title="Notifications">&#128276;</button>
+            <button class="notif-bell-trigger" id="notifBellTrigger" title="Notifications">${typeof amsUiIcon === "function" ? amsUiIcon("bell") : "Alerts"}</button>
             <span class="notif-bell-badge" id="notifBellBadge"></span>
             <div class="notif-bell-panel" id="notifBellPanel">
                 <div class="notif-bell-header">
@@ -159,7 +160,7 @@ function renderTopbar(currentPage) {
                 <div class="user-chip" id="user-chip" title="Account menu">
                     <div class="user-avatar">${escapeHtml(initials)}</div>
                     <span class="user-chip-name">${escapeHtml(name)}</span>
-                    <span class="user-chip-caret">&#9662;</span>
+                    <span class="user-chip-caret">${typeof amsUiIcon === "function" ? amsUiIcon("caret") : ""}</span>
                 </div>
                 <div class="user-chip-menu" id="user-chip-menu">
                     <a class="user-chip-menu-item" href="../pages/profile.html">My Profile</a>
@@ -195,6 +196,73 @@ function renderTopbar(currentPage) {
     /* Sidebar overlay lives outside the sidebar element, created here */
     const overlay = document.getElementById("sidebar-overlay");
     if (overlay) overlay.classList.remove("show");
+}
+
+/* ---- Desktop sidebar: icon-only rail, overlay peek, persist-show pin --------
+   Collapsed = 64px icons so lists get width. Hover/focus peeks labels over
+   the page without shifting .app-main. Pin Show (localStorage ams-sidebar-show)
+   keeps names visible. Mobile drawer (#sidebar-toggle) is unchanged. */
+const AMS_SIDEBAR_SHOW_KEY = "ams-sidebar-show";
+
+function amsSidebarIsPinnedShow() {
+    try { return localStorage.getItem(AMS_SIDEBAR_SHOW_KEY) === "1"; }
+    catch (e) { return false; }
+}
+
+function amsSidebarSetPinnedShow(on) {
+    try {
+        if (on) localStorage.setItem(AMS_SIDEBAR_SHOW_KEY, "1");
+        else localStorage.removeItem(AMS_SIDEBAR_SHOW_KEY);
+    } catch (e) { /* storage unavailable */ }
+}
+
+function amsApplySidebarMode() {
+    const pinned = amsSidebarIsPinnedShow();
+    document.body.classList.toggle("sidebar-collapsed", !pinned);
+    document.body.classList.toggle("sidebar-pinned", pinned);
+    document.body.classList.remove("sidebar-peek");
+    const btn = document.getElementById("sidebar-desk-toggle");
+    if (!btn) return;
+    const show = !pinned;
+    btn.setAttribute("aria-label", show ? "Show sidebar" : "Hide sidebar");
+    btn.title = show ? "Show sidebar names" : "Hide sidebar (icons only)";
+    btn.innerHTML = (typeof amsUiIcon === "function")
+        ? amsUiIcon(show ? "sidebarShow" : "sidebarHide")
+        : (show ? "Show" : "Hide");
+}
+
+function amsInitDesktopSidebar() {
+    amsApplySidebarMode();
+    const btn = document.getElementById("sidebar-desk-toggle");
+    if (btn && !btn.dataset.bound) {
+        btn.dataset.bound = "1";
+        btn.addEventListener("click", function () {
+            amsSidebarSetPinnedShow(!amsSidebarIsPinnedShow());
+            amsApplySidebarMode();
+        });
+    }
+    const sidebar = document.getElementById("sidebar");
+    if (sidebar && !sidebar.dataset.peekBound) {
+        sidebar.dataset.peekBound = "1";
+        sidebar.addEventListener("mouseenter", function () {
+            if (document.body.classList.contains("sidebar-collapsed")) {
+                document.body.classList.add("sidebar-peek");
+            }
+        });
+        sidebar.addEventListener("mouseleave", function () {
+            document.body.classList.remove("sidebar-peek");
+        });
+        sidebar.addEventListener("focusin", function () {
+            if (document.body.classList.contains("sidebar-collapsed")) {
+                document.body.classList.add("sidebar-peek");
+            }
+        });
+        sidebar.addEventListener("focusout", function (e) {
+            if (!sidebar.contains(e.relatedTarget)) {
+                document.body.classList.remove("sidebar-peek");
+            }
+        });
+    }
 }
 
 /* ---- Session gate: no live login session -> redirect to the login page ----- */
@@ -233,6 +301,7 @@ function initLayout(currentPage) {
     renderSidebar(currentPage);
     renderTopbar(currentPage);
     initApp();               /* binds sidebar toggle / overlay / year   */
+    amsInitDesktopSidebar();
     setActiveNav(currentPage);
 
     /* Notification bell (needs the topbar to already be rendered) */

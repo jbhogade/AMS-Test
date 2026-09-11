@@ -74,6 +74,7 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     display: flex;
     flex-direction: column;
     min-width: 0;
+    transition: margin-left 0.2s ease;
 }
 
 .app-content {
@@ -96,7 +97,7 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     display: flex;
     flex-direction: column;
     z-index: 100;
-    transition: transform 0.25s ease;
+    transition: transform 0.25s ease, width 0.2s ease;
     overflow: hidden;
 }
 
@@ -227,6 +228,106 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
 
 .sidebar-overlay.show { display: block; }
 
+/* Desktop hide: icon-only rail. Peek overlay shows names without moving content.
+   Pin Show (body.sidebar-pinned) keeps the full 260px bar. */
+.sidebar-desk-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 6px;
+    line-height: 0;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+.sidebar-desk-toggle:hover {
+    background-color: var(--bg-elevated);
+}
+.sidebar-desk-toggle .ui-icon { width: 18px; height: 18px; }
+
+.sidebar-link-label {
+    white-space: nowrap;
+    overflow: hidden;
+}
+.sidebar-brand-text {
+    min-width: 0;
+    overflow: hidden;
+}
+
+body.sidebar-collapsed .sidebar {
+    width: 64px;
+}
+body.sidebar-collapsed .app-main {
+    margin-left: 64px;
+}
+body.sidebar-collapsed .sidebar-brand {
+    justify-content: center;
+    padding: 16px 12px;
+    gap: 0;
+}
+body.sidebar-collapsed .sidebar-brand-text,
+body.sidebar-collapsed .sidebar-link-label,
+body.sidebar-collapsed .sidebar-footer {
+    display: none;
+}
+body.sidebar-collapsed .sidebar-nav {
+    padding: 10px 8px;
+}
+body.sidebar-collapsed .sidebar-link {
+    justify-content: flex-start;
+    padding: 10px 14px;
+    gap: 12px;
+}
+/* Keep Main / People / Inventory / Admin as a short line so icons stay put. */
+body.sidebar-collapsed .sidebar-nav-label {
+    font-size: 0;
+    line-height: 0;
+    color: transparent;
+    letter-spacing: 0;
+    padding: 14px 8px;
+    height: 29px;
+    overflow: hidden;
+}
+body.sidebar-collapsed .sidebar-nav-label::after {
+    content: "";
+    display: block;
+    width: 20px;
+    height: 1px;
+    margin: 0 auto;
+    background: var(--border);
+}
+
+body.sidebar-collapsed.sidebar-peek .sidebar {
+    width: 260px;
+    box-shadow: var(--shadow);
+    z-index: 110;
+}
+body.sidebar-collapsed.sidebar-peek .app-main {
+    margin-left: 64px;
+}
+body.sidebar-collapsed.sidebar-peek .sidebar-brand {
+    justify-content: center;
+    padding: 16px 12px;
+    gap: 0;
+}
+body.sidebar-collapsed.sidebar-peek .sidebar-link-label {
+    display: revert;
+}
+body.sidebar-collapsed.sidebar-peek .sidebar-nav {
+    padding: 10px 8px;
+}
+body.sidebar-collapsed.sidebar-peek .sidebar-link {
+    justify-content: flex-start;
+    padding: 10px 14px;
+    gap: 12px;
+}
+body.sidebar-collapsed.sidebar-peek .sidebar-nav-label::after {
+    margin: 0;
+}
+
 /* =============================================================================
    4) TOP HEADER BAR
    ===========================================================================*/
@@ -251,6 +352,39 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     font-size: 20px;
     cursor: pointer;
     padding: 4px;
+    line-height: 0;
+}
+
+.ui-icon {
+    width: 18px;
+    height: 18px;
+    display: inline-block;
+    vertical-align: middle;
+    flex-shrink: 0;
+}
+.ui-icon-sm { width: 14px; height: 14px; }
+.ui-icon-lg { width: 32px; height: 32px; }
+.kpi-icon .ui-icon { width: 22px; height: 22px; }
+.activity-icon .ui-icon { width: 16px; height: 16px; }
+.actions-trigger .ui-icon,
+.actions-btn .ui-icon,
+.user-chip-caret .ui-icon { width: 12px; height: 12px; margin-left: 2px; }
+.topbar-toggle .ui-icon { width: 20px; height: 20px; }
+.notif-bell-trigger .ui-icon { width: 16px; height: 16px; }
+.access-denied-icon { color: var(--text-muted); margin-bottom: 10px; }
+.access-denied-icon .ui-icon { width: 32px; height: 32px; }
+
+.skeleton-card {
+    min-height: 72px;
+    background: linear-gradient(90deg, var(--bg-card) 0%, var(--bg-elevated) 50%, var(--bg-card) 100%);
+    background-size: 200% 100%;
+    animation: ams-skel 1.2s ease-in-out infinite;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+@keyframes ams-skel {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
 }
 
 .topbar-title {
@@ -286,6 +420,8 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     font-size: 9px;
     color: var(--text-muted);
     margin-left: 2px;
+    display: inline-flex;
+    align-items: center;
 }
 
 .user-chip-menu {
@@ -349,6 +485,11 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     cursor: pointer;
     font-size: 14px;
     position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    line-height: 0;
 }
 .notif-bell-trigger:hover { color: var(--text-primary); border-color: var(--accent); }
 .notif-bell-badge {
@@ -437,19 +578,19 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
 /* KPI / statistic tile used on the dashboard */
 .kpi-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 18px;
-    margin-bottom: 24px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
 }
 
 .kpi-card {
     background-color: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 18px 20px;
+    padding: 14px 16px;
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
     box-shadow: var(--shadow);
     transition: transform 0.15s ease, border-color 0.15s ease;
 }
@@ -856,8 +997,8 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 16px;
+    gap: 8px;
+    margin-bottom: 12px;
     flex-wrap: wrap;
 }
 
@@ -866,7 +1007,7 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
 .emp-toolbar-left {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     flex-wrap: wrap;
 }
 
@@ -1013,10 +1154,84 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
    RESPONSIVE: tablet / mobile behaviour
    ===========================================================================*/
 @media (max-width: 900px) {
-    .sidebar { transform: translateX(-100%); }
+    .sidebar { transform: translateX(-100%); width: 260px; }
     .sidebar.open { transform: translateX(0); box-shadow: var(--shadow); }
     .app-main { margin-left: 0; }
     .topbar-toggle { display: inline-block; }
+    .sidebar-desk-toggle { display: none; }
+    body.sidebar-collapsed .sidebar,
+    body.sidebar-collapsed.sidebar-peek .sidebar {
+        width: 260px;
+    }
+    body.sidebar-collapsed .app-main,
+    body.sidebar-collapsed.sidebar-peek .app-main {
+        margin-left: 0;
+    }
+    body.sidebar-collapsed .sidebar-brand,
+    body.sidebar-collapsed.sidebar-peek .sidebar-brand {
+        justify-content: flex-start;
+        padding: 20px 20px 16px;
+        gap: 12px;
+    }
+    body.sidebar-collapsed .sidebar-brand-text,
+    body.sidebar-collapsed .sidebar-link-label,
+    body.sidebar-collapsed .sidebar-nav-label,
+    body.sidebar-collapsed .sidebar-footer,
+    body.sidebar-collapsed.sidebar-peek .sidebar-brand-text,
+    body.sidebar-collapsed.sidebar-peek .sidebar-link-label,
+    body.sidebar-collapsed.sidebar-peek .sidebar-nav-label,
+    body.sidebar-collapsed.sidebar-peek .sidebar-footer {
+        display: block;
+        font-size: 11px;
+        line-height: normal;
+        color: var(--text-muted);
+        letter-spacing: 0.08em;
+        padding: 12px 10px 6px;
+        height: auto;
+        overflow: visible;
+    }
+    body.sidebar-collapsed .sidebar-brand-text,
+    body.sidebar-collapsed.sidebar-peek .sidebar-brand-text {
+        font-size: inherit;
+        line-height: inherit;
+        color: inherit;
+        letter-spacing: inherit;
+        padding: 0;
+        height: auto;
+    }
+    body.sidebar-collapsed .sidebar-link-label,
+    body.sidebar-collapsed.sidebar-peek .sidebar-link-label {
+        font-size: inherit;
+        line-height: inherit;
+        color: inherit;
+        letter-spacing: inherit;
+        padding: 0;
+        height: auto;
+        overflow: hidden;
+    }
+    body.sidebar-collapsed .sidebar-footer,
+    body.sidebar-collapsed.sidebar-peek .sidebar-footer {
+        font-size: 12px;
+        line-height: inherit;
+        letter-spacing: normal;
+        padding: 14px 20px;
+        height: auto;
+        overflow: visible;
+    }
+    body.sidebar-collapsed .sidebar-nav-label::after,
+    body.sidebar-collapsed.sidebar-peek .sidebar-nav-label::after {
+        display: none;
+    }
+    body.sidebar-collapsed .sidebar-nav,
+    body.sidebar-collapsed.sidebar-peek .sidebar-nav {
+        padding: 14px 12px;
+    }
+    body.sidebar-collapsed .sidebar-link,
+    body.sidebar-collapsed.sidebar-peek .sidebar-link {
+        justify-content: flex-start;
+        padding: 10px 12px;
+        gap: 12px;
+    }
     .grid-2 { grid-template-columns: 1fr; }
     .topbar-breadcrumb { display: none; }
     .app-content { padding: 18px 16px 40px; }

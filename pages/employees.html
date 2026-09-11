@@ -358,7 +358,7 @@
                 <button class="modal-close" data-close>&times;</button>
             </div>
             <div class="modal-body">
-                <div class="alert alert-danger">&#9888; This will mark the employee as <strong>Inactive</strong> and release all held assets back to the store.</div>
+                <div class="alert alert-danger">This will mark the employee as <strong>Inactive</strong> and release all held assets back to the store.</div>
 
                 <div class="detail-grid">
                     <div class="detail-item">
@@ -426,20 +426,21 @@
     </div>
 
     <!-- Scripts -->
-    <script src="../js/dummy-data.js"></script>
-    <script src="../js/theme.js"></script>
-    <script src="../js/app.js"></script>
-    <script src="../js/layout.js"></script>
-    <script src="../js/sortable.js"></script>
-    <script src="../js/vendor/xlsx.full.min.js"></script>
-    <script src="../js/xlsx-helpers.js"></script>
-    <script src="../js/print-docs.js"></script>
-    <script src="../js/employees.js"></script>
-    <script src="../js/print-forms.js"></script>
+    <script defer src="../js/dummy-data.js"></script>
+    <script defer src="../js/theme.js"></script>
+    <script defer src="../js/app.js"></script>
+    <script defer src="../js/layout.js"></script>
+    <script defer src="../js/sortable.js"></script>
+    <script defer src="../js/xlsx-helpers.js"></script>
+    <script defer src="../js/print-docs.js"></script>
+    <script defer src="../js/employees.js"></script>
+    <script defer src="../js/print-forms.js"></script>
 
     <script>
-        initLayout("employees");
-        initEmployees();
+        document.addEventListener("DOMContentLoaded", function () {
+            initLayout("employees");
+            initEmployees();
+        });
     </script>
 </body>
 </html>
