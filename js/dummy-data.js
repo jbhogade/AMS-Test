@@ -106,7 +106,12 @@ async function amsApiFetch(path, opts) {
     }
     if (!res.ok) {
         let msg = "API error " + res.status;
-        try { const j = await res.json(); if (j && j.error) msg = j.error; } catch (e) { /* non-JSON error */ }
+        try {
+            const j = await res.json();
+            if (j && (j.error || j.detail || j.title || j.message)) {
+                msg = j.error || j.detail || j.title || j.message;
+            }
+        } catch (e) { /* non-JSON error */ }
         throw new Error(msg);
     }
     const text = await res.text();
@@ -2462,6 +2467,7 @@ const AMS_PAGE_REGISTRY = [
     { key: "accessRights",  label: "Access Rights Control Master (Supreme Root only)" },
     { key: "roleAccess",    label: "Role Access Master (Supreme Root only)" },
     { key: "log",           label: "Log Report (Super Root and Supreme Root only)" },
+    { key: "sqlBackup",     label: "SQL Database Backup (hidden until host copy works)" },
     { key: "report.assetLifecycle",     label: "Report: Asset Lifecycle" },
     { key: "report.assetIssue",         label: "Report: Asset Issue Form" },
     { key: "report.assetHandover",      label: "Report: Asset Handover Form" },
@@ -2514,6 +2520,7 @@ const AMS_ROLE_ACCESS_RECOMMENDED = {
     accessRights:           { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "none", "Super Root": "none", "Supreme Root": "full" },
     roleAccess:             { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "none", "Super Root": "none", "Supreme Root": "full" },
     log:                    { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "none", "Super Root": "full", "Supreme Root": "full" },
+    sqlBackup:              { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "none", "Super Root": "none", "Supreme Root": "none" },
     "report.assetLifecycle":    { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
     "report.assetIssue":        { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
     "report.assetHandover":     { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
@@ -2544,6 +2551,9 @@ function amsDefaultRoleAccessMap() {
             }
             if (p.key === "log") {
                 level = (role === "Super Root" || role === "Supreme Root") ? AMS_ACCESS_FULL : AMS_ACCESS_NONE;
+            }
+            if (p.key === "sqlBackup") {
+                level = AMS_ACCESS_NONE;
             }
             map[role][p.key] = level;
         });
@@ -2577,13 +2587,31 @@ function amsMigrateRoleAccessDocument() {
     amsDbSaveDocAsync("roleAccess");
 }
 
+function amsFillMissingRoleAccessKeys(map) {
+    const filled = map && typeof map === "object" ? map : {};
+    const defaults = amsDefaultRoleAccessMap();
+    AMS_USER_ROLES.forEach(role => {
+        if (!filled[role] || typeof filled[role] !== "object") filled[role] = {};
+        AMS_PAGE_REGISTRY.forEach(p => {
+            if (filled[role][p.key] === undefined) {
+                filled[role][p.key] = (defaults[role] && defaults[role][p.key]) || AMS_ACCESS_NONE;
+            }
+        });
+    });
+    return filled;
+}
+
 function amsGetRoleAccessDefaults() {
-    if (AMS_ROLE_ACCESS_DEFAULTS && Object.keys(AMS_ROLE_ACCESS_DEFAULTS).length) return AMS_ROLE_ACCESS_DEFAULTS;
-    try {
-        const raw = localStorage.getItem(AMS_ROLE_ACCESS_STORAGE_KEY);
-        if (raw) return JSON.parse(raw);
-    } catch (e) { /* corrupt storage - fall back to defaults */ }
-    return amsDefaultRoleAccessMap();
+    let map = null;
+    if (AMS_ROLE_ACCESS_DEFAULTS && Object.keys(AMS_ROLE_ACCESS_DEFAULTS).length) map = AMS_ROLE_ACCESS_DEFAULTS;
+    if (!map) {
+        try {
+            const raw = localStorage.getItem(AMS_ROLE_ACCESS_STORAGE_KEY);
+            if (raw) map = JSON.parse(raw);
+        } catch (e) { /* corrupt storage - fall back to defaults */ }
+    }
+    if (!map) map = amsDefaultRoleAccessMap();
+    return amsFillMissingRoleAccessKeys(map);
 }
 
 function amsAccessLevelForUserPage(user, registryKey) {
@@ -2591,6 +2619,9 @@ function amsAccessLevelForUserPage(user, registryKey) {
     const role = (user && user.role) || ((typeof amsGetViewingAsRole === "function") ? amsGetViewingAsRole() : "Standard User");
     if (registryKey === "accessRights" || registryKey === "roleAccess") {
         if (role !== "Supreme Root") return AMS_ACCESS_NONE;
+    }
+    if (registryKey === "sqlBackup") {
+        return AMS_ACCESS_NONE;
     }
     if (registryKey === "log") {
         if (role !== "Supreme Root" && role !== "Super Root") return AMS_ACCESS_NONE;
@@ -2632,6 +2663,7 @@ const AMS_NAV_TO_REGISTRY = {
     "access-rights": "accessRights",
     "role-access": "roleAccess",
     log: "log",
+    "sql-backup": "sqlBackup",
     "master-asset-type": "assetType",
     "master-asset-make": "assetMake",
     "master-asset-category": "assetCategory",

@@ -103,14 +103,21 @@ document.addEventListener("click", (e) => {
     document.getElementById("editAccessUsername").textContent = amsEditingUsername;
 
     const currentlyAllowed = amsResolveAllowedPages(user);
+    const rootRole = user.role === "Super Root" || user.role === "Supreme Root";
 
-    const pages = AMS_PAGE_REGISTRY.filter(p => !p.key.startsWith("report."));
+    const pages = AMS_PAGE_REGISTRY.filter(p => !p.key.startsWith("report.") && p.key !== "sqlBackup");
     const reports = AMS_PAGE_REGISTRY.filter(p => p.key.startsWith("report."));
-    const checkboxHtml = p => `
+    const checkboxHtml = p => {
+        const locked = p.key === "log" || p.key === "accessRights" || p.key === "roleAccess";
+        let checked = currentlyAllowed.includes(p.key);
+        if (p.key === "log") checked = rootRole;
+        if (p.key === "accessRights" || p.key === "roleAccess") checked = user.role === "Supreme Root";
+        return `
         <label>
-            <input type="checkbox" class="access-page-check" value="${amsEsc(p.key)}" ${currentlyAllowed.includes(p.key) ? "checked" : ""}>
-            ${amsEsc(p.label)}
+            <input type="checkbox" class="access-page-check" value="${amsEsc(p.key)}" ${checked ? "checked" : ""}${locked ? " disabled" : ""}>
+            ${amsEsc(p.label)}${locked ? " (role-locked)" : ""}
         </label>`;
+    };
 
     document.getElementById("accessChecklist").innerHTML = `
         <div class="checklist-section">Pages</div>
@@ -133,7 +140,14 @@ document.getElementById("btnSaveAccess").addEventListener("click", () => {
     const user = AMS_DUMMY_USERS.find(u => u.username === amsEditingUsername);
     if (!user) return;
     const checked = [...document.querySelectorAll(".access-page-check:checked")].map(c => c.value);
-    user.allowedPages = checked;
+    const keep = checked.filter(k => k !== "sqlBackup" && k !== "log" && k !== "accessRights" && k !== "roleAccess");
+    if (user.role === "Super Root" || user.role === "Supreme Root") {
+        keep.push("log");
+    }
+    if (user.role === "Supreme Root") {
+        keep.push("accessRights", "roleAccess");
+    }
+    user.allowedPages = keep;
     amsDbSaveAsync("users");
 
     amsNotify(`Access rights updated for ${amsEditingUsername}: ${checked.length} / ${AMS_PAGE_REGISTRY.length} pages`, "warning");

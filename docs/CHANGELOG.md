@@ -1,5 +1,17 @@
 # AMS-Test change log
 
+## 2026-09-19 — SQL database backup (Super Root / Supreme Root)
+
+SQL Database Backup stays in the codebase for a later host-folder copy
+fix. The System Admin tab is hidden for every role, including Super Root
+and Supreme Root. Restart the API and hard-refresh (Ctrl+F5).
+
+## 2026-09-18 — Date field typing and month/year jump
+
+Glass calendar stays. Type in the date box as before. Open the calendar
+from the icon on the right (or Alt+ArrowDown). Click the month or year
+in the calendar header to jump, then pick a day. Hard-refresh (Ctrl+F5).
+
 ## 2026-09-17 — Theme and sidebar pin are per user
 
 Theme and desktop sidebar Show/Hide are stored per signed-in username

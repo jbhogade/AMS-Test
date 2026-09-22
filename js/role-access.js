@@ -25,6 +25,7 @@ const RAM_LOCKED_KEYS = {
     accessRights: "Always Supreme Root only",
     roleAccess: "Always Supreme Root only",
     log: "Always Super Root + Supreme Root only",
+    sqlBackup: "Hidden until host copy into SQL-DB-Backup works",
 };
 
 function amsIsSupremeRootRAM() {
@@ -63,7 +64,7 @@ function ramLevelOptions(selected, locked) {
 
 function renderRoleAccessTable() {
     const map = amsGetRoleAccessDefaults();
-    const pages = AMS_PAGE_REGISTRY.filter(p => !p.key.startsWith("report."));
+    const pages = AMS_PAGE_REGISTRY.filter(p => !p.key.startsWith("report.") && p.key !== "sqlBackup");
     const reports = AMS_PAGE_REGISTRY.filter(p => p.key.startsWith("report."));
 
     const rowHtml = (p) => {

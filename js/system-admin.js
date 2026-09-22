@@ -39,6 +39,7 @@ const AMS_ADMIN_TABS = {
     accessRights:  "access-rights.html",
     roleAccess:    "role-access.html",
     log:           "log-report.html",
+    sqlBackup:     "sql-backup.html",
 };
 /*-------------- End of the code ----------------------------------------------*/
 
@@ -64,14 +65,16 @@ async function initSystemAdmin() {
     });
 
     /* Hide tabs the signed-in user cannot use. Role floors still apply
-       (Access Rights / Role Access = Supreme Root only, Log = Super Root+),
-       and per-user Access Rights assignments apply even to Supreme Root. */
+        (Access Rights / Role Access = Supreme Root only, Log = Super Root+).
+        SQL Database Backup is kept in code but hidden until copy-to
+        SQL-DB-Backup works on the host. */
     let firstVisible = null;
     document.querySelectorAll(".admin-tab").forEach(btn => {
         const key = btn.getAttribute("data-admin-tab");
-        const allowed = (typeof amsUserCanAccessPage === "function")
+        let allowed = (typeof amsUserCanAccessPage === "function")
             ? amsUserCanAccessPage(key)
             : true;
+        if (key === "sqlBackup") allowed = false;
         btn.style.display = allowed ? "" : "none";
         if (allowed && !firstVisible) firstVisible = key;
     });

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<!--
+#-------------- Start Code for : SQL DATABASE BACKUP (sql-backup.html) ----------
+#
+#  PURPOSE   : Super Root / Supreme Root take a full SQL Server backup into
+#              SQL-DB-Backup as AMS-Test-<date-time>.bak.
+#
+#  NAV: System Administrator Master tab, embedded via ?embed=1.
+#
+#  FILES USED :
+#    - css/themes.css, css/main.css, css/ui-styles.css, css/embed-mode.css,
+#      css/role-gate.css
+#    - js/dummy-data.js, js/theme.js, js/app.js, js/layout.js, js/sql-backup.js
+#------------------------------------------------------------------------------
+-->
+<html lang="en" data-theme="platinum" data-ui-style="glass">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL Database Backup | Asset Management System</title>
+
+    <link rel="stylesheet" href="../css/themes.css">
+    <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/ui-styles.css">
+    <link rel="stylesheet" href="../css/embed-mode.css">
+    <link rel="stylesheet" href="../css/role-gate.css">
+</head>
+<body>
+    <script src="../js/embed-mode.js"></script>
+    <div class="app">
+        <aside class="sidebar" id="sidebar">
+            <div id="sidebar-mount"></div>
+        </aside>
+
+        <main class="app-main">
+            <header class="topbar" id="topbar-mount"></header>
+
+            <div class="app-content">
+                <div class="page-heading">
+                    <h1>SQL Database Backup</h1>
+                    <p class="page-sub">Full SQL Server backup for Super Root and Supreme Root only</p>
+                </div>
+
+                <div class="viewing-as-bar">
+                    <label for="viewingAsRole">Signed-in Role:</label>
+                    <input id="viewingAsRole" class="input" disabled style="width:auto; max-width:220px;">
+                    <span class="form-hint" id="viewingAsHint"></span>
+                </div>
+
+                <div id="accessDeniedCard" class="access-denied-card" style="display:none;">
+                    <div class="ad-title">Access Denied</div>
+                    <div class="ad-sub">SQL Database Backup is only available to Super Root and Supreme Root.</div>
+                </div>
+
+                <div id="sqlBackupContent" style="display:none;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Take Backup</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="form-hint" style="margin-bottom:14px;">
+                                Writes a compressed full SQL Server backup (`.bak`) into
+                                `SQL-DB-Backup` as `AMS-Test-&lt;date-time&gt;.bak`. The folder is
+                                created automatically if it is missing.
+                            </p>
+                            <button type="button" class="btn btn-primary" id="btnSqlBackup">Take SQL Backup</button>
+                            <div class="sql-backup-progress" id="sqlBackupProgressWrap" hidden>
+                                <div class="progress sql-backup-progress-bar" id="sqlBackupProgress">
+                                    <div class="progress-fill" id="sqlBackupProgressFill"></div>
+                                </div>
+                                <div class="form-hint" id="sqlBackupProgressLabel">Preparing backup...</div>
+                            </div>
+                            <div class="form-hint" id="sqlBackupStatus" style="margin-top:10px;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script defer src="../js/dummy-data.js"></script>
+    <script defer src="../js/theme.js"></script>
+    <script defer src="../js/app.js"></script>
+    <script defer src="../js/layout.js"></script>
+    <script defer src="../js/sql-backup.js"></script>
+</body>
+</html>
+<!--
+#-------------- End of the code : SQL DATABASE BACKUP ---------------------------
+#------------------------------------------------------------------------------
+-->
