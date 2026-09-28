@@ -1,15 +1,8 @@
 /*==============================================================================
 #-------------- Start Code for : DUMMY DATA (dummy-data.js) -------------------
 #
-#  PURPOSE   : Provides sample / test data for the whole portal because we
-#              are NOT connected to SQL Server yet.
-#
-#  HOW TO USE IN FUTURE (SQL SERVER MIGRATION) :
-#    - Every data source below is a plain JavaScript array / object.
-#    - When you connect SQL Server, replace each section with an AJAX / fetch
-#      call that reads the same shape of data from your backend API.
-#    - KEEP the property names identical so the pages that consume this data
-#      do NOT need to change.
+#  PURPOSE   : In-memory cache of every SQL collection for the portal.
+#              SQL Server (via /api/collection/...) is the source of truth.
 #
 #  FILE MAP :
 #    1. SHARED HELPERS  - date formatting, toast, CSV helpers (from v3-3)
@@ -37,8 +30,8 @@
    DATABASE / API LAYER  (AMS-TEST)
    -----------------------------------------------------------------------------
    The AMS-Test portal is backed by the SQL Server database "AMS-TEST" reached
-   through the ASP.NET Core API (server\AMS.API). Business data is stored as
-   JSON documents in the dbo.ams_collections table; this layer loads every
+   through the ASP.NET Core API (server\AMS.API). Business data lives in
+   per-entity SQL tables (plus data_json on each row). This layer loads every
    collection into the global arrays below at startup and PUTs a collection
    back to the API whenever the in-memory data changes. SQL Server is the
    single source of truth - the arrays are just a live cache of the documents.
@@ -78,9 +71,15 @@ function amsLogout() {
     amsClearSession();
     amsLoginRedirect();
 }
+function amsInPagesFolder() {
+    return /\/pages\//.test(window.location.pathname || "");
+}
+function amsHref(rootPath) {
+    const p = String(rootPath || "").replace(/^\//, "");
+    return (amsInPagesFolder() ? "../" : "") + p;
+}
 function amsLoginRedirect() {
-    const isPages = /\/pages\//.test(window.location.pathname);
-    window.location.replace((isPages ? "../" : "") + "login.html");
+    window.location.replace(amsHref("login.html"));
 }
 
 /* ---- core API client ------------------------------------------------------- */
@@ -2897,26 +2896,6 @@ function amsSaveReportHeaderPrefs(prefs) {
     Object.assign(AMS_REPORT_HEADER_PREFS, prefs);
     try { localStorage.setItem(AMS_REPORT_HEADER_STORAGE_KEY, JSON.stringify(prefs)); } catch (e) { /* storage full */ }
     amsDbSaveDocAsync("reportPrefs");
-}
-
-/* Wipes every localStorage-backed demo preference + data (Settings > Data).
-   The in-memory seed arrays are untouched, so a page reload brings the demo
-   data back exactly as shipped. */
-function amsResetDemoData() {
-    ["ams-theme", "ams-theme-by-user", "ams-ui-style", "ams-sidebar-show", "ams-sidebar-show-by-user", "ams_notifications", "ams_activity_log", "ams_viewing_as_role",
-     "ams_role_access_defaults", "ams_company_details",
-     AMS_PORTAL_NAME_STORAGE_KEY, AMS_FONT_SIZE_STORAGE_KEY,
-     AMS_PAGE_SIZE_STORAGE_KEY, AMS_TOAST_STORAGE_KEY,
-     AMS_REPORT_HEADER_STORAGE_KEY].forEach(key => {
-        try { localStorage.removeItem(key); } catch (e) { /* storage unavailable */ }
-    });
-
-    /* Runtime doc globals hold whatever was loaded from the DB this page-session;
-       reset them too so "restore demo defaults" takes effect immediately without
-       a reload. */
-    Object.keys(AMS_REPORT_HEADER_PREFS).forEach(k => delete AMS_REPORT_HEADER_PREFS[k]);
-    Object.keys(AMS_ROLE_ACCESS_DEFAULTS).forEach(k => delete AMS_ROLE_ACCESS_DEFAULTS[k]);
-    Object.keys(AMS_DUMMY_COMPANY_DETAILS).forEach(k => delete AMS_DUMMY_COMPANY_DETAILS[k]);
 }
 
 /* =============================================================================

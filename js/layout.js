@@ -32,20 +32,20 @@ const ICONS = {
 
 /* ---- Navigation menu definition (single source of truth) ------------------- */
 const NAV_ITEMS = [
-    { page: "dashboard",   label: "Dashboard",   href: "../index.html",       icon: ICONS.dashboard,   section: "Main" },
-    { page: "employees",   label: "Employees",   href: "../pages/employees.html",   icon: ICONS.people,  section: "People" },
-    { page: "assets",      label: "Assets",      href: "../pages/assets.html",      icon: ICONS.assets,      section: "Inventory" },
-    { page: "mobiles",     label: "Mobiles",     href: "../pages/mobiles.html",     icon: ICONS.simCards,    section: "Inventory" },
-    { page: "asset-distribution", label: "Asset Distribution", href: "../pages/asset-distribution.html", icon: ICONS.assets, section: "Inventory" },
-    { page: "consumables", label: "Consumables", href: "../pages/consumables.html", icon: ICONS.consumables, section: "Inventory" },
-    { page: "spare-parts", label: "Spare Parts", href: "../pages/spare-parts.html", icon: ICONS.spareParts,  section: "Inventory" },
-    { page: "accessories", label: "Accessories", href: "../pages/accessories.html", icon: ICONS.accessories, section: "Inventory" },
-    { page: "sim-cards",   label: "SIM Cards",   href: "../pages/sim-cards.html",   icon: ICONS.simCards,   section: "Inventory" },
-    { page: "vendors",     label: "Vendors",     href: "../pages/vendors.html",     icon: ICONS.vendors,     section: "Admin" },
-    { page: "reports",     label: "Reports",     href: "../pages/reports.html",     icon: ICONS.reports,     section: "Admin" },
-    { page: "system-admin",label: "System Admin", href: "../pages/system-admin.html", icon: ICONS.systemAdmin, section: "Admin" },
-    { page: "settings",    label: "Settings",    href: "../pages/settings.html",    icon: ICONS.settings,    section: "Admin" },
-    { page: "user-master", label: "User Master", href: "../pages/user-master.html", icon: ICONS.people,    section: "Admin" }
+    { page: "dashboard",   label: "Dashboard",   href: "index.html",       icon: ICONS.dashboard,   section: "Main" },
+    { page: "employees",   label: "Employees",   href: "pages/employees.html",   icon: ICONS.people,  section: "People" },
+    { page: "assets",      label: "Assets",      href: "pages/assets.html",      icon: ICONS.assets,      section: "Inventory" },
+    { page: "mobiles",     label: "Mobiles",     href: "pages/mobiles.html",     icon: ICONS.simCards,    section: "Inventory" },
+    { page: "asset-distribution", label: "Asset Distribution", href: "pages/asset-distribution.html", icon: ICONS.assets, section: "Inventory" },
+    { page: "consumables", label: "Consumables", href: "pages/consumables.html", icon: ICONS.consumables, section: "Inventory" },
+    { page: "spare-parts", label: "Spare Parts", href: "pages/spare-parts.html", icon: ICONS.spareParts,  section: "Inventory" },
+    { page: "accessories", label: "Accessories", href: "pages/accessories.html", icon: ICONS.accessories, section: "Inventory" },
+    { page: "sim-cards",   label: "SIM Cards",   href: "pages/sim-cards.html",   icon: ICONS.simCards,   section: "Inventory" },
+    { page: "vendors",     label: "Vendors",     href: "pages/vendors.html",     icon: ICONS.vendors,     section: "Admin" },
+    { page: "reports",     label: "Reports",     href: "pages/reports.html",     icon: ICONS.reports,     section: "Admin" },
+    { page: "system-admin",label: "System Admin", href: "pages/system-admin.html", icon: ICONS.systemAdmin, section: "Admin" },
+    { page: "settings",    label: "Settings",    href: "pages/settings.html",    icon: ICONS.settings,    section: "Admin" },
+    { page: "user-master", label: "User Master", href: "pages/user-master.html", icon: ICONS.people,    section: "Admin" }
 ];
 
 /* ---- Page title mapping (used by the top header bar) ----------------------- */
@@ -54,6 +54,8 @@ const PAGE_TITLES = {
     "employees":   { title: "Employees",       sub: "Employee master, assets & handover records" },
     "assets":      { title: "Assets",          sub: "Equipment, machinery & company items" },
     "mobiles":     { title: "Mobiles",         sub: "Mobile phones & handheld devices" },
+    "asset-distribution": { title: "Asset Distribution", sub: "Assets currently assigned to employees" },
+    "profile":     { title: "My Profile",      sub: "Display name, contact and password" },
     "consumables": { title: "Consumables",     sub: "Items consumed during operations" },
     "spare-parts": { title: "Spare Parts",     sub: "Replacement components in stores" },
     "accessories": { title: "Accessories",     sub: "Attachments & add-ons for assets" },
@@ -100,8 +102,9 @@ function renderSidebar(currentPage) {
         }
 
         const active = item.page === currentPage ? "active" : "";
+        const href = (typeof amsHref === "function") ? amsHref(item.href) : item.href;
         sectionsHtml += `
-            <a class="sidebar-link ${active}" href="${item.href}" data-page="${item.page}" title="${escapeHtml(item.label)}">
+            <a class="sidebar-link ${active}" href="${href}" data-page="${item.page}" title="${escapeHtml(item.label)}">
                 <span class="icon">${item.icon}</span>
                 <span class="sidebar-link-label">${escapeHtml(item.label)}</span>
             </a>
@@ -163,7 +166,7 @@ function renderTopbar(currentPage) {
                     <span class="user-chip-caret">${typeof amsUiIcon === "function" ? amsUiIcon("caret") : ""}</span>
                 </div>
                 <div class="user-chip-menu" id="user-chip-menu">
-                    <a class="user-chip-menu-item" href="../pages/profile.html">My Profile</a>
+                    <a class="user-chip-menu-item" href="${(typeof amsHref === "function") ? amsHref("pages/profile.html") : "pages/profile.html"}">My Profile</a>
                     <button type="button" class="user-chip-menu-item" id="user-chip-logout">Logout</button>
                 </div>
             </div>`;
@@ -299,7 +302,7 @@ function amsRequireSession() {
     if (session && session.token) return true;
     const path = window.location.pathname;
     if (path.indexOf("login.html") !== -1) return true;
-    window.location.replace("../login.html");
+    window.location.replace((typeof amsHref === "function") ? amsHref("login.html") : "login.html");
     return false;
 }
 
@@ -309,7 +312,7 @@ function amsLayoutRedirectIfDenied(currentPage) {
     if (typeof amsUserCanAccessNavPage !== "function") return;
     if (amsUserCanAccessNavPage(currentPage)) return;
     const fallback = NAV_ITEMS.find(i => i.page !== currentPage && amsUserCanAccessNavPage(i.page));
-    if (fallback) window.location.replace(fallback.href);
+    if (fallback) window.location.replace((typeof amsHref === "function") ? amsHref(fallback.href) : fallback.href);
 }
 
 function initLayout(currentPage) {
