@@ -42,13 +42,55 @@ function amsEsc(str) {
  *   usageCount: (item) => AMS_DUMMY_ASSETS.filter(a => a.type === item.name).length,
  * }
  */
-const AMS_MT_STATE = { editingKey: null };
+const AMS_MT_STATE = { editingKey: null, booted: false };
+
+function amsMtMatchKeys() {
+    const cfg = AMS_MASTER_CONFIG;
+    return (cfg.importMatchKeys && cfg.importMatchKeys.length) ? cfg.importMatchKeys : null;
+}
+
+function amsMtDuplicateOf(values, excludeKey) {
+    const cfg = AMS_MASTER_CONFIG;
+    const keys = amsMtMatchKeys();
+    if (keys) {
+        return cfg.dataArray.find(i =>
+            i[cfg.idKey] !== excludeKey
+            && keys.every(k => String(i[k] || "").toLowerCase() === String(values[k] || "").toLowerCase())
+        ) || null;
+    }
+    const idVal = values[cfg.idKey];
+    if (!idVal) return null;
+    return cfg.dataArray.find(i =>
+        i[cfg.idKey] !== excludeKey
+        && String(i[cfg.idKey] || "").toLowerCase() === String(idVal).toLowerCase()
+    ) || null;
+}
+
+function amsMtDuplicateMessage() {
+    const cfg = AMS_MASTER_CONFIG;
+    const keys = amsMtMatchKeys();
+    if (!keys) return `A record with this ${cfg.idKey} already exists.`;
+    const labels = keys.map(k => {
+        const field = (cfg.fields || []).find(f => f.key === k);
+        return field ? field.label : k;
+    });
+    return `A record with this ${labels.join(" + ")} already exists.`;
+}
 
 /* ---- EXPORT: current records as real .xlsx --------------------------------- */
 function amsExportMaster() {
     const cfg = AMS_MASTER_CONFIG;
     const headers = [...cfg.fields.map(f => f.key), ...(cfg.autoIdField ? [cfg.autoIdField] : []), "active"];
-    const rows = cfg.dataArray.map(item => [
+    const source = (typeof cfg.rowFilter === "function") ? cfg.dataArray.filter(cfg.rowFilter) : cfg.dataArray;
+    const getterMap = {};
+    cfg.fields.forEach(f => {
+        if (f.hideInTable) return;
+        getterMap[f.key] = item => f.type === "date" ? amsFormatDate(item[f.key]) : item[f.key];
+    });
+    if (cfg.usageCount) getterMap["__usage"] = item => cfg.usageCount(item);
+    getterMap["__active"] = item => item.active ? "Active" : "Inactive";
+    const filtered = typeof amsFilterRows === "function" ? amsFilterRows("masterTable", source, getterMap) : source;
+    const rows = filtered.map(item => [
         ...cfg.fields.map(f => f.type === "date" ? amsFormatDate(item[f.key]) : item[f.key]),
         ...(cfg.autoIdField ? [item[cfg.autoIdField]] : []), item.active ? "true" : "false",
     ]);
@@ -58,27 +100,22 @@ function amsExportMaster() {
 /* ---- TEMPLATE: .xlsx workbook with Instructions + header/example sheet ----- */
 function amsDownloadTemplate() {
     const cfg = AMS_MASTER_CONFIG;
-    if (typeof XLSX === "undefined") {
-        amsToast("Excel export library not loaded. Check js/vendor/xlsx.full.min.js is present.", "warning");
-        return;
-    }
     const headers = [...cfg.fields.map(f => f.key + (f.required ? "*" : "")), "active"];
     const sample = cfg.fields.map(f => f.upper ? "EX" : f.type === "date" ? "13-07-2026" : `Example ${f.label}`);
-    const wb = XLSX.utils.book_new();
-    const instr = XLSX.utils.aoa_to_sheet([
-        [`${cfg.pageTitle} Import Template - Instructions`],
-        ["Fields marked with * are required."],
-        ["Do not delete the header row (row 2)."],
-        ['"active" = true/false.'],
+    amsWriteWorkbook(`${cfg.pageTitle.replace(/\s+/g, "_")}_import_template.xlsx`, [
+        { name: "Instructions", cols: [{ wch: 80 }], aoa: [
+            [`${cfg.pageTitle} Import Template - Instructions`],
+            ["Fields marked with * are required."],
+            ["Do not delete the header row (row 2)."],
+            ['"active" = true/false.'],
+        ] },
+        { name: "Template", aoa: [headers, [...sample, "true"]] },
     ]);
-    instr["!cols"] = [{ wch: 80 }];
-    XLSX.utils.book_append_sheet(wb, instr, "Instructions");
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers, [...sample, "true"]]), "Template");
-    XLSX.writeFile(wb, `${cfg.pageTitle.replace(/\s+/g, "_")}_import_template.xlsx`);
 }
 
 /* ---- IMPORT: bulk upload (upserts by idKey - existing update, new get added) */
 function amsHandleImportFile(file) {
+    if (typeof amsGuardViewOnlyWrite === "function" && amsGuardViewOnlyWrite()) return;
     const cfg = AMS_MASTER_CONFIG;
     amsReadImportRows(file).then((rows) => {
         rows = rows.filter(r => !(r[0] || "").trim().startsWith("#")); // drop instruction lines
@@ -91,6 +128,8 @@ function amsHandleImportFile(file) {
             ? cfg.importMatchKeys.map(k => String(obj[k] || "").toLowerCase()).join("|")
             : String(obj[cfg.idKey] || "").toLowerCase();
 
+        if (typeof amsDbSuspendSaves === "function") amsDbSuspendSaves();
+        try {
         for (let i = 1; i < rows.length; i++) {
             const raw = rows[i];
             if (!raw.length || raw.every(c => !c)) continue;
@@ -127,16 +166,44 @@ function amsHandleImportFile(file) {
                 ? cfg.dataArray.find(item => cfg.importMatchKeys.every(k => String(item[k]).toLowerCase() === String(obj[k] || "").toLowerCase()))
                 : cfg.dataArray.find(item => String(item[cfg.idKey]).toLowerCase() === obj[cfg.idKey].toLowerCase());
             if (existing) {
+                if (typeof cfg.rowFilter === "function" && !cfg.rowFilter(existing)) {
+                    results.push({ row: line, record, result: "skipped", reason: "Record is not visible to your role" });
+                    continue;
+                }
+                if (typeof cfg.writeGuard === "function") {
+                    const guard = cfg.writeGuard(obj, existing);
+                    if (guard && !guard.allowed) {
+                        results.push({ row: line, record, result: "skipped", reason: guard.reason || "Not allowed for your role" });
+                        continue;
+                    }
+                }
                 cfg.fields.forEach(f => { if (obj[f.key]) existing[f.key] = obj[f.key]; });
                 existing.active = active;
                 results.push({ row: line, record, result: "updated", reason: "Existing record updated" });
             } else {
                 const newItem = { active };
                 cfg.fields.forEach(f => { newItem[f.key] = obj[f.key] || ""; });
-                if (cfg.autoIdField) newItem[cfg.autoIdField] = cfg.autoIdGenerate(newItem);
+                if (typeof cfg.rowFilter === "function" && !cfg.rowFilter(newItem)) {
+                    results.push({ row: line, record, result: "skipped", reason: "Record is not visible to your role" });
+                    continue;
+                }
+                if (typeof cfg.writeGuard === "function") {
+                    const guard = cfg.writeGuard(newItem, null);
+                    if (guard && !guard.allowed) {
+                        results.push({ row: line, record, result: "skipped", reason: guard.reason || "Not allowed for your role" });
+                        continue;
+                    }
+                }
                 cfg.dataArray.push(newItem);
+                /* Generate the ID AFTER the push so a max+1 scan sees this row:
+                   two new rows in the same import then get distinct IDs instead
+                   of colliding on the server's record_key (409 -> nothing saves). */
+                if (cfg.autoIdField) newItem[cfg.autoIdField] = cfg.autoIdGenerate(newItem);
                 results.push({ row: line, record, result: "added", reason: "New record added" });
             }
+        }
+        } finally {
+            if (typeof amsDbResumeSaves === "function") amsDbResumeSaves();
         }
 
         amsRenderMasterTable();
@@ -153,14 +220,43 @@ function amsHandleImportFile(file) {
     });
 }
 
+function amsMtEnsureFilters() {
+    const searchBox = document.getElementById("searchBox");
+    if (!searchBox) return;
+    let bar = document.getElementById("mtFilterBar");
+    if (!bar) {
+        bar = document.createElement("div");
+        bar.id = "mtFilterBar";
+        bar.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;align-items:center;";
+        searchBox.insertAdjacentElement("afterend", bar);
+    }
+    if (bar.querySelector("#mtFilter-active")) return;
+    bar.innerHTML = `<select id="mtFilter-active" class="select" style="width:auto;">
+        <option value="">All Status</option>
+        <option value="true">Active</option>
+        <option value="false">Inactive</option>
+    </select>
+    <button type="button" class="btn btn-secondary btn-clear-filters" id="btnMtClearFilters" title="Clear column filters">Clear filters</button>`;
+    document.getElementById("mtFilter-active").addEventListener("change", amsRenderMasterTable);
+    document.getElementById("btnMtClearFilters").addEventListener("click", () => amsFilterClearAndRender("masterTable"));
+}
+
 /* ---- RENDER: the master table ---------------------------------------------- */
 async function amsRenderMasterTable() {
     if (typeof amsDbEnsureLoaded === "function") await amsDbEnsureLoaded();
     const cfg = AMS_MASTER_CONFIG;
     const searchTerm = (document.getElementById("searchBox").value || "").toLowerCase();
+    amsMtEnsureFilters();
 
-    const filtered = cfg.dataArray
-        .filter(item => !searchTerm || cfg.fields.some(f => String(item[f.key] || "").toLowerCase().includes(searchTerm)));
+    const source = (typeof cfg.rowFilter === "function") ? cfg.dataArray.filter(cfg.rowFilter) : cfg.dataArray;
+    const filtered = source
+        .filter(item => {
+            const activeFilter = (document.getElementById("mtFilter-active") || {}).value || "";
+            if (activeFilter === "true" && !item.active) return false;
+            if (activeFilter === "false" && item.active) return false;
+            if (!searchTerm) return true;
+            return cfg.fields.some(f => String(item[f.key] || "").toLowerCase().includes(searchTerm));
+        });
 
     /* Sortable headers (shared js/sortable.js engine) */
     const getterMap = {};
@@ -170,7 +266,8 @@ async function amsRenderMasterTable() {
     });
     if (cfg.usageCount) getterMap["__usage"] = item => cfg.usageCount(item);
     getterMap["__active"] = item => item.active ? "Active" : "Inactive";
-    const sorted = amsSortRows("masterTable", filtered, getterMap);
+    const colFiltered = amsFilterRows("masterTable", filtered, getterMap);
+    const sorted = amsSortRows("masterTable", colFiltered, getterMap);
 
     const rows = sorted
         .map(item => {
@@ -195,7 +292,7 @@ async function amsRenderMasterTable() {
                 ${cfg.usageCount ? `<td class="mono">${usage}</td>` : ""}
                 <td>${statusBadge}</td>
                 <td class="actions-cell">
-                    <button class="actions-trigger" data-actions-for="${amsEsc(item[cfg.idKey])}" title="Actions">Actions &#9662;</button>
+                    <button class="actions-trigger" data-actions-for="${amsEsc(item[cfg.idKey])}" title="Actions">Actions ${typeof amsUiIcon === "function" ? amsUiIcon("caret") : ""}</button>
                     <div class="actions-menu" id="menu-${amsEsc(item[cfg.idKey])}">
                         <button data-mt-action="edit" data-key="${amsEsc(item[cfg.idKey])}">Edit</button>
                         <button data-mt-action="toggle" data-key="${amsEsc(item[cfg.idKey])}">${item.active ? "Deactivate" : "Activate"}</button>
@@ -210,9 +307,14 @@ async function amsRenderMasterTable() {
     const visibleFields = cfg.fields.filter(f => !f.hideInTable);
     const headCells = visibleFields.map(f => amsSortableTh("masterTable", f.key, f.label)).join("");
     const extraColCount = (cfg.rowBadge ? 1 : 0) + (cfg.usageCount ? 1 : 0);
+    const filterKeys = visibleFields.map(f => f.key)
+        .concat(cfg.rowBadge ? [""] : [])
+        .concat(cfg.usageCount ? ["__usage"] : [])
+        .concat(["__active", ""]);
     document.getElementById("masterTable").innerHTML = `
-        <thead><tr>${headCells}${cfg.rowBadge ? `<th>${amsEsc(cfg.rowBadgeLabel || "Flag")}</th>` : ""}${cfg.usageCount ? amsSortableTh("masterTable", "__usage", "Used By") : ""}${amsSortableTh("masterTable", "__active", "Status")}<th></th></tr></thead>
+        <thead><tr>${headCells}${cfg.rowBadge ? `<th>${amsEsc(cfg.rowBadgeLabel || "Flag")}</th>` : ""}${cfg.usageCount ? amsSortableTh("masterTable", "__usage", "Used By") : ""}${amsSortableTh("masterTable", "__active", "Status")}<th></th></tr>${amsFilterHeadRow("masterTable", filterKeys)}</thead>
         <tbody>${rows || `<tr><td colspan="${visibleFields.length + extraColCount + 2}" style="color:var(--text-muted)">No records found</td></tr>`}</tbody>`;
+    if (typeof amsFilterRestoreFocus === "function") amsFilterRestoreFocus("masterTable");
 }
 
 /* ---- MODAL open/close ------------------------------------------------------- */
@@ -236,9 +338,15 @@ function amsMtBuildFormFields() {
                     ${selectHtml}
                     <button type="button" class="btn-quickadd" data-mt-quickadd="${f.key}" title="Add new">+</button>
                     <div class="quickadd-popover" id="mtQaPopover-${f.key}">
-                        ${f.quickAdd.fields.map(qf => `
-                            <label class="qa-label">${amsEsc(qf.label)}</label>
-                            <input type="text" id="mtQa-${f.key}-${qf.key}" ${qf.maxLength ? `maxlength="${qf.maxLength}"` : ""} ${qf.upper ? 'style="text-transform:uppercase;"' : ""}>`).join("")}
+                        ${f.quickAdd.fields.map(qf => {
+                            if (qf.type === "select") {
+                                const qopts = qf.optionsFrom ? qf.optionsFrom() : (qf.options || []);
+                                return `<label class="qa-label">${amsEsc(qf.label)}</label>
+                            <select id="mtQa-${f.key}-${qf.key}">${qopts.map(o => `<option value="${amsEsc(o)}">${amsEsc(o)}</option>`).join("")}</select>`;
+                            }
+                            return `<label class="qa-label">${amsEsc(qf.label)}</label>
+                            <input type="text" id="mtQa-${f.key}-${qf.key}" ${qf.maxLength ? `maxlength="${qf.maxLength}"` : ""} ${qf.upper ? 'style="text-transform:uppercase;"' : ""}>`;
+                        }).join("")}
                         <div class="qa-actions">
                             <button type="button" class="btn btn-secondary" data-mt-qa-cancel="${f.key}">Cancel</button>
                             <button type="button" class="btn" data-mt-qa-save="${f.key}">Add</button>
@@ -297,6 +405,7 @@ function amsMtOpenEdit(key) {
         const el = document.getElementById(`mt-${f.key}`);
         if (f.type === "select" && item[f.key]) amsMtEnsureOption(el, item[f.key]);
         if (f.type === "password") { el.value = ""; return; } // never render a stored password back
+        if (f.type === "date") { amsSetDateInput(el, item[f.key]); return; }
         el.value = item[f.key] || "";
     });
     document.getElementById("mt-active").checked = !!item.active;
@@ -305,6 +414,7 @@ function amsMtOpenEdit(key) {
 
 document.getElementById("mtForm").addEventListener("submit", async (e) => {
     e.preventDefault();
+    if (typeof amsGuardViewOnlyWrite === "function" && amsGuardViewOnlyWrite()) return;
     const cfg = AMS_MASTER_CONFIG;
 
     const values = {};
@@ -317,12 +427,20 @@ document.getElementById("mtForm").addEventListener("submit", async (e) => {
     const active = document.getElementById("mt-active").checked;
     values.active = active;
 
+    if (typeof cfg.writeGuard === "function") {
+        const existing = AMS_MT_STATE.editingKey
+            ? cfg.dataArray.find(i => i[cfg.idKey] === AMS_MT_STATE.editingKey)
+            : null;
+        const guard = cfg.writeGuard(values, existing || null);
+        if (guard && !guard.allowed) { amsToast(guard.reason || "You don't have permission to save this record.", "warning"); return; }
+    }
+
+    if (amsMtDuplicateOf(values, AMS_MT_STATE.editingKey)) {
+        amsToast(amsMtDuplicateMessage(), "warning");
+        return;
+    }
     if (cfg.autoIdField && !AMS_MT_STATE.editingKey) {
-        values[cfg.autoIdField] = cfg.autoIdGenerate(values); // auto IDs are always unique
-    } else {
-        const dupExists = cfg.dataArray.some(i =>
-            i[cfg.idKey].toLowerCase() === values[cfg.idKey].toLowerCase() && i[cfg.idKey] !== AMS_MT_STATE.editingKey);
-        if (dupExists) { amsToast(`A record with this ${cfg.idKey} already exists.`, "warning"); return; }
+        values[cfg.autoIdField] = cfg.autoIdGenerate(values);
     }
 
     /* Optional page hook: e.g. User Master syncs the login (with password) to
@@ -357,12 +475,18 @@ document.getElementById("mtForm").addEventListener("submit", async (e) => {
 
 /* ---- TOGGLE active / deactivate --------------------------------------------- */
 async function amsMtToggleActive(key) {
+    if (typeof amsGuardViewOnlyWrite === "function" && amsGuardViewOnlyWrite()) return;
     const cfg = AMS_MASTER_CONFIG;
     const item = cfg.dataArray.find(i => i[cfg.idKey] === key);
     const newActive = !item.active;
     if (typeof cfg.onBeforeToggle === "function") {
-        const hook = cfg.onBeforeToggle(item, newActive);
-        if (hook && typeof hook.then === "function") await hook;
+        try {
+            const hook = cfg.onBeforeToggle(item, newActive);
+            if (hook && typeof hook.then === "function") await hook;
+        } catch (err) {
+            amsToast(err.message || "Update cancelled.", "danger");
+            return;
+        }
     }
     item.active = newActive;
     amsToast(`${cfg.pageTitle.replace(" Master", "")} ${item.active ? "activated" : "deactivated"}: ${key}`, item.active ? "success" : "warning");
@@ -372,6 +496,7 @@ async function amsMtToggleActive(key) {
 
 /* ---- DELETE (blocked if currently in use) ----------------------------------- */
 async function amsMtDelete(key) {
+    if (typeof amsGuardViewOnlyWrite === "function" && amsGuardViewOnlyWrite()) return;
     const cfg = AMS_MASTER_CONFIG;
     const item = cfg.dataArray.find(i => i[cfg.idKey] === key);
     const usage = cfg.usageCount ? cfg.usageCount(item) : 0;
@@ -510,11 +635,16 @@ document.addEventListener("click", (e) => {
     if (!e.target.closest(".quickadd-popover")) amsMtCloseAllQuickAdd();
 });
 
-/* ---- PAGE INIT ---------------------------------------------------------------- */
-document.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("pageTitle").textContent = AMS_MASTER_CONFIG.pageTitle;
-    document.getElementById("pageSub").textContent = AMS_MASTER_CONFIG.pageSub;
-    document.getElementById("btnAddMaster").textContent = `+ Add ${AMS_MASTER_CONFIG.pageTitle.replace(" Master", "")}`;
+/* ---- PAGE INIT ----------------------------------------------------------------
+   Config is often assigned in another DOMContentLoaded listener (inline page
+   script). Run after those so AMS_MASTER_CONFIG is in place. */
+function amsInitMasterTable() {
+    const cfg = window.AMS_MASTER_CONFIG;
+    if (!cfg || AMS_MT_STATE.booted) return;
+    AMS_MT_STATE.booted = true;
+    document.getElementById("pageTitle").textContent = cfg.pageTitle;
+    document.getElementById("pageSub").textContent = cfg.pageSub;
+    document.getElementById("btnAddMaster").textContent = `+ Add ${cfg.pageTitle.replace(" Master", "")}`;
 
     amsSortRegisterRenderer("masterTable", amsRenderMasterTable);
     amsRenderMasterTable();
@@ -527,7 +657,9 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("importFileInput").addEventListener("change", (e) => {
         if (e.target.files[0]) amsHandleImportFile(e.target.files[0]);
     });
-});
+}
+
+document.addEventListener("DOMContentLoaded", () => setTimeout(amsInitMasterTable, 0));
 
 /*------------------------------------------------------------------------------
 #-------------- End of the code : MASTER TABLE ENGINE --------------------------

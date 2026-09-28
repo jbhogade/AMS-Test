@@ -20,7 +20,7 @@
 #      js/layout.js (sidebar/header), js/employees.js (this page)
 #------------------------------------------------------------------------------
 -->
-<html lang="en" data-theme="dark-grey">
+<html lang="en" data-theme="platinum" data-ui-style="glass">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -28,6 +28,7 @@
 
     <link rel="stylesheet" href="../css/themes.css">
     <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/ui-styles.css">
     <link rel="stylesheet" href="../css/employees.css">
 </head>
 <body>
@@ -41,18 +42,8 @@
 
             <div class="app-content">
                 <!-- ==================== PAGE HEADING ==================== -->
-                <div class="page-heading flex items-center justify-between">
-                    <div>
-                        <h1>Employee Master</h1>
-                        <p>Manage employees, their assets and handover records.</p>
-                    </div>
-                    <div class="quick-actions">
-                        <button class="btn btn-primary" id="emp-add-btn">&#43; Add Employee</button>
-                        <button class="btn btn-secondary" id="emp-template-btn" title="Download a CSV template for bulk import">Template</button>
-                        <button class="btn btn-secondary" id="emp-import-btn" title="Import employees from a CSV file">Import</button>
-                        <button class="btn btn-secondary" id="emp-export-btn" title="Export the current list to CSV">Export</button>
-                        <input type="file" id="emp-import-file" accept=".csv,.xlsx" style="display:none;">
-                    </div>
+                <div class="page-heading">
+                    <p>Manage employees, their assets and handover records.</p>
                 </div>
 
                 <!-- ==================== IMPORT SUMMARY ==================== -->
@@ -68,24 +59,29 @@
 
                 <!-- ==================== TOOLBAR ==================== -->
                 <div class="emp-toolbar">
-                    <input type="search" class="input emp-search" id="emp-search" placeholder="Search name, ID, designation...">
+                    <div class="emp-toolbar-left">
+                        <input type="search" class="input emp-search" id="emp-search" placeholder="Search name, ID, designation...">
 
-                    <select class="select" id="emp-dept-filter" style="width:auto;">
-                        <option value="All">All Departments</option>
-                    </select>
+                        <select class="select" id="emp-site-filter" style="width:auto;">
+                            <option value="All">All Sites</option>
+                        </select>
 
-                    <select class="select" id="emp-status-filter" style="width:auto;">
-                        <option value="All">All Status</option>
-                        <option value="Active">Active</option>
-                        <option value="Inactive">Inactive</option>
-                    </select>
+                        <select class="select" id="emp-status-filter" style="width:auto;">
+                            <option value="All">All Status</option>
+                            <option value="Active">Active</option>
+                            <option value="Inactive">Inactive</option>
+                        </select>
+                        <button type="button" class="btn btn-secondary btn-clear-filters" id="emp-clear-filters" title="Clear column filters">Clear filters</button>
 
-                    <div class="cred-level">
-                        <span>View as:</span>
-                        <select class="select" id="emp-cred-level"></select>
+                        <span class="ams-hint" id="ams-hint">AMS Employee IDs are hidden</span>
                     </div>
-
-                    <span class="ams-hint" id="ams-hint">&#128274; AMS Employee IDs hidden - switch to Super Root to see them</span>
+                    <div class="flex items-center gap-8">
+                        <button class="btn btn-primary" id="emp-add-btn">&#43; Add Employee</button>
+                        <button class="btn btn-secondary" id="emp-template-btn" title="Download a CSV template for bulk import">Template</button>
+                        <button class="btn btn-secondary" id="emp-import-btn" title="Import employees from a CSV file">Import</button>
+                        <button class="btn btn-secondary" id="emp-export-btn" title="Export the current list to CSV">Export</button>
+                        <input type="file" id="emp-import-file" accept=".csv,.xlsx" style="display:none;">
+                    </div>
                 </div>
 
                 <!-- ==================== EMPLOYEE TABLE ==================== -->
@@ -97,6 +93,7 @@
                                     <th id="ams-col">AMS ID</th>
                                     <th>Employee</th>
                                     <th>Department</th>
+                                    <th>Site</th>
                                     <th>Designation</th>
                                     <th>Contact</th>
                                     <th>Email</th>
@@ -181,6 +178,10 @@
                         <datalist id="designation-list"></datalist>
                     </div>
                     <div class="field">
+                        <label>Site</label>
+                        <select class="select" id="f-site"></select>
+                    </div>
+                    <div class="field">
                         <label>Reports To (Manager)</label>
                         <select class="select" id="f-manager"></select>
                     </div>
@@ -242,6 +243,10 @@
                     <div class="detail-item">
                         <label>Department</label>
                         <span id="view-dept">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <label>Site</label>
+                        <span id="view-site">-</span>
                     </div>
                     <div class="detail-item">
                         <label>Designation</label>
@@ -353,7 +358,7 @@
                 <button class="modal-close" data-close>&times;</button>
             </div>
             <div class="modal-body">
-                <div class="alert alert-danger">&#9888; This will mark the employee as <strong>Inactive</strong> and release all held assets back to the store.</div>
+                <div class="alert alert-danger">This will mark the employee as <strong>Inactive</strong> and release all held assets back to the store.</div>
 
                 <div class="detail-grid">
                     <div class="detail-item">
@@ -406,7 +411,7 @@
                 <!-- Facilities to disable -->
                 <div class="form-section">Facilities to Disable (check the ones being revoked)</div>
                 <ul class="facility-checklist" id="exit-facility-list"></ul>
-                <p class="ams-hint" style="margin-top:6px;">Email Login and ERP Login are pre-checked and must be revoked on exit.</p>
+                <p class="ams-hint" style="margin-top:6px;">Nothing is pre-selected. Check a facility to revoke it, or mark N/A if it does not apply to this employee.</p>
 
                 <div class="field mt-16">
                     <label>Exit Remarks</label>
@@ -421,20 +426,21 @@
     </div>
 
     <!-- Scripts -->
-    <script src="../js/dummy-data.js"></script>
-    <script src="../js/theme.js"></script>
-    <script src="../js/app.js"></script>
-    <script src="../js/layout.js"></script>
-    <script src="../js/sortable.js"></script>
-    <script src="../js/vendor/xlsx.full.min.js"></script>
-    <script src="../js/xlsx-helpers.js"></script>
-    <script src="../js/print-docs.js"></script>
-    <script src="../js/employees.js"></script>
-    <script src="../js/print-forms.js"></script>
+    <script defer src="../js/dummy-data.js"></script>
+    <script defer src="../js/theme.js"></script>
+    <script defer src="../js/app.js"></script>
+    <script defer src="../js/layout.js"></script>
+    <script defer src="../js/sortable.js"></script>
+    <script defer src="../js/xlsx-helpers.js"></script>
+    <script defer src="../js/print-docs.js"></script>
+    <script defer src="../js/employees.js"></script>
+    <script defer src="../js/print-forms.js"></script>
 
     <script>
-        initLayout("employees");
-        initEmployees();
+        document.addEventListener("DOMContentLoaded", function () {
+            initLayout("employees");
+            initEmployees();
+        });
     </script>
 </body>
 </html>

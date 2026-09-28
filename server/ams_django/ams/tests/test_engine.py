@@ -23,7 +23,7 @@ class RegistryTests(unittest.TestCase):
         expected = {
             "assets", "employees", "assetTypes", "assetMakes", "assetCategories",
             "sites", "departments", "designations", "vendors", "consumables",
-            "spareParts", "accessories", "company", "roleAccess", "accessRights",
+            "spareParts", "accessories", "mobiles", "company", "roleAccess", "accessRights",
             "reportPrefs", "users", "exitRecords", "consumableLog", "sparePartLog",
             "simCards", "simOperators", "simPlans", "consumableCategories",
             "consumableUnits", "sparePartCategories", "vendorCategories",
@@ -42,6 +42,38 @@ class RegistryTests(unittest.TestCase):
     def test_log_collections_have_no_key_field(self):
         for key in ("consumableLog", "sparePartLog"):
             self.assertIsNone(KEY_INDEX[key].key_field)
+
+    def test_employees_table_has_site_column(self):
+        cols = {c.sql for c in KEY_INDEX["employees"].columns}
+        self.assertIn("site", cols)
+        self.assertIn("department", cols)
+        self.assertIn("status", cols)
+        self.assertIn("emp_id_company", cols)
+
+    def test_promoted_form_columns(self):
+        self.assertIn("purchase_site", {c.sql for c in KEY_INDEX["assets"].columns})
+        self.assertIn("purchase_site", {c.sql for c in KEY_INDEX["mobiles"].columns})
+        self.assertIn("remarks", {c.sql for c in KEY_INDEX["simCards"].columns})
+        self.assertIn("vendor", {c.sql for c in KEY_INDEX["consumables"].columns})
+        self.assertIn("vendor", {c.sql for c in KEY_INDEX["spareParts"].columns})
+        self.assertIn("log_type", {c.sql for c in KEY_INDEX["consumableLog"].columns})
+        self.assertIn("asset_base_id", {c.sql for c in KEY_INDEX["sparePartLog"].columns})
+        self.assertIn("linked_employee", {c.sql for c in KEY_INDEX["users"].columns})
+        self.assertIn("hr_admin_contact", {c.sql for c in KEY_INDEX["company"].columns})
+
+    def test_asset_makes_typed_by_type(self):
+        d = KEY_INDEX["assetMakes"]
+        self.assertEqual(d.key_field, "makeCode")
+        cols = {c.sql for c in d.columns}
+        self.assertIn("make_code", cols)
+        self.assertIn("asset_type", cols)
+        self.assertIn("name", cols)
+
+    def test_asset_type_category_and_used_on(self):
+        type_cols = {c.sql for c in KEY_INDEX["assetTypes"].columns}
+        self.assertIn("category", type_cols)
+        cat_cols = {c.sql for c in KEY_INDEX["assetCategories"].columns}
+        self.assertIn("used_on", cat_cols)
 
 
 class ColumnValueTests(unittest.TestCase):

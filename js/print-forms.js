@@ -62,7 +62,15 @@ function amsBuildAdditionalRemarks(extraRemarks) {
 function amsSubordinateAssetsDetailed(amsId) {
     const list = [];
     getSubordinates(amsId).forEach(sub => {
-        getEmployeeAssets(sub.amsId).forEach(a => list.push({ ...a, subName: getEmployeeFullName(sub), subEmpId: sub.empId }));
+        getEmployeeAssets(sub.amsId).forEach(a => {
+            /* Only what the subordinate PERSONALLY holds - skip assets they are
+               merely custodian of (real user is a deeper subordinate). Otherwise
+               the same asset would appear on every manager's form up the chain. */
+            if (amsAssetIsDeptOrSub(a)) return;
+            list.push({
+                ...a, subName: getEmployeeFullName(sub), subEmpId: amsGetEmployeeDisplayId(sub),
+            });
+        });
     });
     return list;
 }
@@ -91,8 +99,13 @@ function amsGenerateReport(amsId, type, extraRemarks) {
     const directOwned = splitOwned ? splitOwned.direct : owned;
     const subOwned = splitOwned ? splitOwned.subordinate : [];
     const subAssets = isIssue ? amsSubordinateAssetsDetailed(amsId) : [];
+    const mobileSimPreview = typeof amsBuildPrintMobileSimHtml === "function"
+        ? amsBuildPrintMobileSimHtml(amsId, { withCondition: isIssue, returnedLabel: !isIssue, exitRecord: isIssue ? null : exitRecord })
+        : { html: "", mobileDirect: 0, mobileTeam: 0, simDirect: 0, simTeam: 0 };
     const assignmentType = isIssue
-        ? amsAssignmentTypeLabel(directOwned.length, subOwned.length + subAssets.length)
+        ? amsAssignmentTypeLabel(
+            directOwned.length + mobileSimPreview.mobileDirect + mobileSimPreview.simDirect,
+            subOwned.length + subAssets.length + mobileSimPreview.mobileTeam + mobileSimPreview.simTeam)
         : "";
 
     const title = isIssue ? "Asset Issue Form" : "Asset Handover Form";
@@ -173,26 +186,26 @@ function amsGenerateReport(amsId, type, extraRemarks) {
             </tbody>
         </table>`;
 
-    const accessoriesHtml = isIssue ? ((typeof amsBuildPrintAccessoriesHtml === "function")
-        ? amsBuildPrintAccessoriesHtml(directOwned)
-        : `
-        <div class="pf-section-bar">Accessories / Items Included</div>
-        <div class="pf-checklist-grid">
-            <label class="pf-check-block"><input type="checkbox" disabled> Power Adaptor / Charger</label>
-            <label class="pf-check-block"><input type="checkbox" disabled> Carrying Bag / Case</label>
-            <label class="pf-check-block"><input type="checkbox" disabled> Mouse / Keyboard (if applicable)</label>
-            <label class="pf-check-block"><input type="checkbox" disabled> Original Box / Documentation</label>
-            <label class="pf-check-block" style="grid-column:1 / -1;">Other: ________________________________</label>
-        </div>`) : "";
+    const accessoryItems = isIssue && (typeof amsPrintDirectHoldingsForAccessories === "function")
+        ? amsPrintDirectHoldingsForAccessories(amsId, directOwned)
+        : directOwned;
+    const accessoriesHtml = isIssue && (typeof amsBuildPrintAccessoriesHtml === "function")
+        ? amsBuildPrintAccessoriesHtml(accessoryItems)
+        : "";
+
+    const mobileSimPrint = mobileSimPreview;
 
     const subRows = subAssets.map(sa => ({
         id: amsPrintAssetId(sa), type: sa.type, makeModel: sa.makeModel,
         site: sa.currentSite || sa.site, holder: sa.subName, holderId: sa.subEmpId,
     }));
     subOwned.forEach(oa => {
+        const holderEmp = oa.assignedToSubordinate ? amsGetEmployeeByAmsId(oa.assignedToSubordinate) : null;
         subRows.push({
             id: amsPrintAssetId(oa), type: oa.type, makeModel: oa.makeModel,
-            site: oa.currentSite || oa.site, holder: amsAssetHolderLabel(oa), holderId: "",
+            site: oa.currentSite || oa.site,
+            holder: holderEmp ? holderEmp.name : (oa.assignedSubText || amsAssetHolderLabel(oa)),
+            holderId: holderEmp ? amsGetEmployeeDisplayId(holderEmp) : "",
         });
     });
     const subordinateHtml = subRows.length ? `
@@ -220,6 +233,8 @@ function amsGenerateReport(amsId, type, extraRemarks) {
             <label class="pf-check-block"><input type="checkbox" disabled> Asset condition verified by IT/Admin</label>
             ${(exitRecord ? exitRecord.facilitiesDisabled : []).map(f => `
                 <label class="pf-check-block"><input type="checkbox" disabled> ${amsEsc(f)} revoked</label>`).join("")}
+            ${((exitRecord && exitRecord.facilitiesNotApplicable) ? exitRecord.facilitiesNotApplicable : []).map(f => `
+                <label class="pf-check-block"><input type="checkbox" disabled> ${amsEsc(f)} - N/A</label>`).join("")}
             <label class="pf-check-block"><input type="checkbox" disabled> Subordinate assets flagged for reassignment (if applicable)</label>
         </div>` : "";
 
@@ -240,6 +255,7 @@ function amsGenerateReport(amsId, type, extraRemarks) {
 
             ${accessoriesHtml}
             ${subordinateHtml}
+            ${mobileSimPrint.html}
             ${transferHtml}
             ${clearanceHtml}
 
@@ -285,7 +301,7 @@ function amsGenerateReport(amsId, type, extraRemarks) {
 
             <div class="pf-footer">
                 <span>AMS v4 - Generated electronically</span>
-                <span>Internal Ref: ${formNo} &middot; ${directOwned.length} asset(s) ${isIssue ? "issued" : "returned"}${isIssue ? ` &middot; ${directOwned.length} direct, ${subOwned.length + subAssets.length} team` : ""}</span>
+                <span>Internal Ref: ${formNo} &middot; ${directOwned.length} asset(s) ${isIssue ? "issued" : "returned"}${isIssue ? ` &middot; ${directOwned.length} direct, ${subOwned.length + subAssets.length} team` : ""}${mobileSimPrint.mobileDirect || mobileSimPrint.mobileTeam ? ` &middot; ${mobileSimPrint.mobileDirect} mobile(s), ${mobileSimPrint.mobileTeam} team` : ""}${mobileSimPrint.simDirect || mobileSimPrint.simTeam ? ` &middot; ${mobileSimPrint.simDirect} SIM(s), ${mobileSimPrint.simTeam} team` : ""}</span>
             </div>
         </div>
     `;

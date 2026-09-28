@@ -9,7 +9,7 @@
 #    1. Reset & Base           - normalize spacing, fonts, colors
 #    2. App Shell Layout       - sidebar + header + content grid
 #    3. Sidebar                - navigation panel on the left
-#    4. Top Header Bar         - page title, search, theme switcher
+#    4. Top Header Bar         - page title, theme switcher, user chip
 #    5. Cards & KPI Cards      - content panels and statistic tiles
 #    6. Tables                 - data grids (assets, logs, etc.)
 #    7. Buttons & Forms        - actions, inputs, dropdowns
@@ -74,6 +74,7 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     display: flex;
     flex-direction: column;
     min-width: 0;
+    transition: margin-left 0.2s ease;
 }
 
 .app-content {
@@ -96,7 +97,20 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     display: flex;
     flex-direction: column;
     z-index: 100;
-    transition: transform 0.25s ease;
+    transition: transform 0.25s ease, width 0.2s ease;
+    overflow: hidden;
+}
+
+/* Brand / nav / footer live inside #sidebar-mount, so that wrapper must be
+   a column flex child that fills the sidebar. Otherwise overflow-y on
+   .sidebar-nav never kicks in and low-resolution screens clip the last links. */
+#sidebar-mount {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
 }
 
 /* Sidebar brand / logo area at the top */
@@ -106,6 +120,7 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     gap: 12px;
     padding: 20px 20px 16px;
     border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
 }
 
 .sidebar-logo {
@@ -138,8 +153,14 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     flex: 1;
     min-height: 0;                 /* allows the list to shrink so it scrolls */
     overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     padding: 14px 12px;
 }
+
+.sidebar-nav::-webkit-scrollbar { width: 8px; }
+.sidebar-nav::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
 .sidebar-nav-label {
     font-size: 11px;
@@ -193,6 +214,7 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     border-top: 1px solid var(--border);
     font-size: 12px;
     color: var(--text-muted);
+    flex-shrink: 0;
 }
 
 /* Overlay behind the sidebar when opened on small screens */
@@ -205,6 +227,106 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
 }
 
 .sidebar-overlay.show { display: block; }
+
+/* Desktop hide: icon-only rail. Peek overlay shows names without moving content.
+   Pin Show (body.sidebar-pinned) keeps the full 260px bar. */
+.sidebar-desk-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 6px;
+    line-height: 0;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+.sidebar-desk-toggle:hover {
+    background-color: var(--bg-elevated);
+}
+.sidebar-desk-toggle .ui-icon { width: 18px; height: 18px; }
+
+.sidebar-link-label {
+    white-space: nowrap;
+    overflow: hidden;
+}
+.sidebar-brand-text {
+    min-width: 0;
+    overflow: hidden;
+}
+
+body.sidebar-collapsed .sidebar {
+    width: 64px;
+}
+body.sidebar-collapsed .app-main {
+    margin-left: 64px;
+}
+body.sidebar-collapsed .sidebar-brand {
+    justify-content: center;
+    padding: 16px 12px;
+    gap: 0;
+}
+body.sidebar-collapsed .sidebar-brand-text,
+body.sidebar-collapsed .sidebar-link-label,
+body.sidebar-collapsed .sidebar-footer {
+    display: none;
+}
+body.sidebar-collapsed .sidebar-nav {
+    padding: 10px 8px;
+}
+body.sidebar-collapsed .sidebar-link {
+    justify-content: flex-start;
+    padding: 10px 14px;
+    gap: 12px;
+}
+/* Keep Main / People / Inventory / Admin as a short line so icons stay put. */
+body.sidebar-collapsed .sidebar-nav-label {
+    font-size: 0;
+    line-height: 0;
+    color: transparent;
+    letter-spacing: 0;
+    padding: 14px 8px;
+    height: 29px;
+    overflow: hidden;
+}
+body.sidebar-collapsed .sidebar-nav-label::after {
+    content: "";
+    display: block;
+    width: 20px;
+    height: 1px;
+    margin: 0 auto;
+    background: var(--border);
+}
+
+body.sidebar-collapsed.sidebar-peek .sidebar {
+    width: 260px;
+    box-shadow: var(--shadow);
+    z-index: 110;
+}
+body.sidebar-collapsed.sidebar-peek .app-main {
+    margin-left: 64px;
+}
+body.sidebar-collapsed.sidebar-peek .sidebar-brand {
+    justify-content: center;
+    padding: 16px 12px;
+    gap: 0;
+}
+body.sidebar-collapsed.sidebar-peek .sidebar-link-label {
+    display: revert;
+}
+body.sidebar-collapsed.sidebar-peek .sidebar-nav {
+    padding: 10px 8px;
+}
+body.sidebar-collapsed.sidebar-peek .sidebar-link {
+    justify-content: flex-start;
+    padding: 10px 14px;
+    gap: 12px;
+}
+body.sidebar-collapsed.sidebar-peek .sidebar-nav-label::after {
+    margin: 0;
+}
 
 /* =============================================================================
    4) TOP HEADER BAR
@@ -230,6 +352,39 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     font-size: 20px;
     cursor: pointer;
     padding: 4px;
+    line-height: 0;
+}
+
+.ui-icon {
+    width: 18px;
+    height: 18px;
+    display: inline-block;
+    vertical-align: middle;
+    flex-shrink: 0;
+}
+.ui-icon-sm { width: 14px; height: 14px; }
+.ui-icon-lg { width: 32px; height: 32px; }
+.kpi-icon .ui-icon { width: 22px; height: 22px; }
+.activity-icon .ui-icon { width: 16px; height: 16px; }
+.actions-trigger .ui-icon,
+.actions-btn .ui-icon,
+.user-chip-caret .ui-icon { width: 12px; height: 12px; margin-left: 2px; }
+.topbar-toggle .ui-icon { width: 20px; height: 20px; }
+.notif-bell-trigger .ui-icon { width: 16px; height: 16px; }
+.access-denied-icon { color: var(--text-muted); margin-bottom: 10px; }
+.access-denied-icon .ui-icon { width: 32px; height: 32px; }
+
+.skeleton-card {
+    min-height: 72px;
+    background: linear-gradient(90deg, var(--bg-card) 0%, var(--bg-elevated) 50%, var(--bg-card) 100%);
+    background-size: 200% 100%;
+    animation: ams-skel 1.2s ease-in-out infinite;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+}
+@keyframes ams-skel {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
 }
 
 .topbar-title {
@@ -242,55 +397,8 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     color: var(--text-muted);
 }
 
-/* Push search box and controls to the right side */
+/* Push controls to the right side */
 .topbar-spacer { flex: 1; }
-
-/* Header search input */
-.topbar-search {
-    position: relative;
-}
-
-.topbar-search input {
-    background-color: var(--bg-input);
-    border: 1px solid var(--border);
-    color: var(--text-primary);
-    border-radius: 8px;
-    padding: 8px 14px 8px 34px;
-    width: 220px;
-    font-size: 13px;
-    outline: none;
-    transition: border-color 0.15s ease, width 0.2s ease;
-}
-
-.topbar-search input:focus {
-    border-color: var(--accent);
-    width: 260px;
-}
-
-/* Magnifying-glass icon drawn with pure CSS */
-.topbar-search .search-icon {
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 14px;
-    height: 14px;
-    border: 2px solid var(--text-muted);
-    border-radius: 50%;
-    pointer-events: none;
-}
-
-.topbar-search .search-icon::after {
-    content: '';
-    position: absolute;
-    width: 2px;
-    height: 7px;
-    background: var(--text-muted);
-    bottom: -6px;
-    right: -3px;
-    transform: rotate(45deg);
-    border-radius: 1px;
-}
 
 /* User chip on the right of the header */
 .user-chip {
@@ -312,6 +420,8 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     font-size: 9px;
     color: var(--text-muted);
     margin-left: 2px;
+    display: inline-flex;
+    align-items: center;
 }
 
 .user-chip-menu {
@@ -375,6 +485,11 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     cursor: pointer;
     font-size: 14px;
     position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    line-height: 0;
 }
 .notif-bell-trigger:hover { color: var(--text-primary); border-color: var(--accent); }
 .notif-bell-badge {
@@ -463,19 +578,19 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
 /* KPI / statistic tile used on the dashboard */
 .kpi-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 18px;
-    margin-bottom: 24px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
 }
 
 .kpi-card {
     background-color: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 18px 20px;
+    padding: 14px 16px;
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
     box-shadow: var(--shadow);
     transition: transform 0.15s ease, border-color 0.15s ease;
 }
@@ -669,12 +784,12 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     top: calc(100% + 6px);
     right: 0;
     width: 240px;
-    background: var(--bg-card);
+    background: var(--bg-elevated);
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 12px;
     box-shadow: var(--shadow);
-    z-index: 210;
+    z-index: 220;
     display: none;
 }
 
@@ -851,6 +966,25 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
 
 .progress-fill { height: 100%; border-radius: 999px; background: var(--accent); }
 
+.sql-backup-progress { margin-top: 14px; }
+.sql-backup-progress-bar { position: relative; height: 10px; }
+.sql-backup-progress-bar .progress-fill {
+    width: 32%;
+    transform: translateX(-120%);
+}
+.sql-backup-progress-bar.is-running .progress-fill {
+    animation: ams-backup-progress 1.15s ease-in-out infinite;
+}
+.sql-backup-progress-bar.is-done .progress-fill {
+    width: 100%;
+    transform: none;
+    animation: none;
+}
+@keyframes ams-backup-progress {
+    0% { transform: translateX(-120%); }
+    100% { transform: translateX(380%); }
+}
+
 /* =============================================================================
    10) UTILITIES & RESPONSIVE
    ===========================================================================*/
@@ -867,10 +1001,59 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
 .text-secondary { color: var(--text-secondary); }
 .text-right { text-align: right; }
 
-/* Page heading shown at the top of each page's content */
-.page-heading { margin-bottom: 22px; }
+/* Page heading shown at the top of each page's content.
+   List pages drop the in-page h1 (topbar already shows PAGE_TITLES);
+   the subtitle is a single muted line so stats + toolbar sit higher. */
+.page-heading { margin: 0 0 12px; }
 .page-heading h1 { font-size: 22px; font-weight: 700; }
-.page-heading p { color: var(--text-secondary); font-size: 14px; margin-top: 4px; }
+.page-heading p { color: var(--text-secondary); font-size: 14px; margin-top: 0; }
+
+/* Shared list-page toolbar: filters left, actions right.
+   .asset-toolbar / .emp-toolbar keep their class names and inherit these. */
+.list-toolbar,
+.asset-toolbar,
+.emp-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+}
+
+.list-toolbar-left,
+.asset-toolbar-left,
+.emp-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.stock-by-type {
+    margin-bottom: 16px;
+}
+
+.stock-by-type > summary {
+    cursor: pointer;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding: 8px 0;
+    list-style: none;
+}
+
+.stock-by-type > summary::-webkit-details-marker { display: none; }
+
+.stock-by-type > summary::before {
+    content: "\25B6";
+    display: inline-block;
+    margin-right: 8px;
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.stock-by-type[open] > summary::before { content: "\25BC"; }
 
 /* Quick action buttons row */
 .quick-actions { display: flex; flex-wrap: wrap; gap: 12px; }
@@ -990,13 +1173,86 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
    RESPONSIVE: tablet / mobile behaviour
    ===========================================================================*/
 @media (max-width: 900px) {
-    .sidebar { transform: translateX(-100%); }
+    .sidebar { transform: translateX(-100%); width: 260px; }
     .sidebar.open { transform: translateX(0); box-shadow: var(--shadow); }
     .app-main { margin-left: 0; }
     .topbar-toggle { display: inline-block; }
+    .sidebar-desk-toggle { display: none; }
+    body.sidebar-collapsed .sidebar,
+    body.sidebar-collapsed.sidebar-peek .sidebar {
+        width: 260px;
+    }
+    body.sidebar-collapsed .app-main,
+    body.sidebar-collapsed.sidebar-peek .app-main {
+        margin-left: 0;
+    }
+    body.sidebar-collapsed .sidebar-brand,
+    body.sidebar-collapsed.sidebar-peek .sidebar-brand {
+        justify-content: flex-start;
+        padding: 20px 20px 16px;
+        gap: 12px;
+    }
+    body.sidebar-collapsed .sidebar-brand-text,
+    body.sidebar-collapsed .sidebar-link-label,
+    body.sidebar-collapsed .sidebar-nav-label,
+    body.sidebar-collapsed .sidebar-footer,
+    body.sidebar-collapsed.sidebar-peek .sidebar-brand-text,
+    body.sidebar-collapsed.sidebar-peek .sidebar-link-label,
+    body.sidebar-collapsed.sidebar-peek .sidebar-nav-label,
+    body.sidebar-collapsed.sidebar-peek .sidebar-footer {
+        display: block;
+        font-size: 11px;
+        line-height: normal;
+        color: var(--text-muted);
+        letter-spacing: 0.08em;
+        padding: 12px 10px 6px;
+        height: auto;
+        overflow: visible;
+    }
+    body.sidebar-collapsed .sidebar-brand-text,
+    body.sidebar-collapsed.sidebar-peek .sidebar-brand-text {
+        font-size: inherit;
+        line-height: inherit;
+        color: inherit;
+        letter-spacing: inherit;
+        padding: 0;
+        height: auto;
+    }
+    body.sidebar-collapsed .sidebar-link-label,
+    body.sidebar-collapsed.sidebar-peek .sidebar-link-label {
+        font-size: inherit;
+        line-height: inherit;
+        color: inherit;
+        letter-spacing: inherit;
+        padding: 0;
+        height: auto;
+        overflow: hidden;
+    }
+    body.sidebar-collapsed .sidebar-footer,
+    body.sidebar-collapsed.sidebar-peek .sidebar-footer {
+        font-size: 12px;
+        line-height: inherit;
+        letter-spacing: normal;
+        padding: 14px 20px;
+        height: auto;
+        overflow: visible;
+    }
+    body.sidebar-collapsed .sidebar-nav-label::after,
+    body.sidebar-collapsed.sidebar-peek .sidebar-nav-label::after {
+        display: none;
+    }
+    body.sidebar-collapsed .sidebar-nav,
+    body.sidebar-collapsed.sidebar-peek .sidebar-nav {
+        padding: 14px 12px;
+    }
+    body.sidebar-collapsed .sidebar-link,
+    body.sidebar-collapsed.sidebar-peek .sidebar-link {
+        justify-content: flex-start;
+        padding: 10px 12px;
+        gap: 12px;
+    }
     .grid-2 { grid-template-columns: 1fr; }
-    .topbar-search input { width: 140px; }
-    .topbar-search input:focus { width: 170px; }
+    .topbar-breadcrumb { display: none; }
     .app-content { padding: 18px 16px 40px; }
 }
 
@@ -1006,6 +1262,9 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     .chart-bar-row { grid-template-columns: 90px 1fr 40px; }
     .form-grid { grid-template-columns: 1fr; }
     .modal-overlay { padding: 16px 12px; }
+    .list-toolbar .search-input,
+    .asset-toolbar .search-input,
+    .emp-toolbar .emp-search { width: 100%; min-width: 0; }
 }
 
 /* Short / landscape-ish viewports: trim vertical chrome so tables, dashboards
@@ -1025,6 +1284,17 @@ h1, h2, h3, h4, h5, h6 { font-weight: 600; line-height: 1.25; }
     .app-content { max-width: 1920px; }
 }
 
+body.ams-view-only .btn-primary,
+body.ams-view-only [id^="btnAdd"],
+body.ams-view-only [id$="-add-btn"],
+body.ams-view-only [id$="Import"],
+body.ams-view-only [id$="-import-btn"],
+body.ams-view-only #btnAddMaster,
+body.ams-view-only #btnImport {
+    pointer-events: none;
+    opacity: 0.45;
+}
+
 /*------------------------------------------------------------------------------
 #  SORTABLE COLUMN HEADERS (js/sortable.js)
 #------------------------------------------------------------------------------
@@ -1036,6 +1306,179 @@ th.sortable {
 th.sortable:hover { color: var(--accent, #4da3ff); }
 th.sort-active { color: var(--accent, #4da3ff); }
 .sort-arrow { font-size: 11px; margin-left: 4px; opacity: 0.7; }
+
+.col-filter-row th.col-filter-cell {
+    padding: 6px 8px;
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.col-filter-input {
+    width: 100%;
+    min-width: 64px;
+    padding: 5px 7px;
+    font-size: 12px;
+    font-weight: 400;
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+.col-filter-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.btn-clear-filters { white-space: nowrap; }
+
+/* =============================================================================
+   DATE PICKER  (replaces the OS calendar so Theme / glass apply everywhere)
+   ===========================================================================*/
+input[type="date"] {
+    position: relative;
+    color: var(--text-primary);
+    accent-color: var(--accent);
+    padding-right: 2.4em;
+}
+input[type="date"]::-webkit-calendar-picker-indicator {
+    opacity: 1;
+    pointer-events: none;
+    display: block;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+input[type="date"]::-webkit-inner-spin-button {
+    display: none;
+}
+
+.ams-date-pop {
+    position: fixed;
+    z-index: 5000;
+    width: 280px;
+    padding: 12px;
+    border-radius: 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    color: var(--text-primary);
+    font-family: inherit;
+}
+.ams-date-pop-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.ams-date-pop-title {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+.ams-date-pop-title-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 700;
+    font-family: inherit;
+    padding: 4px 8px;
+    border-radius: 8px;
+}
+.ams-date-pop-title-btn:hover,
+.ams-date-pop-title-btn.is-active {
+    background: var(--bg-elevated);
+}
+.ams-date-pop-grid-months,
+.ams-date-pop-grid-years {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    min-height: 196px;
+}
+.ams-date-pop-cell {
+    height: 40px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 12.5px;
+    font-family: inherit;
+    font-weight: 600;
+}
+.ams-date-pop-cell:hover { background: var(--bg-elevated); }
+.ams-date-pop-cell.today { box-shadow: inset 0 0 0 1px var(--accent); }
+.ams-date-pop-cell.selected {
+    background: var(--accent);
+    color: var(--accent-contrast);
+}
+.ams-date-pop-nav {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+}
+.ams-date-pop-nav:hover { border-color: var(--accent); }
+.ams-date-pop-week,
+.ams-date-pop-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+.ams-date-pop-week span {
+    text-align: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    padding: 4px 0 6px;
+    text-transform: uppercase;
+}
+.ams-date-pop-day {
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 12.5px;
+    font-family: inherit;
+}
+.ams-date-pop-day:hover { background: var(--bg-elevated); }
+.ams-date-pop-day.muted { color: var(--text-muted); opacity: 0.55; }
+.ams-date-pop-day.today { box-shadow: inset 0 0 0 1px var(--accent); }
+.ams-date-pop-day.selected {
+    background: var(--accent);
+    color: var(--accent-contrast);
+}
+.ams-date-pop-foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 10px;
+}
+.ams-date-pop-foot button {
+    flex: 1;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-elevated);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
+}
+.ams-date-pop-foot button:hover { border-color: var(--accent); }
 
 /*------------------------------------------------------------------------------
 #-------------- End of the code : MAIN LAYOUT & COMPONENTS --------------------

@@ -23,7 +23,7 @@
 #      js/system-admin.js
 #------------------------------------------------------------------------------
 -->
-<html lang="en" data-theme="dark-grey">
+<html lang="en" data-theme="platinum" data-ui-style="glass">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -31,6 +31,7 @@
 
     <link rel="stylesheet" href="../css/themes.css">
     <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/ui-styles.css">
     <link rel="stylesheet" href="../css/system-admin.css">
 </head>
 <body>
@@ -71,6 +72,7 @@
                     <button class="admin-tab" data-admin-tab="accessRights">Access Rights Control Master</button>
                     <button class="admin-tab" data-admin-tab="roleAccess">Role Access Master</button>
                     <button class="admin-tab" data-admin-tab="log">Log Report</button>
+                    <button class="admin-tab" data-admin-tab="sqlBackup" style="display:none;">SQL Database Backup</button>
                 </div>
 
                 <div class="admin-frame-wrap">
@@ -80,11 +82,11 @@
         </main>
     </div>
 
-    <script src="../js/dummy-data.js"></script>
-    <script src="../js/theme.js"></script>
-    <script src="../js/app.js"></script>
-    <script src="../js/layout.js"></script>
-    <script src="../js/system-admin.js"></script>
+    <script defer src="../js/dummy-data.js"></script>
+    <script defer src="../js/theme.js"></script>
+    <script defer src="../js/app.js"></script>
+    <script defer src="../js/layout.js"></script>
+    <script defer src="../js/system-admin.js"></script>
 </body>
 </html>
 <!--

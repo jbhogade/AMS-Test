@@ -10,8 +10,12 @@
 #              only page-specific part.
 #
 #              ROLE GUARDS (resolved from the logged-in session role):
-#                - "Supreme Root" is only offered as an assignable Role while the
-#                  session role is "Supreme Root".
+#                - Assignable roles are limited to the session role and below
+#                  (Admin cannot pick Super Root / Supreme Root; Super Root
+#                  cannot pick Supreme Root).
+#                - Accounts above the session role are hidden (table + export).
+#                  Admin does not see Super Root+; Super Root does not see
+#                  Supreme Root. Only Supreme Root sees every row.
 #                - Supreme Root accounts can never be deleted from this screen.
 #                - Super Root accounts can only be deleted while the session role
 #                  is Supreme Root.
@@ -22,7 +26,7 @@
 #      js/master-table.js
 #------------------------------------------------------------------------------
 -->
-<html lang="en" data-theme="dark-grey">
+<html lang="en" data-theme="platinum" data-ui-style="glass">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -30,6 +34,7 @@
 
     <link rel="stylesheet" href="../css/themes.css">
     <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/ui-styles.css">
     <link rel="stylesheet" href="../css/master-table.css">
 </head>
 <body>
@@ -99,35 +104,56 @@
         </div>
     </div>
 
-    <script src="../js/dummy-data.js"></script>
-    <script src="../js/theme.js"></script>
-    <script src="../js/app.js"></script>
-    <script src="../js/layout.js"></script>
-    <script src="../js/sortable.js"></script>
-    <script src="../js/vendor/xlsx.full.min.js"></script>
-    <script src="../js/xlsx-helpers.js"></script>
-    <script src="../js/master-table.js"></script>
+    <script defer src="../js/dummy-data.js"></script>
+    <script defer src="../js/theme.js"></script>
+    <script defer src="../js/app.js"></script>
+    <script defer src="../js/layout.js"></script>
+    <script defer src="../js/sortable.js"></script>
+    <script defer src="../js/xlsx-helpers.js"></script>
+    <script defer src="../js/master-table.js"></script>
 
     <!-- ====================================================================
          THIS PAGE'S MASTER CONFIG + ROLE GUARDS (only part unique to User Master)
          ==================================================================== -->
     <script>
-        (function () {
-            /* Only a Supreme Root can create/see "Supreme Root" as an assignable
-               role - everyone else's Add/Edit form simply doesn't offer it. */
+        document.addEventListener("DOMContentLoaded", function () {
+            /* Role rank: you may assign / see your own level and below. */
+            const AMS_USER_ROLE_RANK = {
+                "Standard User": 0,
+                "Viewer (Read-Only)": 1,
+                "Admin": 2,
+                "Super Root": 3,
+                "Supreme Root": 4,
+            };
+            function amsUserRoleRank(role) {
+                const n = AMS_USER_ROLE_RANK[role];
+                return typeof n === "number" ? n : -1;
+            }
+            function amsSessionRoleRank() {
+                return amsUserRoleRank(amsGetViewingAsRole());
+            }
+
+            /* Assignable roles stop at the signed-in role (Admin cannot pick
+               Super Root+; Super Root cannot pick Supreme Root). */
             function amsGetAllowedRoleOptions() {
-                const viewingAs = amsGetViewingAsRole();
-                return viewingAs === "Supreme Root"
-                    ? AMS_USER_ROLES
-                    : AMS_USER_ROLES.filter(r => r !== "Supreme Root");
+                const cap = amsSessionRoleRank();
+                return AMS_USER_ROLES.filter(r => amsUserRoleRank(r) <= cap);
             }
             window.amsGetAllowedRoleOptions = amsGetAllowedRoleOptions;
+
+            /* Hide accounts strictly above the session role (Admin hides Super
+               Root+; Super Root hides Supreme Root). */
+            function amsIsUserMasterRowVisible(item) {
+                if (!item) return true;
+                return amsUserRoleRank(item.role) <= amsSessionRoleRank();
+            }
 
             window.AMS_MASTER_CONFIG = {
                 pageTitle: "User Master",
                 pageSub: "Manage system login accounts and roles. A password is required for new accounts so they can log in.",
                 dataArray: AMS_DUMMY_USERS,
                 idKey: "username",
+                rowFilter: amsIsUserMasterRowVisible,
                 fields: [
                     { key: "username",       label: "Username",         required: true },
                     { key: "linkedEmployee", label: "Linked Employee",  type: "select",
@@ -153,15 +179,35 @@
                     { key: "remarks",        label: "Remarks",          multiline: true },
                 ],
                 deleteGuard: (item) => {
-                    const sessionRole = amsGetViewingAsRole();
                     if (item.role === "Supreme Root") return { allowed: false, reason: "Supreme Root accounts cannot be deleted from this screen." };
-                    if (item.role === "Super Root" && sessionRole !== "Supreme Root") return { allowed: false, reason: "Only a Supreme Root user can delete a Super Root account." };
+                    if (amsUserRoleRank(item.role) > amsSessionRoleRank()) return { allowed: false, reason: "You cannot delete an account above your own role." };
+                    if (item.role === "Super Root" && amsGetViewingAsRole() !== "Supreme Root") return { allowed: false, reason: "Only a Supreme Root user can delete a Super Root account." };
+                    return { allowed: true };
+                },
+                writeGuard: (values, existing) => {
+                    if (existing && amsUserRoleRank(existing.role) > amsSessionRoleRank()) {
+                        return { allowed: false, reason: "You cannot edit an account above your own role." };
+                    }
+                    if (values && amsUserRoleRank(values.role) > amsSessionRoleRank()) {
+                        return { allowed: false, reason: "You cannot create or assign a role above your own." };
+                    }
                     return { allowed: true };
                 },
                 /* Sync login accounts to the real ams_users table via the API so
                    new accounts can actually log in. Skipped silently when the
                    API is unreachable so the screen still works offline. */
                 onBeforeSave: async (values, editingKey) => {
+                    if (amsUserRoleRank(values.role) > amsSessionRoleRank()) {
+                        throw new Error("You cannot create or assign a role above your own.");
+                    }
+                    if (editingKey) {
+                        const existing = (typeof AMS_DUMMY_USERS !== "undefined")
+                            ? AMS_DUMMY_USERS.find(u => u.username === editingKey)
+                            : null;
+                        if (existing && amsUserRoleRank(existing.role) > amsSessionRoleRank()) {
+                            throw new Error("You cannot edit an account above your own role.");
+                        }
+                    }
                     const sess = amsGetSession();
                     if (!sess || !sess.token) return; // not logged in / no API
                     const payload = {
@@ -182,6 +228,9 @@
                     }
                 },
                 onBeforeToggle: async (item, newActive) => {
+                    if (amsUserRoleRank(item.role) > amsSessionRoleRank()) {
+                        throw new Error("You cannot change an account above your own role.");
+                    }
                     const sess = amsGetSession();
                     if (!sess || !sess.token) return;
                     await amsApiFetch(`/api/auth/users/${encodeURIComponent(item.username)}`, { method: "PUT", body: { active: newActive } });
@@ -199,9 +248,11 @@
                 if (sessionRole === "Supreme Root") {
                     hint.innerHTML = `Signed in as <strong>Supreme Root</strong> - full control: can create Supreme Root accounts and delete Super Root accounts.`;
                 } else if (sessionRole === "Super Root") {
-                    hint.textContent = "Signed in as Super Root - cannot create or delete other Supreme Root / Super Root accounts. Access Rights Control Master, Role Access Master, and Supreme Root's Log Report records are hidden from this role.";
+                    hint.textContent = "Signed in as Super Root - Supreme Root accounts are hidden. Cannot create Supreme Root accounts or delete Super Root accounts. Access Rights Control Master, Role Access Master, and Supreme Root's Log Report records are hidden from this role.";
+                } else if (sessionRole === "Admin") {
+                    hint.textContent = "Signed in as Admin - Super Root and Supreme Root accounts are hidden. Cannot create or assign Super Root or Supreme Root roles.";
                 } else {
-                    hint.textContent = "Signed in as a limited role - some actions may be restricted by real access rights.";
+                    hint.textContent = "Signed in as a limited role - Super Root and Supreme Root accounts are hidden. Some actions may be restricted by access rights.";
                 }
             }
 
@@ -210,8 +261,8 @@
                 amsUpdateUserRoleHint();
             }
 
-            document.addEventListener("DOMContentLoaded", initUserMaster);
-        })();
+            initUserMaster();
+        });
     </script>
 </body>
 </html>

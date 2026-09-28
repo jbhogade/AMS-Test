@@ -3,7 +3,7 @@
 #-------------- Start Code for : SETTINGS (settings.html) ----------------------
 #
 #  PURPOSE   : Portal preferences hub:
-#                1. Appearance   - theme gallery + font size
+#                1. Appearance   - theme gallery, font size
 #                2. General      - portal name, default list page size, currency
 #                3. Notifications- toast toggle, clear bell / activity log
 #                4. Data         - "Viewing As" role shortcut, reset demo data
@@ -13,11 +13,11 @@
 #                apply on every page of the portal.
 #
 #  FILES USED :
-#    - css/themes.css, css/main.css, css/settings.css
+#    - css/themes.css, css/main.css, css/ui-styles.css, css/settings.css
 #    - js/dummy-data.js, js/theme.js, js/app.js, js/layout.js, js/settings.js
 #------------------------------------------------------------------------------
 -->
-<html lang="en" data-theme="dark-grey">
+<html lang="en" data-theme="platinum" data-ui-style="glass">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -25,6 +25,7 @@
 
     <link rel="stylesheet" href="../css/themes.css">
     <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/ui-styles.css">
     <link rel="stylesheet" href="../css/settings.css">
 </head>
 <body>
@@ -58,12 +59,12 @@
                             <h3>Theme</h3>
                         </div>
                         <div class="card-body">
-                            <p class="form-hint" style="margin-bottom:14px;">
-                                Pick a color theme. The choice is remembered by your browser and applied on every page.
-                            </p>
-                            <div class="theme-grid" id="themeGallery"></div>
-                        </div>
-                    </div>
+                             <p class="form-hint" style="margin-bottom:14px;">
+                                 Pick a color theme. Glass is always on. The choice is remembered by your browser and applied on every page.
+                             </p>
+                             <div class="theme-grid" id="themeGallery"></div>
+                         </div>
+                     </div>
 
                     <div class="card">
                         <div class="card-header">
@@ -163,30 +164,16 @@
                             </div>
                         </div>
                     </div>
-
-                    <div class="card">
-                        <div class="card-header">
-                            <h3>Demo Data</h3>
-                        </div>
-                        <div class="card-body">
-                            <p class="form-hint" style="margin-bottom:14px;">
-                                This portal runs on dummy data. Reset clears every browser-saved preference and
-                                change (theme, company details, notifications, activity log, portal settings, role
-                                simulator) and restores the original demo data on the next page load.
-                            </p>
-                            <button type="button" class="btn btn-danger" id="btnResetDemoData">Reset Demo Data</button>
-                        </div>
-                    </div>
                 </section>
             </div>
         </main>
     </div>
 
-    <script src="../js/dummy-data.js"></script>
-    <script src="../js/theme.js"></script>
-    <script src="../js/app.js"></script>
-    <script src="../js/layout.js"></script>
-    <script src="../js/settings.js"></script>
+    <script defer src="../js/dummy-data.js"></script>
+    <script defer src="../js/theme.js"></script>
+    <script defer src="../js/app.js"></script>
+    <script defer src="../js/layout.js"></script>
+    <script defer src="../js/settings.js"></script>
 </body>
 </html>
 <!--

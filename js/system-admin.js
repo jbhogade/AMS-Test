@@ -39,6 +39,7 @@ const AMS_ADMIN_TABS = {
     accessRights:  "access-rights.html",
     roleAccess:    "role-access.html",
     log:           "log-report.html",
+    sqlBackup:     "sql-backup.html",
 };
 /*-------------- End of the code ----------------------------------------------*/
 
@@ -63,23 +64,22 @@ async function initSystemAdmin() {
         btn.addEventListener("click", () => amsLoadAdminTab(btn.getAttribute("data-admin-tab")));
     });
 
-    /* Hide tabs for pages the signed-in role cannot use, so a Super Root (or
-       any non-Supreme role) never sees a button that leads to an "Access
-       Denied" wall: Access Rights + Role Access are Supreme Root only, Log
-       Report is Super Root + Supreme Root only. */
-    const role = (typeof amsGetViewingAsRole === "function") ? amsGetViewingAsRole() : "Standard User";
+    /* Hide tabs the signed-in user cannot use. Role floors still apply
+        (Access Rights / Role Access = Supreme Root only, Log = Super Root+).
+        SQL Database Backup is kept in code but hidden until copy-to
+        SQL-DB-Backup works on the host. */
+    let firstVisible = null;
     document.querySelectorAll(".admin-tab").forEach(btn => {
         const key = btn.getAttribute("data-admin-tab");
-        if (key === "accessRights" || key === "roleAccess") {
-            if (role !== "Supreme Root") btn.style.display = "none";
-        }
-        if (key === "log") {
-            if (role !== "Supreme Root" && role !== "Super Root") btn.style.display = "none";
-        }
+        let allowed = (typeof amsUserCanAccessPage === "function")
+            ? amsUserCanAccessPage(key)
+            : true;
+        if (key === "sqlBackup") allowed = false;
+        btn.style.display = allowed ? "" : "none";
+        if (allowed && !firstVisible) firstVisible = key;
     });
 
-    /* Default to the first tab on load */
-    amsLoadAdminTab("company");
+    amsLoadAdminTab(firstVisible || "company");
 }
 
 document.addEventListener("DOMContentLoaded", initSystemAdmin);

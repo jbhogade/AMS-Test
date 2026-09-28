@@ -327,6 +327,30 @@ def health(request):
     return JsonResponse({"ok": True, "app": "AMS-Test API", "database": "AMS-TEST"})
 
 
+# ---- /api/backup -------------------------------------------------------------
+
+
+@require_auth
+def backup(request):
+    if request.method != "POST":
+        return HttpResponse(status=405)
+    if not is_root(request.role):
+        return JsonResponse(
+            {"error": "Only Super Root and Supreme Root can take a SQL backup."},
+            status=403,
+        )
+    try:
+        db = get_db()
+        result = db.backup_database(str(settings.FRONTEND_ROOT))
+        return JsonResponse(result)
+    except pyodbc.Error as ex:
+        return JsonResponse({"error": "SQL backup failed. " + str(ex)}, status=500)
+    except OSError as ex:
+        return JsonResponse({"error": "SQL backup failed. " + str(ex)}, status=500)
+    except Exception as ex:
+        return JsonResponse({"error": "SQL backup failed. " + str(ex)}, status=500)
+
+
 # ---- frontend serving (same-origin, mirrors .NET UseStaticFiles) -------------
 
 

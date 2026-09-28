@@ -32,19 +32,20 @@ const ICONS = {
 
 /* ---- Navigation menu definition (single source of truth) ------------------- */
 const NAV_ITEMS = [
-    { page: "dashboard",   label: "Dashboard",   href: "../index.html",       icon: ICONS.dashboard,   section: "Main" },
-    { page: "employees",   label: "Employees",   href: "../pages/employees.html",   icon: ICONS.people,  section: "People" },
-    { page: "assets",      label: "Assets",      href: "../pages/assets.html",      icon: ICONS.assets,      section: "Inventory" },
-    { page: "asset-distribution", label: "Asset Distribution", href: "../pages/asset-distribution.html", icon: ICONS.assets, section: "Inventory" },
-    { page: "consumables", label: "Consumables", href: "../pages/consumables.html", icon: ICONS.consumables, section: "Inventory" },
-    { page: "spare-parts", label: "Spare Parts", href: "../pages/spare-parts.html", icon: ICONS.spareParts,  section: "Inventory" },
-    { page: "accessories", label: "Accessories", href: "../pages/accessories.html", icon: ICONS.accessories, section: "Inventory" },
-    { page: "sim-cards",   label: "SIM Cards",   href: "../pages/sim-cards.html",   icon: ICONS.simCards,   section: "Inventory" },
-    { page: "vendors",     label: "Vendors",     href: "../pages/vendors.html",     icon: ICONS.vendors,     section: "Admin" },
-    { page: "reports",     label: "Reports",     href: "../pages/reports.html",     icon: ICONS.reports,     section: "Admin" },
-    { page: "system-admin",label: "System Admin", href: "../pages/system-admin.html", icon: ICONS.systemAdmin, section: "Admin" },
-    { page: "settings",    label: "Settings",    href: "../pages/settings.html",    icon: ICONS.settings,    section: "Admin" },
-    { page: "user-master", label: "User Master", href: "../pages/user-master.html", icon: ICONS.people,    section: "Admin" }
+    { page: "dashboard",   label: "Dashboard",   href: "index.html",       icon: ICONS.dashboard,   section: "Main" },
+    { page: "employees",   label: "Employees",   href: "pages/employees.html",   icon: ICONS.people,  section: "People" },
+    { page: "assets",      label: "Assets",      href: "pages/assets.html",      icon: ICONS.assets,      section: "Inventory" },
+    { page: "mobiles",     label: "Mobiles",     href: "pages/mobiles.html",     icon: ICONS.simCards,    section: "Inventory" },
+    { page: "asset-distribution", label: "Asset Distribution", href: "pages/asset-distribution.html", icon: ICONS.assets, section: "Inventory" },
+    { page: "consumables", label: "Consumables", href: "pages/consumables.html", icon: ICONS.consumables, section: "Inventory" },
+    { page: "spare-parts", label: "Spare Parts", href: "pages/spare-parts.html", icon: ICONS.spareParts,  section: "Inventory" },
+    { page: "accessories", label: "Accessories", href: "pages/accessories.html", icon: ICONS.accessories, section: "Inventory" },
+    { page: "sim-cards",   label: "SIM Cards",   href: "pages/sim-cards.html",   icon: ICONS.simCards,   section: "Inventory" },
+    { page: "vendors",     label: "Vendors",     href: "pages/vendors.html",     icon: ICONS.vendors,     section: "Admin" },
+    { page: "reports",     label: "Reports",     href: "pages/reports.html",     icon: ICONS.reports,     section: "Admin" },
+    { page: "system-admin",label: "System Admin", href: "pages/system-admin.html", icon: ICONS.systemAdmin, section: "Admin" },
+    { page: "settings",    label: "Settings",    href: "pages/settings.html",    icon: ICONS.settings,    section: "Admin" },
+    { page: "user-master", label: "User Master", href: "pages/user-master.html", icon: ICONS.people,    section: "Admin" }
 ];
 
 /* ---- Page title mapping (used by the top header bar) ----------------------- */
@@ -52,6 +53,9 @@ const PAGE_TITLES = {
     "dashboard":   { title: "Dashboard",       sub: "Overview of your inventory" },
     "employees":   { title: "Employees",       sub: "Employee master, assets & handover records" },
     "assets":      { title: "Assets",          sub: "Equipment, machinery & company items" },
+    "mobiles":     { title: "Mobiles",         sub: "Mobile phones & handheld devices" },
+    "asset-distribution": { title: "Asset Distribution", sub: "Assets currently assigned to employees" },
+    "profile":     { title: "My Profile",      sub: "Display name, contact and password" },
     "consumables": { title: "Consumables",     sub: "Items consumed during operations" },
     "spare-parts": { title: "Spare Parts",     sub: "Replacement components in stores" },
     "accessories": { title: "Accessories",     sub: "Attachments & add-ons for assets" },
@@ -76,7 +80,8 @@ const PAGE_TITLES = {
     "master-vendor-category":     { title: "Vendor Category Master",     sub: "Supply categories used by the Vendor Master" },
     "access-rights": { title: "Access Rights Control Master", sub: "Per-user page access (Supreme Root)" },
     "role-access":   { title: "Role Access Master",           sub: "Default page access per role (Supreme Root)" },
-    "log":           { title: "Log Report",                   sub: "Activity audit trail (Super Root + Supreme Root)" }
+    "log":           { title: "Log Report",                   sub: "Activity audit trail (Super Root + Supreme Root)" },
+    "sql-backup":    { title: "SQL Database Backup",          sub: "Full SQL Server backup (Super Root + Supreme Root)" }
 };
 
 /* ---- Render the sidebar into #sidebar-mount -------------------------------- */
@@ -88,6 +93,8 @@ function renderSidebar(currentPage) {
     let lastSection = "";
 
     NAV_ITEMS.forEach(item => {
+        if (typeof amsUserCanAccessNavPage === "function" && !amsUserCanAccessNavPage(item.page)) return;
+
         /* Add a section label when the section changes */
         if (item.section !== lastSection) {
             sectionsHtml += `<div class="sidebar-nav-label">${escapeHtml(item.section)}</div>`;
@@ -95,10 +102,11 @@ function renderSidebar(currentPage) {
         }
 
         const active = item.page === currentPage ? "active" : "";
+        const href = (typeof amsHref === "function") ? amsHref(item.href) : item.href;
         sectionsHtml += `
-            <a class="sidebar-link ${active}" href="${item.href}" data-page="${item.page}">
+            <a class="sidebar-link ${active}" href="${href}" data-page="${item.page}" title="${escapeHtml(item.label)}">
                 <span class="icon">${item.icon}</span>
-                <span>${escapeHtml(item.label)}</span>
+                <span class="sidebar-link-label">${escapeHtml(item.label)}</span>
             </a>
         `;
     });
@@ -106,7 +114,7 @@ function renderSidebar(currentPage) {
     mount.innerHTML = `
         <div class="sidebar-brand">
             <div class="sidebar-logo">AM</div>
-            <div>
+            <div class="sidebar-brand-text">
                 <div class="sidebar-brand-name">${escapeHtml((typeof amsGetPortalName === "function") ? amsGetPortalName() : "Asset Manager")}</div>
                 <div class="sidebar-brand-sub">Management Portal v4.0</div>
             </div>
@@ -128,18 +136,15 @@ function renderTopbar(currentPage) {
     const pageInfo = PAGE_TITLES[currentPage] || { title: "Portal", sub: "" };
 
     mount.innerHTML = `
-        <button class="topbar-toggle" id="sidebar-toggle" aria-label="Open menu">&#9776;</button>
+        <button class="topbar-toggle" id="sidebar-toggle" aria-label="Open menu">${typeof amsUiIcon === "function" ? amsUiIcon("menu") : "Menu"}</button>
+        <button type="button" class="sidebar-desk-toggle" id="sidebar-desk-toggle" aria-label="Hide sidebar">${typeof amsUiIcon === "function" ? amsUiIcon("sidebarHide") : "Hide"}</button>
         <div>
             <div class="topbar-title">${escapeHtml(pageInfo.title)}</div>
             <div class="topbar-breadcrumb">Home &rsaquo; ${escapeHtml(pageInfo.title)} ${pageInfo.sub ? '&rsaquo; ' + escapeHtml(pageInfo.sub) : ''}</div>
         </div>
         <div class="topbar-spacer"></div>
-        <div class="topbar-search">
-            <span class="search-icon"></span>
-            <input type="search" placeholder="Quick search..." id="global-search" aria-label="Search">
-        </div>
         <div class="notif-bell-wrap">
-            <button class="notif-bell-trigger" id="notifBellTrigger" title="Notifications">&#128276;</button>
+            <button class="notif-bell-trigger" id="notifBellTrigger" title="Notifications">${typeof amsUiIcon === "function" ? amsUiIcon("bell") : "Alerts"}</button>
             <span class="notif-bell-badge" id="notifBellBadge"></span>
             <div class="notif-bell-panel" id="notifBellPanel">
                 <div class="notif-bell-header">
@@ -158,10 +163,10 @@ function renderTopbar(currentPage) {
                 <div class="user-chip" id="user-chip" title="Account menu">
                     <div class="user-avatar">${escapeHtml(initials)}</div>
                     <span class="user-chip-name">${escapeHtml(name)}</span>
-                    <span class="user-chip-caret">&#9662;</span>
+                    <span class="user-chip-caret">${typeof amsUiIcon === "function" ? amsUiIcon("caret") : ""}</span>
                 </div>
                 <div class="user-chip-menu" id="user-chip-menu">
-                    <a class="user-chip-menu-item" href="../pages/profile.html">My Profile</a>
+                    <a class="user-chip-menu-item" href="${(typeof amsHref === "function") ? amsHref("pages/profile.html") : "pages/profile.html"}">My Profile</a>
                     <button type="button" class="user-chip-menu-item" id="user-chip-logout">Logout</button>
                 </div>
             </div>`;
@@ -195,6 +200,101 @@ function renderTopbar(currentPage) {
     if (overlay) overlay.classList.remove("show");
 }
 
+/* ---- Desktop sidebar: icon-only rail, overlay peek, persist-show pin --------
+   Collapsed = 64px icons so lists get width. Hover/focus peeks labels over
+   the page without shifting .app-main. Pin Show (localStorage ams-sidebar-show)
+   keeps names visible. Pin is stored per signed-in username
+   (ams-sidebar-show-by-user). Mobile drawer (#sidebar-toggle) is unchanged. */
+const AMS_SIDEBAR_SHOW_KEY = "ams-sidebar-show";
+const AMS_SIDEBAR_SHOW_BY_USER_KEY = "ams-sidebar-show-by-user";
+
+function amsSidebarUserKey() {
+    const sess = (typeof amsGetSession === "function") ? amsGetSession() : null;
+    return (sess && sess.username) ? String(sess.username).trim().toLowerCase() : "";
+}
+
+function amsReadSidebarMap() {
+    try { return JSON.parse(localStorage.getItem(AMS_SIDEBAR_SHOW_BY_USER_KEY) || "{}") || {}; }
+    catch (e) { return {}; }
+}
+
+function amsWriteSidebarMap(map) {
+    try { localStorage.setItem(AMS_SIDEBAR_SHOW_BY_USER_KEY, JSON.stringify(map)); } catch (e) { /* storage unavailable */ }
+}
+
+function amsSidebarIsPinnedShow() {
+    const user = amsSidebarUserKey();
+    if (user) {
+        const map = amsReadSidebarMap();
+        if (Object.prototype.hasOwnProperty.call(map, user)) return map[user] === "1" || map[user] === true;
+        return false;
+    }
+    try { return localStorage.getItem(AMS_SIDEBAR_SHOW_KEY) === "1"; }
+    catch (e) { return false; }
+}
+
+function amsSidebarSetPinnedShow(on) {
+    try {
+        if (on) localStorage.setItem(AMS_SIDEBAR_SHOW_KEY, "1");
+        else localStorage.removeItem(AMS_SIDEBAR_SHOW_KEY);
+        const user = amsSidebarUserKey();
+        if (user) {
+            const map = amsReadSidebarMap();
+            map[user] = on ? "1" : "0";
+            amsWriteSidebarMap(map);
+        }
+    } catch (e) { /* storage unavailable */ }
+}
+
+function amsApplySidebarMode() {
+    const pinned = amsSidebarIsPinnedShow();
+    document.body.classList.toggle("sidebar-collapsed", !pinned);
+    document.body.classList.toggle("sidebar-pinned", pinned);
+    document.body.classList.remove("sidebar-peek");
+    const btn = document.getElementById("sidebar-desk-toggle");
+    if (!btn) return;
+    const show = !pinned;
+    btn.setAttribute("aria-label", show ? "Show sidebar" : "Hide sidebar");
+    btn.title = show ? "Show sidebar names" : "Hide sidebar (icons only)";
+    btn.innerHTML = (typeof amsUiIcon === "function")
+        ? amsUiIcon(show ? "sidebarShow" : "sidebarHide")
+        : (show ? "Show" : "Hide");
+}
+
+function amsInitDesktopSidebar() {
+    amsApplySidebarMode();
+    const btn = document.getElementById("sidebar-desk-toggle");
+    if (btn && !btn.dataset.bound) {
+        btn.dataset.bound = "1";
+        btn.addEventListener("click", function () {
+            amsSidebarSetPinnedShow(!amsSidebarIsPinnedShow());
+            amsApplySidebarMode();
+        });
+    }
+    const sidebar = document.getElementById("sidebar");
+    if (sidebar && !sidebar.dataset.peekBound) {
+        sidebar.dataset.peekBound = "1";
+        sidebar.addEventListener("mouseenter", function () {
+            if (document.body.classList.contains("sidebar-collapsed")) {
+                document.body.classList.add("sidebar-peek");
+            }
+        });
+        sidebar.addEventListener("mouseleave", function () {
+            document.body.classList.remove("sidebar-peek");
+        });
+        sidebar.addEventListener("focusin", function () {
+            if (document.body.classList.contains("sidebar-collapsed")) {
+                document.body.classList.add("sidebar-peek");
+            }
+        });
+        sidebar.addEventListener("focusout", function (e) {
+            if (!sidebar.contains(e.relatedTarget)) {
+                document.body.classList.remove("sidebar-peek");
+            }
+        });
+    }
+}
+
 /* ---- Session gate: no live login session -> redirect to the login page ----- */
 function amsRequireSession() {
     if (typeof amsGetSession !== "function") return true;
@@ -202,11 +302,19 @@ function amsRequireSession() {
     if (session && session.token) return true;
     const path = window.location.pathname;
     if (path.indexOf("login.html") !== -1) return true;
-    window.location.replace("../login.html");
+    window.location.replace((typeof amsHref === "function") ? amsHref("login.html") : "login.html");
     return false;
 }
 
 /* ---- Initialise the whole layout ------------------------------------------- */
+function amsLayoutRedirectIfDenied(currentPage) {
+    if (!currentPage || currentPage === "login" || currentPage === "profile") return;
+    if (typeof amsUserCanAccessNavPage !== "function") return;
+    if (amsUserCanAccessNavPage(currentPage)) return;
+    const fallback = NAV_ITEMS.find(i => i.page !== currentPage && amsUserCanAccessNavPage(i.page));
+    if (fallback) window.location.replace((typeof amsHref === "function") ? amsHref(fallback.href) : fallback.href);
+}
+
 function initLayout(currentPage) {
     if (!amsRequireSession()) return;
     initTheme();
@@ -223,10 +331,310 @@ function initLayout(currentPage) {
     renderSidebar(currentPage);
     renderTopbar(currentPage);
     initApp();               /* binds sidebar toggle / overlay / year   */
+    amsInitDesktopSidebar();
     setActiveNav(currentPage);
 
     /* Notification bell (needs the topbar to already be rendered) */
     if (typeof amsInitBell === "function") amsInitBell();
+    amsInitDatePickers();
+
+    /* Page access (including Supreme Root per-user assignments) is on the
+       user profile loaded from SQL. Re-apply the sidebar once that lands. */
+    if (typeof amsDbEnsureLoaded === "function") {
+        amsDbEnsureLoaded().then(() => {
+            if (typeof amsEnsureSessionUserProfile === "function") amsEnsureSessionUserProfile();
+            amsLayoutRedirectIfDenied(currentPage);
+            renderSidebar(currentPage);
+            setActiveNav(currentPage);
+            if (typeof amsApplyViewOnlyChrome === "function") amsApplyViewOnlyChrome();
+        });
+    }
+}
+
+/* =============================================================================
+   THEMED DATE PICKER
+   -----------------------------------------------------------------------------
+   Native <input type="date"> calendars are drawn by the OS and ignore Theme.
+   This panel is viewport-fixed, uses theme variables, and is wired to every
+   date field (including ones added later by Add/Edit modals).
+   Type in the field as before. Open the glass calendar from the icon on the
+   right (or Alt+ArrowDown). Click the month or year in the header to jump.
+   ----------------------------------------------------------------------------*/
+const AMS_DATE_MONTHS = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"];
+const AMS_DATE_MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const AMS_DATE_DOW = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const AMS_DATE_ICON_PX = 36;
+
+let AMS_DATE_POP = null;
+let AMS_DATE_TARGET = null;
+let AMS_DATE_VIEW = { y: 0, m: 0 };
+let AMS_DATE_MODE = "day";
+
+function amsDateIso(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + day;
+}
+
+function amsDateParse(value) {
+    if (!value) return null;
+    const m = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return null;
+    const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    return isNaN(d.getTime()) ? null : d;
+}
+
+function amsDateOnIcon(e, input) {
+    const r = input.getBoundingClientRect();
+    return e.clientX >= r.right - AMS_DATE_ICON_PX;
+}
+
+function amsDateYearStart(y) {
+    return Math.floor(y / 12) * 12;
+}
+
+function amsDateEnsurePop() {
+    if (AMS_DATE_POP) return AMS_DATE_POP;
+    const pop = document.createElement("div");
+    pop.className = "ams-date-pop";
+    pop.hidden = true;
+    pop.innerHTML = `
+        <div class="ams-date-pop-head">
+            <button type="button" class="ams-date-pop-nav" data-date-nav="-1" aria-label="Previous">&lt;</button>
+            <div class="ams-date-pop-title">
+                <button type="button" class="ams-date-pop-title-btn" data-date-mode="month"></button>
+                <button type="button" class="ams-date-pop-title-btn" data-date-mode="year"></button>
+            </div>
+            <button type="button" class="ams-date-pop-nav" data-date-nav="1" aria-label="Next">&gt;</button>
+        </div>
+        <div class="ams-date-pop-week">${AMS_DATE_DOW.map(d => "<span>" + d + "</span>").join("")}</div>
+        <div class="ams-date-pop-grid"></div>
+        <div class="ams-date-pop-foot">
+            <button type="button" data-date-clear>Clear</button>
+            <button type="button" data-date-today>Today</button>
+        </div>`;
+    document.body.appendChild(pop);
+    pop.addEventListener("mousedown", function (e) { e.preventDefault(); });
+    pop.addEventListener("click", function (e) {
+        const modeBtn = e.target.closest("[data-date-mode]");
+        if (modeBtn) {
+            const next = modeBtn.getAttribute("data-date-mode");
+            AMS_DATE_MODE = (AMS_DATE_MODE === next) ? "day" : next;
+            amsDateRender();
+            return;
+        }
+        const nav = e.target.closest("[data-date-nav]");
+        if (nav) {
+            const step = Number(nav.getAttribute("data-date-nav"));
+            if (AMS_DATE_MODE === "year") AMS_DATE_VIEW.y += step * 12;
+            else if (AMS_DATE_MODE === "month") AMS_DATE_VIEW.y += step;
+            else {
+                AMS_DATE_VIEW.m += step;
+                if (AMS_DATE_VIEW.m < 0) { AMS_DATE_VIEW.m = 11; AMS_DATE_VIEW.y -= 1; }
+                if (AMS_DATE_VIEW.m > 11) { AMS_DATE_VIEW.m = 0; AMS_DATE_VIEW.y += 1; }
+            }
+            amsDateRender();
+            return;
+        }
+        if (e.target.closest("[data-date-clear]")) {
+            amsDateApply("");
+            return;
+        }
+        if (e.target.closest("[data-date-today]")) {
+            amsDateApply(amsDateIso(new Date()));
+            return;
+        }
+        const yearBtn = e.target.closest("[data-date-year]");
+        if (yearBtn) {
+            AMS_DATE_VIEW.y = Number(yearBtn.getAttribute("data-date-year"));
+            AMS_DATE_MODE = "month";
+            amsDateRender();
+            return;
+        }
+        const monthBtn = e.target.closest("[data-date-month]");
+        if (monthBtn) {
+            AMS_DATE_VIEW.m = Number(monthBtn.getAttribute("data-date-month"));
+            AMS_DATE_MODE = "day";
+            amsDateRender();
+            return;
+        }
+        const day = e.target.closest("[data-date-day]");
+        if (day) amsDateApply(day.getAttribute("data-date-day"));
+    });
+    AMS_DATE_POP = pop;
+    return pop;
+}
+
+function amsDateRenderTitle() {
+    const pop = amsDateEnsurePop();
+    const monthBtn = pop.querySelector('[data-date-mode="month"]');
+    const yearBtn = pop.querySelector('[data-date-mode="year"]');
+    monthBtn.textContent = AMS_DATE_MONTHS[AMS_DATE_VIEW.m];
+    yearBtn.textContent = String(AMS_DATE_VIEW.y);
+    monthBtn.classList.toggle("is-active", AMS_DATE_MODE === "month");
+    yearBtn.classList.toggle("is-active", AMS_DATE_MODE === "year");
+    pop.querySelector(".ams-date-pop-week").hidden = AMS_DATE_MODE !== "day";
+}
+
+function amsDateRenderDayGrid() {
+    const pop = amsDateEnsurePop();
+    const first = new Date(AMS_DATE_VIEW.y, AMS_DATE_VIEW.m, 1);
+    const startDow = first.getDay();
+    const daysInMonth = new Date(AMS_DATE_VIEW.y, AMS_DATE_VIEW.m + 1, 0).getDate();
+    const prevDays = new Date(AMS_DATE_VIEW.y, AMS_DATE_VIEW.m, 0).getDate();
+    const selected = AMS_DATE_TARGET ? AMS_DATE_TARGET.value : "";
+    const today = amsDateIso(new Date());
+    let html = "";
+    for (let i = 0; i < 42; i++) {
+        let y = AMS_DATE_VIEW.y;
+        let m = AMS_DATE_VIEW.m;
+        let d = i - startDow + 1;
+        let muted = "";
+        if (d < 1) {
+            m -= 1;
+            if (m < 0) { m = 11; y -= 1; }
+            d = prevDays + d;
+            muted = " muted";
+        } else if (d > daysInMonth) {
+            d = d - daysInMonth;
+            m += 1;
+            if (m > 11) { m = 0; y += 1; }
+            muted = " muted";
+        }
+        const iso = y + "-" + String(m + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+        const cls = "ams-date-pop-day" + muted
+            + (iso === selected ? " selected" : "")
+            + (iso === today ? " today" : "");
+        html += '<button type="button" class="' + cls + '" data-date-day="' + iso + '">' + d + "</button>";
+    }
+    pop.querySelector(".ams-date-pop-grid").className = "ams-date-pop-grid";
+    pop.querySelector(".ams-date-pop-grid").innerHTML = html;
+}
+
+function amsDateRenderMonthGrid() {
+    const pop = amsDateEnsurePop();
+    const selected = amsDateParse(AMS_DATE_TARGET ? AMS_DATE_TARGET.value : "");
+    const now = new Date();
+    let html = "";
+    for (let m = 0; m < 12; m++) {
+        const cls = "ams-date-pop-cell"
+            + (selected && selected.getFullYear() === AMS_DATE_VIEW.y && selected.getMonth() === m ? " selected" : "")
+            + (now.getFullYear() === AMS_DATE_VIEW.y && now.getMonth() === m ? " today" : "");
+        html += '<button type="button" class="' + cls + '" data-date-month="' + m + '">' + AMS_DATE_MONTHS_SHORT[m] + "</button>";
+    }
+    pop.querySelector(".ams-date-pop-grid").className = "ams-date-pop-grid ams-date-pop-grid-months";
+    pop.querySelector(".ams-date-pop-grid").innerHTML = html;
+}
+
+function amsDateRenderYearGrid() {
+    const pop = amsDateEnsurePop();
+    const start = amsDateYearStart(AMS_DATE_VIEW.y);
+    const selected = amsDateParse(AMS_DATE_TARGET ? AMS_DATE_TARGET.value : "");
+    const nowY = new Date().getFullYear();
+    let html = "";
+    for (let i = 0; i < 12; i++) {
+        const y = start + i;
+        const cls = "ams-date-pop-cell"
+            + (selected && selected.getFullYear() === y ? " selected" : "")
+            + (nowY === y ? " today" : "");
+        html += '<button type="button" class="' + cls + '" data-date-year="' + y + '">' + y + "</button>";
+    }
+    pop.querySelector(".ams-date-pop-grid").className = "ams-date-pop-grid ams-date-pop-grid-years";
+    pop.querySelector(".ams-date-pop-grid").innerHTML = html;
+}
+
+function amsDateRender() {
+    amsDateRenderTitle();
+    if (AMS_DATE_MODE === "month") amsDateRenderMonthGrid();
+    else if (AMS_DATE_MODE === "year") amsDateRenderYearGrid();
+    else amsDateRenderDayGrid();
+}
+
+function amsDatePlace() {
+    const pop = amsDateEnsurePop();
+    const r = AMS_DATE_TARGET.getBoundingClientRect();
+    const pw = pop.offsetWidth || 280;
+    const ph = pop.offsetHeight || 320;
+    let left = r.left;
+    if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+    if (left < 8) left = 8;
+    let top = r.bottom + 6;
+    if (top + ph > window.innerHeight - 8) {
+        top = r.top - ph - 6;
+        if (top < 8) top = 8;
+    }
+    pop.style.left = left + "px";
+    pop.style.top = top + "px";
+}
+
+function amsDateOpen(input) {
+    AMS_DATE_TARGET = input;
+    const parsed = amsDateParse(input.value) || new Date();
+    AMS_DATE_VIEW = { y: parsed.getFullYear(), m: parsed.getMonth() };
+    AMS_DATE_MODE = "day";
+    const pop = amsDateEnsurePop();
+    pop.hidden = false;
+    amsDateRender();
+    amsDatePlace();
+}
+
+function amsDateClose() {
+    if (AMS_DATE_POP) AMS_DATE_POP.hidden = true;
+    AMS_DATE_TARGET = null;
+    AMS_DATE_MODE = "day";
+}
+
+function amsDateApply(iso) {
+    if (!AMS_DATE_TARGET) return;
+    const el = AMS_DATE_TARGET;
+    el.value = iso;
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+    amsDateClose();
+}
+
+function amsInitDatePickers() {
+    if (document.documentElement.dataset.amsDatePickers === "1") return;
+    document.documentElement.dataset.amsDatePickers = "1";
+    document.addEventListener("mousedown", function (e) {
+        const input = e.target.closest && e.target.closest('input[type="date"]');
+        if (!input) return;
+        if (!amsDateOnIcon(e, input)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (AMS_DATE_TARGET === input && AMS_DATE_POP && !AMS_DATE_POP.hidden) amsDateClose();
+        else amsDateOpen(input);
+    }, true);
+    document.addEventListener("click", function (e) {
+        const input = e.target.closest && e.target.closest('input[type="date"]');
+        if (input && amsDateOnIcon(e, input)) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+        }
+        if (AMS_DATE_POP && !AMS_DATE_POP.hidden && !e.target.closest(".ams-date-pop")) {
+            if (input && AMS_DATE_TARGET === input) return;
+            amsDateClose();
+        }
+    }, true);
+    document.addEventListener("scroll", function (e) {
+        if (!AMS_DATE_TARGET) return;
+        if (AMS_DATE_POP && (e.target === AMS_DATE_POP || AMS_DATE_POP.contains(e.target))) return;
+        amsDateClose();
+    }, true);
+    window.addEventListener("resize", function () { if (AMS_DATE_TARGET) amsDateClose(); }, { passive: true });
+    document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") amsDateClose();
+        if ((e.altKey && e.key === "ArrowDown") || e.key === "F4") {
+            if (e.target && e.target.matches && e.target.matches('input[type="date"]')) {
+                e.preventDefault();
+                amsDateOpen(e.target);
+            }
+        }
+    });
 }
 
 /* =============================================================================
@@ -247,7 +655,7 @@ function amsDropdownOpen(trigger, menu) {
     menu.style.position = "fixed";
     menu.style.right = "auto";
     menu.style.top = "auto";
-    menu.style.zIndex = "500";
+    menu.style.zIndex = "4000";
     menu.style.left = "-9999px";                 /* measure off-screen first   */
     const mw = menu.offsetWidth || 200;
     const mh = menu.offsetHeight || 320;

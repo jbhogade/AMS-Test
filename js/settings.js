@@ -3,17 +3,17 @@
 #
 #  PURPOSE   : Drives the Settings page - a portal preferences hub:
 #
-#                1. Appearance  - theme gallery (11 themes with live CSS-var
-#                   previews) + font size (sm / md / lg)
+#                1. Appearance  - theme gallery (12 themes with live CSS-var
+#                   previews), style gallery (surface look), font size (sm / md / lg)
 #                2. General     - portal name (sidebar brand), default list
 #                   page size, currency display note
 #                3. Notifications - toast popup toggle, clear the notification
 #                   bell history, clear the permanent activity log
-#                4. Data        - "Viewing As" role shortcut + Reset Demo Data
+#                4. Data        - signed-in role (read-only)
 #
 #  PERSISTENCE: every choice is localStorage-backed via the shared helpers in
 #               js/dummy-data.js (portal name, font size, page size, toast
-#               toggle) and js/theme.js (theme), so the choices apply on every
+#               toggle) and js/theme.js (theme + style), so the choices apply on every
 #               page, not just here.
 #------------------------------------------------------------------------------*/
 
@@ -52,8 +52,7 @@ function renderThemeGallery() {
         card.addEventListener("click", () => {
             const name = card.getAttribute("data-theme-card");
             applyTheme(name);
-            grid.querySelectorAll(".theme-card").forEach(c =>
-                c.classList.toggle("selected", c === card));
+            markSelectedTheme();
             const label = card.querySelector(".theme-card-name").textContent;
             amsNotify(`Theme changed to ${label}`, "success");
         });
@@ -161,13 +160,6 @@ function initNotificationsTab() {
 function initDataTab() {
     const roleInput = document.getElementById("settingsSignedInRole");
     if (roleInput) roleInput.value = amsGetViewingAsRole();
-
-    const resetBtn = document.getElementById("btnResetDemoData");
-    if (resetBtn) resetBtn.addEventListener("click", () => {
-        if (!confirm("Reset all demo data and preferences? Theme, company details, notifications, activity log, portal settings and preferences will be restored to defaults.")) return;
-        amsResetDemoData();
-        location.reload();
-    });
 }
 /*-------------- End of the code ----------------------------------------------*/
 

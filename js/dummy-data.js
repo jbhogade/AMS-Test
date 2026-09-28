@@ -1,15 +1,8 @@
 /*==============================================================================
 #-------------- Start Code for : DUMMY DATA (dummy-data.js) -------------------
 #
-#  PURPOSE   : Provides sample / test data for the whole portal because we
-#              are NOT connected to SQL Server yet.
-#
-#  HOW TO USE IN FUTURE (SQL SERVER MIGRATION) :
-#    - Every data source below is a plain JavaScript array / object.
-#    - When you connect SQL Server, replace each section with an AJAX / fetch
-#      call that reads the same shape of data from your backend API.
-#    - KEEP the property names identical so the pages that consume this data
-#      do NOT need to change.
+#  PURPOSE   : In-memory cache of every SQL collection for the portal.
+#              SQL Server (via /api/collection/...) is the source of truth.
 #
 #  FILE MAP :
 #    1. SHARED HELPERS  - date formatting, toast, CSV helpers (from v3-3)
@@ -37,8 +30,8 @@
    DATABASE / API LAYER  (AMS-TEST)
    -----------------------------------------------------------------------------
    The AMS-Test portal is backed by the SQL Server database "AMS-TEST" reached
-   through the ASP.NET Core API (server\AMS.API). Business data is stored as
-   JSON documents in the dbo.ams_collections table; this layer loads every
+   through the ASP.NET Core API (server\AMS.API). Business data lives in
+   per-entity SQL tables (plus data_json on each row). This layer loads every
    collection into the global arrays below at startup and PUTs a collection
    back to the API whenever the in-memory data changes. SQL Server is the
    single source of truth - the arrays are just a live cache of the documents.
@@ -78,9 +71,15 @@ function amsLogout() {
     amsClearSession();
     amsLoginRedirect();
 }
+function amsInPagesFolder() {
+    return /\/pages\//.test(window.location.pathname || "");
+}
+function amsHref(rootPath) {
+    const p = String(rootPath || "").replace(/^\//, "");
+    return (amsInPagesFolder() ? "../" : "") + p;
+}
 function amsLoginRedirect() {
-    const isPages = /\/pages\//.test(window.location.pathname);
-    window.location.replace((isPages ? "../" : "") + "login.html");
+    window.location.replace(amsHref("login.html"));
 }
 
 /* ---- core API client ------------------------------------------------------- */
@@ -106,7 +105,12 @@ async function amsApiFetch(path, opts) {
     }
     if (!res.ok) {
         let msg = "API error " + res.status;
-        try { const j = await res.json(); if (j && j.error) msg = j.error; } catch (e) { /* non-JSON error */ }
+        try {
+            const j = await res.json();
+            if (j && (j.error || j.detail || j.title || j.message)) {
+                msg = j.error || j.detail || j.title || j.message;
+            }
+        } catch (e) { /* non-JSON error */ }
         throw new Error(msg);
     }
     const text = await res.text();
@@ -136,6 +140,7 @@ const AMS_COLLECTIONS = {
     spareParts:      () => AMS_DUMMY_SPARE_PARTS,
     sparePartLog:    () => AMS_DUMMY_SPAREPART_LOG,
     accessories:     () => AMS_DUMMY_ACCESSORIES,
+    mobiles:         () => DUMMY_MOBILES,
     simCards:        () => AMS_DUMMY_SIM_CARDS,
     simOperators:    () => AMS_DUMMY_SIM_OPERATORS,
     simPlans:        () => AMS_DUMMY_SIM_PLANS,
@@ -182,16 +187,26 @@ async function amsDbLoadAll() {
         const venMax = AMS_DUMMY_VENDORS.reduce((m, v) =>
             Math.max(m, parseInt(String(v.vendorId || "0").replace(/\D/g, ""), 10) || 0), 0);
         if (venMax >= AMS_VENDOR_SEQ) AMS_VENDOR_SEQ = venMax + 1;
+        const makesBackfilled = amsBackfillAssetMakeCodes();
         amsMigrateEmployeeNames();
+        await amsMergeLoginUsersIntoProfiles();
         AMS_DB_READY = true;
+        if (typeof amsMigrateRoleAccessDocument === "function") amsMigrateRoleAccessDocument();
+        if (makesBackfilled) amsDbSaveAsync("assetMakes");
     })();
     return AMS_DB_LOADING;
 }
 function amsDbEnsureLoaded() { return amsDbLoadAll(); }
 function amsDbIsReady() { return AMS_DB_READY; }
 
+function amsWritesBlocked() {
+    if (typeof amsUserCanWriteCurrentPage !== "function") return false;
+    return !amsUserCanWriteCurrentPage();
+}
+
 /* Persist an array collection back to SQL Server (wholesale replace). */
 async function amsDbSave(key) {
+    if (amsWritesBlocked()) return;
     const getter = AMS_COLLECTIONS[key];
     if (!getter) return;
     try { await amsApiPut("/api/collection/" + key, getter()); }
@@ -200,6 +215,7 @@ async function amsDbSave(key) {
 
 /* Persist a document collection (object) back to SQL Server. */
 async function amsDbSaveDoc(key) {
+    if (amsWritesBlocked() && key !== "roleAccess") return;
     const getter = AMS_DOC_COLLECTIONS[key];
     if (!getter) return;
     try { await amsApiPut("/api/collection/" + key, getter()); }
@@ -222,31 +238,94 @@ async function amsDbSaveArray(arr) {
 
 /* Convenience: fire-and-forget save (keeps the UI responsive; errors still
    surface through amsDbSave's toast). */
+/* Bulk import (and similar batch mutators) suspend fire-and-forget PUTs so
+   overlapping wholesale replaces cannot wipe rows added earlier in the same
+   pass. Callers MUST persist once after resume. */
+let AMS_DB_SAVE_SUSPEND = 0;
+function amsDbSuspendSaves() { AMS_DB_SAVE_SUSPEND += 1; }
+function amsDbResumeSaves() { if (AMS_DB_SAVE_SUSPEND > 0) AMS_DB_SAVE_SUSPEND -= 1; }
+function amsDbSavesSuspended() { return AMS_DB_SAVE_SUSPEND > 0; }
+
 function amsDbSaveAsync(key) {
-    if (!amsDbIsReady()) return;
+    if (!amsDbIsReady() || AMS_DB_SAVE_SUSPEND > 0) return;
     amsDbSave(key).catch(() => {});
 }
 function amsDbSaveDocAsync(key) {
-    if (!amsDbIsReady()) return;
+    if (!amsDbIsReady() || AMS_DB_SAVE_SUSPEND > 0) return;
     amsDbSaveDoc(key).catch(() => {});
 }
 
-/* Converts stored ISO date (yyyy-mm-dd) to dd-mm-yyyy for display in the UI */
+/* Converts stored ISO date (yyyy-mm-dd) to dd-mm-yyyy for display in the UI.
+   Non-ISO stored values (Excel import leftovers) are normalised first. */
 function amsFormatDate(iso) {
-    if (!iso) return "";
-    const parts = String(iso).split("-");
-    if (parts.length !== 3) return iso;
-    const [y, m, d] = parts;
+    const canonical = amsParseDMY(iso);
+    if (!canonical) return iso ? String(iso) : "";
+    const [y, m, d] = canonical.split("-");
     return `${d}-${m}-${y}`;
 }
 
-/* Reverse of amsFormatDate: dd-mm-yyyy (e.g. from CSV import) back to ISO */
+/* Normalises any imported / stored date to ISO yyyy-mm-dd for <input type="date">.
+   Accepts: yyyy-mm-dd (already ISO, must not be swapped), dd-mm-yyyy (template),
+   slash/dot variants, US m/d/yyyy when the day is > 12, named months, Excel
+   serials, and Date objects. Unrecognised values return "". */
 function amsParseDMY(dmy) {
-    if (!dmy) return "";
-    const parts = String(dmy).trim().split("-");
-    if (parts.length !== 3) return dmy;
-    const [d, m, y] = parts;
-    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+    if (dmy == null || dmy === "") return "";
+    const pad = n => String(n).padStart(2, "0");
+    const isoFromParts = (y, mo, d) => {
+        const year = Number(y);
+        const month = Number(mo);
+        const day = Number(d);
+        if (!year || month < 1 || month > 12 || day < 1 || day > 31) return "";
+        return `${String(year).padStart(4, "0")}-${pad(month)}-${pad(day)}`;
+    };
+    const expandYear = y => {
+        const s = String(y);
+        if (s.length !== 2) return s;
+        const n = parseInt(s, 10);
+        return String(n >= 70 ? 1900 + n : 2000 + n);
+    };
+    if (dmy instanceof Date && !isNaN(dmy.getTime())) {
+        return isoFromParts(dmy.getFullYear(), dmy.getMonth() + 1, dmy.getDate());
+    }
+    let s = String(dmy).trim();
+    if (!s) return "";
+    s = s.replace(/[T\s]\d{1,2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/i, "");
+
+    if (/^\d+(\.\d+)?$/.test(s)) {
+        const n = Number(s);
+        if (n >= 20000 && n < 80000) {
+            const utc = Date.UTC(1899, 11, 30) + Math.round(n) * 86400000;
+            const dt = new Date(utc);
+            return isoFromParts(dt.getUTCFullYear(), dt.getUTCMonth() + 1, dt.getUTCDate());
+        }
+    }
+
+    let m = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+    if (m) return isoFromParts(m[1], m[2], m[3]);
+
+    m = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
+    if (m) {
+        let day = parseInt(m[1], 10);
+        let month = parseInt(m[2], 10);
+        const year = expandYear(m[3]);
+        if (day <= 12 && month > 12) {
+            const tmp = day; day = month; month = tmp;
+        }
+        return isoFromParts(year, month, day);
+    }
+
+    const MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12 };
+    m = s.match(/^(\d{1,2})[-/. ]([A-Za-z]+)[-/. ,]+(\d{2,4})$/);
+    if (m) {
+        const month = MONTHS[m[2].slice(0, 3).toLowerCase()];
+        if (month) return isoFromParts(expandYear(m[3]), month, m[1]);
+    }
+    m = s.match(/^([A-Za-z]+)[-/. ]+(\d{1,2}),?[-/. ]+(\d{2,4})$/);
+    if (m) {
+        const month = MONTHS[m[1].slice(0, 3).toLowerCase()];
+        if (month) return isoFromParts(expandYear(m[3]), month, m[2]);
+    }
+    return "";
 }
 
 /* Toast notification - types: info | success | warning | danger */
@@ -483,6 +562,45 @@ function amsEsc(str) {
     return div.innerHTML;
 }
 
+/* Unique, trimmed, case-insensitive values for toolbar filter dropdowns. */
+function amsUniqueSorted(values) {
+    const seen = {};
+    const out = [];
+    (values || []).forEach(v => {
+        const s = String(v == null ? "" : v).trim();
+        if (!s) return;
+        const k = s.toLowerCase();
+        if (seen[k]) return;
+        seen[k] = true;
+        out.push(s);
+    });
+    out.sort((a, b) => a.localeCompare(b));
+    return out;
+}
+
+/* Rebuilds a <select> while keeping the current value when it is still valid. */
+function amsFillSelectOptions(selectEl, allLabel, values) {
+    if (!selectEl) return;
+    const prev = selectEl.value;
+    const list = values || [];
+    selectEl.innerHTML = `<option value="">${amsEsc(allLabel)}</option>` +
+        list.map(v => `<option value="${amsEsc(v)}">${amsEsc(v)}</option>`).join("");
+    if (prev && (prev === "" || list.indexOf(prev) !== -1)) selectEl.value = prev;
+}
+
+/* Company Employee ID for a history / report row. Stored empId may be the
+   hidden AMS ID (portal view-model) or the company ID; never show AMS IDs
+   except on Supreme Root-only screens. */
+function amsHistoryEmpDisplayId(h) {
+    if (!h) return "";
+    const raw = h.empId || h.empCode || "";
+    if (!raw) return "";
+    const emp = (typeof findEmployeeAny === "function" && findEmployeeAny(raw))
+        || (typeof amsGetEmployeeByAmsId === "function" && amsGetEmployeeByAmsId(raw))
+        || null;
+    return emp ? amsGetEmployeeDisplayId(emp) : raw;
+}
+
 /* =============================================================================
    2) NOTIFICATIONS  (toast + persistent bell + append-only activity log)
    ===========================================================================*/
@@ -621,8 +739,131 @@ function amsQuickAddAccessory(name, assetType) {
         return null;
     }
     AMS_ACC_SEQ += 1;
-    AMS_DUMMY_ACCESSORIES.push({ accCode: `ACC-${String(AMS_ACC_SEQ).padStart(6, "0")}`, name: trimmed, assetType, active: true });
+    AMS_DUMMY_ACCESSORIES.push({ accCode: `ACC-${String(AMS_ACC_SEQ).padStart(6, "0")}`, name: trimmed, assetType, site: "", active: true });
     amsDbSaveAsync("accessories");
+    return trimmed;
+}
+
+let AMS_MAKE_SEQ = 0;
+
+function amsNextMakeCode() {
+    AMS_MAKE_SEQ += 1;
+    return `MAKE-${String(AMS_MAKE_SEQ).padStart(6, "0")}`;
+}
+
+function amsBackfillAssetMakeCodes() {
+    const makeMax = AMS_DUMMY_ASSET_MAKES.reduce((m, item) =>
+        Math.max(m, parseInt(String(item.makeCode || "0").replace(/\D/g, ""), 10) || 0), 0);
+    if (makeMax >= AMS_MAKE_SEQ) AMS_MAKE_SEQ = makeMax;
+    let assigned = false;
+    AMS_DUMMY_ASSET_MAKES.forEach(item => {
+        if (!item.makeCode) {
+            item.makeCode = amsNextMakeCode();
+            assigned = true;
+        }
+        if (item.assetType == null) item.assetType = "";
+    });
+    return assigned;
+}
+
+function amsGetMakeOptions(assetType) {
+    if (!assetType) return [];
+    return AMS_DUMMY_ASSET_MAKES.filter(m => m.assetType === assetType && m.active).map(m => m.name);
+}
+
+function amsFillMakeSelect(selectEl, assetType, selected) {
+    if (!selectEl) return;
+    const options = amsGetMakeOptions(assetType);
+    const keep = (selected || "").trim();
+    const names = options.slice();
+    if (keep && !names.some(n => n === keep)) names.unshift(keep);
+    selectEl.innerHTML = names.map(n => `<option value="${amsEsc(n)}">${amsEsc(n)}</option>`).join("");
+    if (keep) selectEl.value = keep;
+}
+
+function amsQuickAddMake(name, assetType) {
+    const trimmed = (name || "").trim();
+    const type = (assetType || "").trim();
+    if (!trimmed || !type) return null;
+    if (AMS_DUMMY_ASSET_MAKES.some(m =>
+        String(m.assetType || "").toLowerCase() === type.toLowerCase()
+        && String(m.name || "").toLowerCase() === trimmed.toLowerCase()
+    )) {
+        return null;
+    }
+    AMS_DUMMY_ASSET_MAKES.push({ makeCode: amsNextMakeCode(), name: trimmed, assetType: type, active: true });
+    amsDbSaveAsync("assetMakes");
+    return trimmed;
+}
+
+const AMS_CATEGORY_USED_ON = ["Assets", "Mobiles", "Both"];
+
+function amsCategoryUsedOn(categoryName) {
+    const c = AMS_DUMMY_ASSET_CATEGORIES.find(x => x.name === categoryName);
+    return (c && c.usedOn) ? c.usedOn : "";
+}
+
+function amsCategoryMatchesPage(categoryName, pageKind) {
+    const used = amsCategoryUsedOn(categoryName);
+    if (!used) return false;
+    if (used === "Both") return true;
+    return used === pageKind;
+}
+
+function amsGetCategoryOptions(pageKind) {
+    return AMS_DUMMY_ASSET_CATEGORIES.filter(c => c.active && amsCategoryMatchesPage(c.name, pageKind)).map(c => c.name);
+}
+
+function amsGetTypeOptions(pageKind, categoryName) {
+    return AMS_DUMMY_ASSET_TYPES.filter(t => {
+        if (!t.active || !t.category) return false;
+        if (!amsCategoryMatchesPage(t.category, pageKind)) return false;
+        if (categoryName && t.category !== categoryName) return false;
+        return true;
+    }).map(t => t.name);
+}
+
+function amsTypeBelongsToPage(typeName, pageKind) {
+    const t = AMS_DUMMY_ASSET_TYPES.find(x => x.name === typeName);
+    if (!t || !t.category) return false;
+    return amsCategoryMatchesPage(t.category, pageKind);
+}
+
+function amsFillNamedSelect(selectEl, names, selected) {
+    if (!selectEl) return;
+    const keep = (selected || "").trim();
+    const list = names.slice();
+    if (keep && !list.some(n => n === keep)) list.unshift(keep);
+    selectEl.innerHTML = list.map(n => `<option value="${amsEsc(n)}">${amsEsc(n)}</option>`).join("");
+    if (keep) selectEl.value = keep;
+}
+
+function amsFillCategorySelect(selectEl, pageKind, selected) {
+    amsFillNamedSelect(selectEl, amsGetCategoryOptions(pageKind), selected);
+}
+
+function amsFillTypeSelect(selectEl, pageKind, categoryName, selected) {
+    amsFillNamedSelect(selectEl, amsGetTypeOptions(pageKind, categoryName), selected);
+}
+
+function amsQuickAddCategory(name, usedOn) {
+    const trimmed = (name || "").trim();
+    const used = (usedOn || "").trim();
+    if (!trimmed || !used) return null;
+    if (AMS_DUMMY_ASSET_CATEGORIES.some(c => c.name.toLowerCase() === trimmed.toLowerCase())) return null;
+    AMS_DUMMY_ASSET_CATEGORIES.push({ name: trimmed, usedOn: used, active: true });
+    amsDbSaveAsync("assetCategories");
+    return trimmed;
+}
+
+function amsQuickAddAssetType(name, shortform, category) {
+    const trimmed = (name || "").trim();
+    const short = (shortform || "").trim().toUpperCase();
+    const cat = (category || "").trim();
+    if (!trimmed || !short || !cat) return null;
+    if (AMS_DUMMY_ASSET_TYPES.some(t => t.name.toLowerCase() === trimmed.toLowerCase())) return null;
+    AMS_DUMMY_ASSET_TYPES.push({ name: trimmed, shortform: short, category: cat, active: true });
+    amsDbSaveAsync("assetTypes");
     return trimmed;
 }
 
@@ -774,6 +1015,7 @@ function amsGetEmployeeByAmsId(amsId) {
         email: e.email,
         status: e.status,
         reportsTo: e.managerAmsId,
+        site: e.site || "",
     };
 }
 
@@ -825,6 +1067,7 @@ const AMS_ASSET_STATUS_OPTIONS = [
     "In Store", "Assigned", "In Repair", "Transfer", "Not Working", "Retired / Scrapped", "Replaced",
 ];
 const DUMMY_ASSETS = [];
+const DUMMY_MOBILES = [];
 
 
 /* =============================================================================
@@ -914,10 +1157,11 @@ const AMS_DUMMY_SPAREPART_LOG = [];
    8a) SIM CARD MASTER  (mobile SIM cards issued to employees)
    ----------------------------------------------------------------------------
    A SIM card and a mobile phone are issued together to some users. The phone
-   itself is tracked as a normal Asset; this collection stores the separate SIM
-   record (SIM serial / ICCID, the mobile number on it, operator, plan, issue
-   status and assignment). Rendered by pages/sim-cards.html + js/sim-cards.js
-   in the same style as the Asset Master.
+   is tracked in Mobile Master (`DUMMY_MOBILES`); this collection stores the
+   separate SIM record. Assigning either side keeps both in sync: the SIM's
+   `linkedMobileId` is the phone's stable `amsAssetId`, and the phone's
+   `simMobileNo` is the SIM mobile number. Rendered by pages/sim-cards.html
+   + js/sim-cards.js in the same style as the Asset Master.
    ===========================================================================*/
 
 const AMS_SIM_STATUS_OPTIONS = ["In Store", "Issued", "Blocked", "Retired"];
@@ -1006,6 +1250,202 @@ function amsNextSimId() {
     return "SIM-" + String(maxSeq + 1).padStart(6, "0");
 }
 
+/* Stable key for a mobile record. Display `id` changes on assign/transfer
+   (Smart Asset ID suffix), so SIM.linkedMobileId must store amsAssetId. */
+function amsMobileStableId(m) {
+    if (!m) return "";
+    return m.amsAssetId || m.id || "";
+}
+
+function amsFindMobileByRef(ref) {
+    if (!ref) return null;
+    const list = (typeof DUMMY_MOBILES !== "undefined" && Array.isArray(DUMMY_MOBILES)) ? DUMMY_MOBILES : [];
+    return list.find(m => m.amsAssetId === ref)
+        || list.find(m => m.id === ref)
+        || list.find(m => m.displayId === ref)
+        || null;
+}
+
+function amsFindSimByMobileNumber(num) {
+    const n = String(num || "").trim();
+    if (!n || n === "0") return null;
+    return AMS_DUMMY_SIM_CARDS.find(s => String(s.mobileNumber || "").trim() === n) || null;
+}
+
+function amsSimMatchesMobile(s, m) {
+    if (!s || !m || s.personalMobile) return false;
+    const sid = s.linkedMobileId;
+    if (!sid) return false;
+    return sid === m.amsAssetId || sid === m.id || sid === m.displayId;
+}
+
+function amsUnlinkSimFromMobile(s) {
+    if (!s) return false;
+    let changed = false;
+    if (s.linkedMobileId && !s.personalMobile) {
+        const m = amsFindMobileByRef(s.linkedMobileId);
+        if (m && String(m.simMobileNo || "0") === String(s.mobileNumber || "")) {
+            m.simMobileNo = "0";
+            changed = true;
+        }
+    }
+    s.linkedMobileId = null;
+    s.personalMobile = false;
+    return changed;
+}
+
+function amsLinkSimToMobile(s, m) {
+    if (!s || !m) return false;
+    amsUnlinkSimFromMobile(s);
+    AMS_DUMMY_SIM_CARDS.forEach(other => {
+        if (other === s || other.personalMobile) return;
+        if (amsSimMatchesMobile(other, m)) {
+            other.linkedMobileId = null;
+            other.personalMobile = false;
+        }
+    });
+    s.personalMobile = false;
+    s.linkedMobileId = amsMobileStableId(m);
+    m.simMobileNo = s.mobileNumber || "0";
+    return true;
+}
+
+function amsIssueSimToEmployee(s, empId, assignDate, remarks) {
+    if (!s || !empId || s.status === "Retired") return false;
+    const already = s.assignedTo === empId && s.status === "Issued";
+    const emp = typeof amsGetEmployeeByAmsId === "function" ? amsGetEmployeeByAmsId(empId) : null;
+    s.assignedTo = empId;
+    s.assignedDate = assignDate || s.assignedDate || new Date().toISOString().slice(0, 10);
+    s.status = "Issued";
+    if (!already) {
+        if (!Array.isArray(s.history)) s.history = [];
+        s.history.push({
+            date: s.assignedDate,
+            action: "Assigned",
+            empId: emp ? emp.empId : "",
+            empName: emp ? emp.name : "",
+            empDept: emp ? emp.dept : "",
+            remarks: remarks || "Linked from Mobile Master",
+            statusLabel: "Issued",
+        });
+    }
+    return true;
+}
+
+function amsIssueMobileToEmployee(m, empId, assignDate, remarks) {
+    if (!m || !empId) return false;
+    if (["Retired / Scrapped", "Not Working", "Replaced"].includes(m.status)) return false;
+    if (m.assignedTo && m.assignedTo !== empId) return false;
+    const already = m.assignedTo === empId && m.status === "Assigned";
+    const emp = typeof amsGetEmployeeByAmsId === "function" ? amsGetEmployeeByAmsId(empId) : null;
+    m.assignedTo = empId;
+    m.status = "Assigned";
+    m.dept = emp ? emp.dept : (m.dept || "");
+    if (typeof amsComputeFullId === "function") m.id = amsComputeFullId(m);
+    if (!already) {
+        if (!Array.isArray(m.history)) m.history = [];
+        m.history.push({
+            date: assignDate || new Date().toISOString().slice(0, 10),
+            action: "Assigned - New",
+            empId: emp ? emp.empId : "",
+            empName: emp ? emp.name : "",
+            empDept: emp ? emp.dept : "",
+            assetIdFull: m.id,
+            statusLabel: "Assigned",
+            note: remarks || "Linked from SIM Card Master",
+        });
+    }
+    return true;
+}
+
+/* Mobile Master picked a SIM number (Add/Edit or Assign). Mirrors the link
+   onto the SIM card and issues it to the same employee when the phone is assigned. */
+function amsSyncMobileToSimNumber(mobile, simNumber, empId, assignDate) {
+    if (!mobile) return false;
+    const num = String(simNumber == null ? (mobile.simMobileNo || "0") : simNumber).trim() || "0";
+    let simsChanged = false;
+    AMS_DUMMY_SIM_CARDS.forEach(s => {
+        if (s.personalMobile) return;
+        if (amsSimMatchesMobile(s, mobile) && String(s.mobileNumber || "").trim() !== num) {
+            s.linkedMobileId = null;
+            simsChanged = true;
+        }
+    });
+    mobile.simMobileNo = num;
+    if (num === "0") return simsChanged;
+    const s = amsFindSimByMobileNumber(num);
+    if (!s || s.status === "Retired") return simsChanged;
+    if (s.linkedMobileId && !s.personalMobile) {
+        const prev = amsFindMobileByRef(s.linkedMobileId);
+        if (prev && prev !== mobile && String(prev.simMobileNo || "0") === String(s.mobileNumber || "")) {
+            prev.simMobileNo = "0";
+        }
+    }
+    s.linkedMobileId = amsMobileStableId(mobile);
+    s.personalMobile = false;
+    simsChanged = true;
+    const emp = empId || mobile.assignedTo;
+    if (emp && s.status !== "Blocked" && (!s.assignedTo || s.assignedTo === emp)) {
+        amsIssueSimToEmployee(s, emp, assignDate, "Linked from Mobile Master");
+    }
+    return simsChanged;
+}
+
+/* SIM Master Assign/Reassign Used In. choice is "", "__personal__", or a
+   stable mobile id. Also assigns an In-Store phone to the same employee. */
+function amsSyncSimChoiceToMobile(s, choice, empId, assignDate) {
+    if (!s) return false;
+    if (choice === "__personal__") {
+        const changed = amsUnlinkSimFromMobile(s);
+        s.personalMobile = true;
+        s.linkedMobileId = null;
+        return changed;
+    }
+    if (!choice) return amsUnlinkSimFromMobile(s);
+    const m = amsFindMobileByRef(choice);
+    if (!m) {
+        amsUnlinkSimFromMobile(s);
+        return true;
+    }
+    amsLinkSimToMobile(s, m);
+    if (empId) amsIssueMobileToEmployee(m, empId, assignDate, "Linked from SIM Card Master");
+    return true;
+}
+
+function amsUnlinkMobileSim(mobile, returnSim) {
+    if (!mobile) return false;
+    const empId = mobile.assignedTo;
+    const num = String(mobile.simMobileNo || "0").trim();
+    let simsChanged = false;
+    AMS_DUMMY_SIM_CARDS.forEach(s => {
+        const sameNumber = num && num !== "0" && String(s.mobileNumber || "").trim() === num && !s.personalMobile;
+        const matched = amsSimMatchesMobile(s, mobile)
+            || (sameNumber && (!s.linkedMobileId || amsSimMatchesMobile(s, mobile)));
+        if (!matched) return;
+        if (returnSim && empId && s.assignedTo === empId && s.status !== "Retired") {
+            if (!Array.isArray(s.history)) s.history = [];
+            const emp = typeof amsGetEmployeeByAmsId === "function" ? amsGetEmployeeByAmsId(empId) : null;
+            s.history.push({
+                date: new Date().toISOString().slice(0, 10),
+                action: "Returned",
+                empId: emp ? emp.empId : "",
+                empName: emp ? emp.name : "",
+                empDept: emp ? emp.dept : "",
+                remarks: "Returned with linked mobile",
+                statusLabel: "In Store",
+            });
+            s.assignedTo = null;
+            s.assignedDate = "";
+            s.status = "In Store";
+        }
+        s.linkedMobileId = null;
+        s.personalMobile = false;
+        simsChanged = true;
+    });
+    if (num && num !== "0") mobile.simMobileNo = "0";
+    return simsChanged;
+}
+
 
 /* =============================================================================
    8b) VENDOR MASTER  (suppliers behind Assets / Consumables / Spare Parts)
@@ -1072,14 +1512,30 @@ function amsPopulateVendorSelects() {
 /* Sets a vendor select to a given vendor name, adding it as an option first if
    it is not in the current master list (so old records never show blank). */
 function amsSetVendorSelectValue(selId, value) {
-    const sel = document.getElementById(selId);
+    amsSetSelectValue(selId, value);
+}
+
+/* Sets any <select> to a stored value. If that value is missing from the
+   option list (imported / deactivated master), it is added so Edit never
+   shows blank when the record still has the value. */
+function amsSetSelectValue(selOrId, value) {
+    const sel = typeof selOrId === "string" ? document.getElementById(selOrId) : selOrId;
     if (!sel) return;
-    if (value && !Array.from(sel.options).some(o => o.value === value)) {
+    const keep = value == null ? "" : String(value);
+    if (keep && !Array.from(sel.options).some(o => o.value === keep)) {
         const opt = document.createElement("option");
-        opt.value = value; opt.textContent = value;
+        opt.value = keep;
+        opt.textContent = keep;
         sel.appendChild(opt);
     }
-    sel.value = value || "";
+    sel.value = keep;
+}
+
+/* Fills an <input type="date"> from any stored / imported date format. */
+function amsSetDateInput(elOrId, value) {
+    const el = typeof elOrId === "string" ? document.getElementById(elOrId) : elOrId;
+    if (!el) return;
+    el.value = amsParseDMY(value) || "";
 }
 
 /* ---- Vendor quick-add (+) : one shared popover, dropped next to whichever
@@ -1180,11 +1636,19 @@ const DESIGNATIONS = [
     "Accountant", "HR Executive", "Machine Operator", "Security Guard"
 ];
 
-/* ---- Credential levels (demo of the "Super Root User" visibility rule) ----- */
+/* Hidden AMS IDs (employee AMS ID, AMS Asset ID) are knowledge-only for
+   Supreme Root. Other roles always see company / display IDs. */
+function amsIsSupremeRoot() {
+    const role = (typeof amsGetViewingAsRole === "function") ? amsGetViewingAsRole() : "";
+    return role === "Supreme Root";
+}
+
+/* ---- Credential levels (legacy names kept for older imports) ----- */
 const CREDENTIAL_LEVELS = [
     { name: "Standard User",  amsVisible: false },
     { name: "Administrator",  amsVisible: false },
-    { name: "Super Root",     amsVisible: true  }
+    { name: "Super Root",     amsVisible: false },
+    { name: "Supreme Root",   amsVisible: true  }
 ];
 
 /* ---- Facilities checked / disabled during employee exit or handover --------- */
@@ -1324,6 +1788,7 @@ function addEmployee(data) {
            even when the manager record does not exist yet). */
         managerName: data.managerName || "",
         managerId: data.managerId || "",
+        site: data.site || "",
         status: "Active",
         exitDate: null
     };
@@ -1347,6 +1812,7 @@ function updateEmployee(amsId, data) {
     emp.contact = data.contact || "";
     emp.email = data.email || "";
     emp.managerAmsId = data.managerAmsId || null;
+    emp.site = data.site || "";
     amsDbSaveAsync("employees");
     amsResolvePendingManagers();
     return emp;
@@ -1387,7 +1853,7 @@ function amsResolvePendingManagers() {
                         is re-pointed to this person so the team's asset records
                         continue under the new incharge, and the transfer is
                         snapshotted for the printed Handover Form. */
-function exitEmployee(amsId, exitDate, remarks, facilitiesDisabled, exitReason, teamInchargeAmsId) {
+function exitEmployee(amsId, exitDate, remarks, facilitiesDisabled, exitReason, teamInchargeAmsId, facilitiesNotApplicable) {
     const emp = findEmployee(amsId);
     if (!emp) return null;
     emp.status = "Inactive";
@@ -1395,19 +1861,37 @@ function exitEmployee(amsId, exitDate, remarks, facilitiesDisabled, exitReason, 
     emp.exitRemarks = remarks || "";
     emp.exitReason = exitReason || "";
 
-    /* Snapshot the direct assets held at exit (before releasing them) */
+    /* Snapshot the direct assets / mobiles / SIMs held at exit (before releasing them) */
     const directAssetsHeld = DUMMY_ASSETS
         .filter(a => a.assignedTo === amsId)
         .map(a => ({
-            assetId: a.id, type: a.type, makeModel: a.makeModel,
-            site: a.currentSite || a.site, assignedDepartment: a.assignedDepartment,
+            id: a.id, assetId: a.id, type: a.type, makeModel: amsAssetMakeModel(a),
+            site: a.currentSite || a.site, currentSite: a.currentSite || a.site,
+            assignedDepartment: a.assignedDepartment,
             remarks: a.remarks, usageNote: a.usageNote,
+            assignedTo: a.assignedTo, displayId: a.displayId,
+        }));
+    const directMobilesHeld = DUMMY_MOBILES
+        .filter(a => a.assignedTo === amsId)
+        .map(a => ({
+            id: a.id, displayId: a.displayId, type: a.type, make: a.make, model: a.model,
+            makeModel: amsAssetMakeModel(a),
+            imei1: a.imei1, imei2: a.imei2, batteryNo: a.batteryNo, chargerNo: a.chargerNo,
+            simMobileNo: a.simMobileNo || "0",
+            site: a.currentSite || a.site, currentSite: a.currentSite || a.site,
+            remarks: a.remarks, status: a.status, assignedTo: a.assignedTo,
+            assignedToSubordinate: a.assignedToSubordinate, assignedSubText: a.assignedSubText,
+        }));
+    const directSimCardsHeld = AMS_DUMMY_SIM_CARDS
+        .filter(s => s.assignedTo === amsId)
+        .map(s => ({
+            simId: s.simId, mobileNumber: s.mobileNumber, operator: s.operator,
+            plan: s.plan, status: s.status, assignedTo: s.assignedTo,
+            linkedMobileId: s.linkedMobileId || null, personalMobile: !!s.personalMobile,
         }));
 
-    /* Facilities disabled at exit (defaults to the facilities revoked on exit) */
-    const disabled = (facilitiesDisabled && facilitiesDisabled.length)
-        ? facilitiesDisabled.map(String)
-        : FACILITIES_CHECKLIST.filter(f => f.revokedOnExit).map(f => f.label);
+    const disabled = Array.isArray(facilitiesDisabled) ? facilitiesDisabled.map(String) : [];
+    const notApplicable = Array.isArray(facilitiesNotApplicable) ? facilitiesNotApplicable.map(String) : [];
 
     /* ---- Subordinate / team transfer to the new Incharge / HOD ----
        Direct subordinates (still active) get their reporting line re-pointed to
@@ -1429,13 +1913,46 @@ function exitEmployee(amsId, exitDate, remarks, facilitiesDisabled, exitReason, 
         subordinates.forEach(sub => {
             getEmployeeAssets(sub.amsId).forEach(a => {
                 subordinateAssetsTransferred.push({
-                    subAmsId: sub.amsId, subName: getEmployeeFullName(sub), subEmpId: sub.empId,
-                    assetId: a.id, type: a.type, makeModel: a.makeModel,
-                    site: a.currentSite || a.site, status: a.status,
+                    subAmsId: sub.amsId, subName: getEmployeeFullName(sub), subEmpId: amsGetEmployeeDisplayId(sub),
+                    assetId: a.id, type: a.type, makeModel: amsAssetMakeModel(a),
+                    site: a.currentSite || a.site, status: a.status, kind: "asset",
+                });
+            });
+            getEmployeeMobiles(sub.amsId).forEach(a => {
+                subordinateAssetsTransferred.push({
+                    subAmsId: sub.amsId, subName: getEmployeeFullName(sub), subEmpId: amsGetEmployeeDisplayId(sub),
+                    assetId: a.id, type: a.type, makeModel: amsAssetMakeModel(a),
+                    site: a.currentSite || a.site, status: a.status, kind: "mobile",
+                    imei1: a.imei1, simMobileNo: a.simMobileNo,
+                });
+            });
+            getEmployeeSimCards(sub.amsId).forEach(s => {
+                subordinateAssetsTransferred.push({
+                    subAmsId: sub.amsId, subName: getEmployeeFullName(sub), subEmpId: amsGetEmployeeDisplayId(sub),
+                    assetId: s.simId, type: "SIM Card", makeModel: [s.operator, s.plan].filter(Boolean).join(" / "),
+                    site: s.mobileNumber || "-", status: s.status, kind: "sim",
                 });
             });
         });
     }
+
+    const subordinateMobilesHeld = [];
+    const subordinateSimCardsHeld = [];
+    getSubordinates(amsId).forEach(sub => {
+        /* Only what the subordinate PERSONALLY holds - skip custodian-held ones
+           (real user deeper), so they do not cascade onto every senior's form. */
+        getEmployeeMobiles(sub.amsId).forEach(a => {
+            if (amsAssetIsDeptOrSub(a)) return;
+            subordinateMobilesHeld.push({
+                ...a, id: a.id, holder: getEmployeeFullName(sub), holderId: amsGetEmployeeDisplayId(sub),
+                site: a.currentSite || a.site, subName: getEmployeeFullName(sub), subEmpId: amsGetEmployeeDisplayId(sub),
+            });
+        });
+        getEmployeeSimCards(sub.amsId).forEach(s => subordinateSimCardsHeld.push({
+            ...s, holder: getEmployeeFullName(sub), holderId: amsGetEmployeeDisplayId(sub),
+            subName: getEmployeeFullName(sub), subEmpId: amsGetEmployeeDisplayId(sub),
+        }));
+    });
 
     AMS_DUMMY_EXIT_RECORDS.push({
         exitId: amsGenerateExitId(),
@@ -1448,7 +1965,12 @@ function exitEmployee(amsId, exitDate, remarks, facilitiesDisabled, exitReason, 
         exitReason: emp.exitReason,
         exitRemarks: emp.exitRemarks,
         facilitiesDisabled: disabled,
+        facilitiesNotApplicable: notApplicable,
         directAssetsHeld,
+        directMobilesHeld,
+        directSimCardsHeld,
+        subordinateMobilesHeld,
+        subordinateSimCardsHeld,
         teamTransferredTo,
         subordinateAssetsTransferred,
     });
@@ -1456,8 +1978,27 @@ function exitEmployee(amsId, exitDate, remarks, facilitiesDisabled, exitReason, 
     DUMMY_ASSETS.forEach(a => {
         if (a.assignedTo === amsId) a.assignedTo = null;
     });
+    DUMMY_MOBILES.forEach(a => {
+        if (a.assignedTo === amsId) {
+            a.assignedTo = null; a.assignedToSubordinate = null; a.assignedSubText = null;
+            a.status = "In Store";
+        }
+    });
+    AMS_DUMMY_SIM_CARDS.forEach(s => {
+        if (s.assignedTo === amsId) {
+            s.assignedTo = null; s.assignedDate = ""; s.status = "In Store";
+            if (s.linkedMobileId && !s.personalMobile) {
+                const m = amsFindMobileByRef(s.linkedMobileId);
+                if (m && String(m.simMobileNo || "0") === String(s.mobileNumber || "")) m.simMobileNo = "0";
+            }
+            s.linkedMobileId = null;
+            s.personalMobile = false;
+        }
+    });
     amsDbSaveAsync("employees");
     amsDbSaveAsync("assets");
+    amsDbSaveAsync("mobiles");
+    amsDbSaveAsync("simCards");
     amsDbSaveAsync("exitRecords");
     return emp;
 }
@@ -1477,10 +2018,44 @@ function getEmployeeAssets(amsId) {
     return DUMMY_ASSETS.filter(a => a.assignedTo === amsId);
 }
 
-/* Assets owned by an employee's subordinates (the whole team) */
+/* Mobiles directly assigned to an employee (Mobile Master collection) */
+function getEmployeeMobiles(amsId) {
+    return DUMMY_MOBILES.filter(a => a.assignedTo === amsId);
+}
+
+/* SIM cards currently assigned to an employee */
+function getEmployeeSimCards(amsId) {
+    return AMS_DUMMY_SIM_CARDS.filter(s => s.assignedTo === amsId);
+}
+
+function amsSimPrintUsedIn(s) {
+    if (!s) return "None";
+    if (s.personalMobile) return "Personal Mobile";
+    if (!s.linkedMobileId) return "None";
+    const m = amsFindMobileByRef(s.linkedMobileId);
+    return m && typeof amsPrintAssetId === "function" ? amsPrintAssetId(m) : s.linkedMobileId;
+}
+
+/* Assets PERSONALLY held by an employee's direct subordinates.
+   Assets a subordinate is only the CUSTODIAN of - whose actual user is a deeper
+   subordinate/free-text holder (amsAssetIsDeptOrSub) - are excluded. Those are
+   already represented on that subordinate's own form, so including them here
+   would make them cascade onto every manager further up the chain. */
 function getSubordinateAssets(amsId) {
     const subIds = getSubordinates(amsId).map(s => s.amsId);
-    return DUMMY_ASSETS.filter(a => subIds.includes(a.assignedTo));
+    return DUMMY_ASSETS.filter(a => subIds.includes(a.assignedTo) && !amsAssetIsDeptOrSub(a));
+}
+
+/* Mobiles PERSONALLY held by an employee's direct subordinates (see above). */
+function getSubordinateMobiles(amsId) {
+    const subIds = getSubordinates(amsId).map(s => s.amsId);
+    return DUMMY_MOBILES.filter(a => subIds.includes(a.assignedTo) && !amsAssetIsDeptOrSub(a));
+}
+
+/* SIM cards owned by an employee's direct subordinates */
+function getSubordinateSimCards(amsId) {
+    const subIds = getSubordinates(amsId).map(s => s.amsId);
+    return AMS_DUMMY_SIM_CARDS.filter(s => subIds.includes(s.assignedTo));
 }
 
 /* Assets not assigned to anyone yet */
@@ -1531,7 +2106,7 @@ function amsAssetHolderLabel(a) {
     if (!a) return "";
     if (a.assignedToSubordinate) {
         const emp = amsGetEmployeeByAmsId(a.assignedToSubordinate);
-        return emp ? `${emp.name} (${emp.empId})` : a.assignedToSubordinate;
+        return emp ? `${emp.name} (${amsGetEmployeeDisplayId(emp)})` : a.assignedToSubordinate;
     }
     if (a.assignedSubText) return a.assignedSubText;
     return "";
@@ -1566,6 +2141,41 @@ function amsTeamEmployeeAssets(amsId) {
     return team;
 }
 
+/* Owned / Team lists that include assigned Mobiles and SIM cards so Employee
+   Master counters, distribution, and reports count every held device. */
+function amsOwnedEmployeeHoldings(amsId) {
+    const assets = amsOwnedEmployeeAssets(amsId);
+    const mobiles = getEmployeeMobiles(amsId).filter(a => !amsAssetIsDeptOrSub(a));
+    const sims = getEmployeeSimCards(amsId);
+    return assets.concat(mobiles, sims);
+}
+
+function amsTeamEmployeeHoldings(amsId) {
+    const team = amsTeamEmployeeAssets(amsId).slice();
+    getSubordinateMobiles(amsId).forEach(a => team.push(a));
+    getEmployeeMobiles(amsId).forEach(a => { if (amsAssetIsDeptOrSub(a)) team.push(a); });
+    getSubordinateSimCards(amsId).forEach(s => team.push(s));
+    return team;
+}
+
+function amsHoldingDisplayId(item) {
+    if (!item) return "";
+    if (item.simId) return item.simId;
+    return (typeof amsPrintAssetId === "function") ? amsPrintAssetId(item) : (item.id || item.assetId || "");
+}
+
+function amsHoldingMakeModel(item) {
+    if (!item) return "";
+    if (item.simId) return [item.operator, item.plan, item.mobileNumber].filter(Boolean).join(" / ");
+    return (typeof amsAssetMakeModel === "function") ? amsAssetMakeModel(item) : (item.makeModel || "");
+}
+
+function amsHoldingTypeLabel(item) {
+    if (!item) return "";
+    if (item.simId) return "SIM Card";
+    return item.type || "";
+}
+
 /* Printed "Assignment Type" label for an Asset Issue Form, based on the mix of
    assets shown on the form. */
 function amsAssignmentTypeLabel(directCount, teamCount) {
@@ -1575,20 +2185,17 @@ function amsAssignmentTypeLabel(directCount, teamCount) {
 }
 
 /* Builds the "Accessories / Items Included" section of a printed form.
-   Lists EVERY active "Common / Supportive Accessory" from the Accessory Master
-   that applies to the asset type(s) of the issued assets (plus the recorded
-   accessories even if no longer in the master), pre-checking the ones actually
-   issued on the asset record. Always ends with an "Other" line. When the master
-   has no matching accessories AND nothing was recorded, falls back to a small
-   standard checklist so the section is never empty. */
-function amsBuildPrintAccessoriesHtml(assets) {
-    const list = (assets || []).filter(oa => oa);
+   Uses only items issued DIRECTLY to the employee (assets, mobiles, SIMs).
+   Lists unique Accessory Master options for those item types (plus recorded
+   accessories even if no longer in the master), pre-checking issued ones.
+   If nothing is issued, the section is omitted (no default checklist). */
+function amsBuildPrintAccessoriesHtml(items) {
+    const list = (items || []).filter(oa => oa);
+    if (!list.length) return "";
 
-    /* Union of asset types on the issued assets (used to pull the master list) */
     const types = [];
     list.forEach(oa => { if (oa.type && !types.includes(oa.type)) types.push(oa.type); });
 
-    /* Every active master accessory for those types, deduplicated by name */
     const masterOptions = [];
     types.forEach(t => {
         amsGetAccessoryOptions(t).forEach(name => {
@@ -1596,11 +2203,10 @@ function amsBuildPrintAccessoriesHtml(assets) {
         });
     });
 
-    /* Accessories actually recorded on the assets (pre-checked) */
     const issued = [];
     list.forEach(oa => {
         (Array.isArray(oa.accessories) ? oa.accessories : []).forEach(name => {
-            if (!issued.includes(name)) issued.push(name);
+            if (name && !issued.includes(name)) issued.push(name);
         });
     });
 
@@ -1609,26 +2215,218 @@ function amsBuildPrintAccessoriesHtml(assets) {
         const checked = issued.includes(name) ? "checked" : "";
         rows.push(`<label class="pf-check-block"><input type="checkbox" ${checked}> ${amsEsc(name)}</label>`);
     });
-    /* Recorded accessories that are no longer in the master still show, checked */
     issued.forEach(name => {
         if (!masterOptions.includes(name)) {
             rows.push(`<label class="pf-check-block"><input type="checkbox" checked> ${amsEsc(name)}</label>`);
         }
     });
-    if (!rows.length) {
-        rows.push(
-            `<label class="pf-check-block"><input type="checkbox"> Power Adaptor / Charger</label>`,
-            `<label class="pf-check-block"><input type="checkbox"> Carrying Bag / Case</label>`,
-            `<label class="pf-check-block"><input type="checkbox"> Mouse / Keyboard (if applicable)</label>`,
-            `<label class="pf-check-block"><input type="checkbox"> Original Box / Documentation</label>`,
-        );
-    }
+    if (!rows.length) return "";
     rows.push(`<label class="pf-check-block" style="grid-column:1 / -1;">Other: ________________________________</label>`);
     return `
         <div class="pf-section-bar">Accessories / Items Included</div>
         <div class="pf-checklist-grid">
             ${rows.join("")}
         </div>`;
+}
+
+function amsPrintDirectHoldingsForAccessories(amsId, extraAssets) {
+    const assets = extraAssets || [];
+    const mobiles = (typeof amsCollectPrintMobilesForEmp === "function")
+        ? (amsCollectPrintMobilesForEmp(amsId).direct || [])
+        : [];
+    const sims = (typeof amsCollectPrintSimsForEmp === "function")
+        ? (amsCollectPrintSimsForEmp(amsId).direct || [])
+        : [];
+    return assets.concat(mobiles, sims);
+}
+
+function amsAssetMakeModel(oa) {
+    if (!oa) return "";
+    if (oa.makeModel) return oa.makeModel;
+    return [oa.make, oa.model].filter(Boolean).join(" ").trim();
+}
+
+function amsCollectPrintMobilesForEmp(amsId) {
+    const split = amsSplitDirectVsSubordinateAssets(getEmployeeMobiles(amsId));
+    const subordinate = [];
+    getSubordinates(amsId).forEach(sub => {
+        /* Only mobiles the subordinate PERSONALLY holds - skip ones they are
+           merely custodian of, so they do not cascade up the chain. */
+        getEmployeeMobiles(sub.amsId).forEach(a => {
+            if (amsAssetIsDeptOrSub(a)) return;
+            subordinate.push({
+                ...a,
+                id: amsPrintAssetId(a),
+                holder: getEmployeeFullName(sub),
+                holderId: amsGetEmployeeDisplayId(sub),
+                site: a.currentSite || a.site,
+            });
+        });
+    });
+    split.subordinate.forEach(oa => {
+        const holderEmp = oa.assignedToSubordinate ? amsGetEmployeeByAmsId(oa.assignedToSubordinate) : null;
+        subordinate.push({
+            ...oa,
+            id: amsPrintAssetId(oa),
+            holder: holderEmp ? holderEmp.name : (oa.assignedSubText || amsAssetHolderLabel(oa)),
+            holderId: holderEmp ? amsGetEmployeeDisplayId(holderEmp) : "",
+            site: oa.currentSite || oa.site,
+        });
+    });
+    return { direct: split.direct, subordinate };
+}
+
+function amsCollectPrintSimsForEmp(amsId) {
+    const subordinate = [];
+    getSubordinates(amsId).forEach(sub => {
+        getEmployeeSimCards(sub.amsId).forEach(s => subordinate.push({
+            ...s,
+            holder: getEmployeeFullName(sub),
+            holderId: amsGetEmployeeDisplayId(sub),
+        }));
+    });
+    return { direct: getEmployeeSimCards(amsId), subordinate };
+}
+
+function amsBuildPrintMobilesSectionHtml(directList, subList, opts) {
+    const withCondition = !!(opts && opts.withCondition);
+    const conditionRow = () => ["Good", "Needs Repair / Service", "Damaged"].map(o =>
+        `<label class="pf-check-inline"><input type="checkbox" disabled> ${o}</label>`).join("");
+    const typeLabel = m => {
+        const mm = amsAssetMakeModel(m);
+        return `${amsEsc(m.type || "-")}${mm ? ` (${amsEsc(mm)})` : ""}`;
+    };
+    const mobileNo = m => (m.simMobileNo && m.simMobileNo !== "0") ? m.simMobileNo : "-";
+    let html = "";
+    const mobileTitle = (opts && opts.returnedLabel) ? "Mobiles Returned" : "Mobiles Issued";
+    if (directList && directList.length) {
+        html += `
+        <div class="pf-section-bar">${mobileTitle}</div>
+        <table class="pf-asset-table">
+            <thead>
+                <tr>
+                    <th style="width:30px;">#</th><th>Mobile ID</th><th>Type / Make / Model</th>
+                    <th>IMEI No 1</th><th>IMEI No 2</th><th>Battery No</th><th>Charger No</th>
+                    <th>Mobile No</th><th>Site</th>${withCondition ? "<th>Physical Condition at Issue</th>" : ""}
+                </tr>
+            </thead>
+            <tbody>
+                ${directList.map((m, i) => `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td class="mono">${amsEsc(amsPrintAssetId(m))}</td>
+                        <td>${typeLabel(m)}</td>
+                        <td class="mono">${amsEsc(m.imei1 || "-")}</td>
+                        <td class="mono">${amsEsc(m.imei2 || "-")}</td>
+                        <td class="mono">${amsEsc(m.batteryNo || "-")}</td>
+                        <td class="mono">${amsEsc(m.chargerNo || "-")}</td>
+                        <td class="mono">${amsEsc(mobileNo(m))}</td>
+                        <td>${amsEsc(m.currentSite || m.site || "-")}</td>
+                        ${withCondition ? `<td>${conditionRow()}</td>` : ""}
+                    </tr>`).join("")}
+            </tbody>
+        </table>`;
+    }
+    if (subList && subList.length) {
+        html += `
+        <div class="pf-section-bar">Mobiles Currently Assigned to Subordinates (For Reference)</div>
+        <table class="pf-asset-table">
+            <thead>
+                <tr>
+                    <th style="width:30px;">#</th><th>Mobile ID</th><th>Type / Make / Model</th>
+                    <th>IMEI No 1</th><th>Mobile No</th><th>Held By</th><th>Employee ID</th><th>Site</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${subList.map((m, i) => `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td class="mono">${amsEsc(m.id || amsPrintAssetId(m))}</td>
+                        <td>${typeLabel(m)}</td>
+                        <td class="mono">${amsEsc(m.imei1 || "-")}</td>
+                        <td class="mono">${amsEsc(mobileNo(m))}</td>
+                        <td>${amsEsc(m.holder || m.subName || "-")}</td>
+                        <td class="mono">${m.holderId || m.subEmpId ? amsEsc(m.holderId || m.subEmpId) : "-"}</td>
+                        <td>${amsEsc(m.site || m.currentSite || "-")}</td>
+                    </tr>`).join("")}
+            </tbody>
+        </table>`;
+    }
+    return html;
+}
+
+function amsBuildPrintSimCardsSectionHtml(directList, subList, opts) {
+    const simTitle = (opts && opts.returnedLabel) ? "SIM Cards Returned" : "SIM Cards Issued";
+    let html = "";
+    if (directList && directList.length) {
+        html += `
+        <div class="pf-section-bar">${simTitle}</div>
+        <table class="pf-asset-table">
+            <thead>
+                <tr>
+                    <th style="width:30px;">#</th><th>SIM ID</th><th>Mobile Number</th>
+                    <th>Operator</th><th>Plan</th><th>Site</th><th>Used In</th><th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${directList.map((s, i) => `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td class="mono">${amsEsc(s.simId || "-")}</td>
+                        <td class="mono">${amsEsc(s.mobileNumber || "-")}</td>
+                        <td>${amsEsc(s.operator || "-")}</td>
+                        <td>${amsEsc(s.plan || "-")}</td>
+                        <td>${amsEsc(s.site || "-")}</td>
+                        <td>${amsEsc(amsSimPrintUsedIn(s))}</td>
+                        <td>${amsEsc(s.status || "-")}</td>
+                    </tr>`).join("")}
+            </tbody>
+        </table>`;
+    }
+    if (subList && subList.length) {
+        html += `
+        <div class="pf-section-bar">SIM Cards Currently Assigned to Subordinates (For Reference)</div>
+        <table class="pf-asset-table">
+            <thead>
+                <tr>
+                    <th style="width:30px;">#</th><th>SIM ID</th><th>Mobile Number</th>
+                    <th>Operator</th><th>Plan</th><th>Site</th><th>Held By</th><th>Employee ID</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${subList.map((s, i) => `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td class="mono">${amsEsc(s.simId || "-")}</td>
+                        <td class="mono">${amsEsc(s.mobileNumber || "-")}</td>
+                        <td>${amsEsc(s.operator || "-")}</td>
+                        <td>${amsEsc(s.plan || "-")}</td>
+                        <td>${amsEsc(s.site || "-")}</td>
+                        <td>${amsEsc(s.holder || s.subName || "-")}</td>
+                        <td class="mono">${s.holderId || s.subEmpId ? amsEsc(s.holderId || s.subEmpId) : "-"}</td>
+                    </tr>`).join("")}
+            </tbody>
+        </table>`;
+    }
+    return html;
+}
+
+function amsBuildPrintMobileSimHtml(amsId, opts) {
+    const exitRecord = opts && opts.exitRecord;
+    const mobiles = exitRecord
+        ? { direct: exitRecord.directMobilesHeld || [], subordinate: exitRecord.subordinateMobilesHeld || [] }
+        : amsCollectPrintMobilesForEmp(amsId);
+    const sims = exitRecord
+        ? { direct: exitRecord.directSimCardsHeld || [], subordinate: exitRecord.subordinateSimCardsHeld || [] }
+        : amsCollectPrintSimsForEmp(amsId);
+    return {
+        html: amsBuildPrintMobilesSectionHtml(mobiles.direct, mobiles.subordinate, opts)
+            + amsBuildPrintSimCardsSectionHtml(sims.direct, sims.subordinate, opts),
+        mobileDirect: mobiles.direct.length,
+        mobileTeam: mobiles.subordinate.length,
+        simDirect: sims.direct.length,
+        simTeam: sims.subordinate.length,
+    };
 }
 
 /* =============================================================================
@@ -1641,6 +2439,7 @@ const AMS_PAGE_REGISTRY = [
     { key: "dashboard",     label: "Dashboard" },
     { key: "employee",      label: "Employee Master" },
     { key: "asset",         label: "Asset Master" },
+    { key: "mobile",        label: "Mobile Master" },
     { key: "reports",       label: "Report Master (page access)" },
     { key: "assetType",     label: "Asset Type Master" },
     { key: "assetMake",     label: "Asset Make Master" },
@@ -1652,6 +2451,10 @@ const AMS_PAGE_REGISTRY = [
     { key: "designation",   label: "Designation Master" },
     { key: "systemAdmin",   label: "System Administrator Master (hub)" },
     { key: "accessory",     label: "Accessory Master" },
+    { key: "simCards",      label: "SIM Card Master" },
+    { key: "vendors",       label: "Vendor Master" },
+    { key: "assetDistribution", label: "Asset Distribution" },
+    { key: "settings",      label: "Settings" },
     { key: "simOperator",   label: "SIM Operator Master" },
     { key: "simPlan",       label: "SIM Plan Master" },
     { key: "consumableCategory", label: "Consumable Category Master" },
@@ -1663,6 +2466,7 @@ const AMS_PAGE_REGISTRY = [
     { key: "accessRights",  label: "Access Rights Control Master (Supreme Root only)" },
     { key: "roleAccess",    label: "Role Access Master (Supreme Root only)" },
     { key: "log",           label: "Log Report (Super Root and Supreme Root only)" },
+    { key: "sqlBackup",     label: "SQL Database Backup (hidden until host copy works)" },
     { key: "report.assetLifecycle",     label: "Report: Asset Lifecycle" },
     { key: "report.assetIssue",         label: "Report: Asset Issue Form" },
     { key: "report.assetHandover",      label: "Report: Asset Handover Form" },
@@ -1670,42 +2474,318 @@ const AMS_PAGE_REGISTRY = [
     { key: "report.consumableUsed",     label: "Report: Consumable Used" },
     { key: "report.sparePartsRestock",  label: "Report: Spare Parts Restock" },
     { key: "report.sparePartsUsed",     label: "Report: Spare Parts Used" },
+    { key: "report.assetDistribution",  label: "Report: Asset Distribution" },
 ];
 const AMS_DUMMY_USERS = [];
 
 
 /* Role Access defaults - what a role can see when a user has no per-user override.
-   Supreme-Root-exclusive pages (accessRights, roleAccess, log) are enforced in code too. */
+   Levels: "none" | "view" | "full" (legacy true/false still accepted).
+   Supreme-Root-exclusive pages (accessRights, roleAccess, log) are enforced in code too.
+   Matrix matches docs/AMS-Role-Access-Matrix.xlsx Recommended sheet. */
 const AMS_ROLE_ACCESS_STORAGE_KEY = "ams_role_access_defaults";
+const AMS_ACCESS_NONE = "none";
+const AMS_ACCESS_VIEW = "view";
+const AMS_ACCESS_FULL = "full";
+
+const AMS_ROLE_ACCESS_RECOMMENDED = {
+    dashboard:              { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    employee:               { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    asset:                  { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    mobile:                 { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    simCards:               { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    consumable:             { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    spareParts:             { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    accessory:              { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    assetDistribution:      { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    vendors:                { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    reports:                { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    settings:               { "Standard User": "full", "Viewer (Read-Only)": "full", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    systemAdmin:            { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    userMaster:             { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    company:                { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "none", "Super Root": "full", "Supreme Root": "full" },
+    assetType:              { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    assetMake:              { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    assetCategory:          { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    site:                   { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    department:             { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    designation:            { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    simOperator:            { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    simPlan:                { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    consumableCategory:     { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    unitOfMeasure:          { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    sparePartCategory:      { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    vendorCategory:         { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    accessRights:           { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "none", "Super Root": "none", "Supreme Root": "full" },
+    roleAccess:             { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "none", "Super Root": "none", "Supreme Root": "full" },
+    log:                    { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "none", "Super Root": "full", "Supreme Root": "full" },
+    sqlBackup:              { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "none", "Super Root": "none", "Supreme Root": "none" },
+    "report.assetLifecycle":    { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    "report.assetIssue":        { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    "report.assetHandover":     { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    "report.consumableRestock": { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    "report.consumableUsed":    { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    "report.sparePartsRestock": { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    "report.sparePartsUsed":    { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    "report.assetDistribution": { "Standard User": "full", "Viewer (Read-Only)": "view", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+};
+
+function amsNormalizeAccessLevel(value) {
+    if (value === AMS_ACCESS_NONE || value === false || value === "false" || value === 0 || value === "0" || value === "N" || value === "NO") return AMS_ACCESS_NONE;
+    if (value === AMS_ACCESS_VIEW || value === "VIEW" || value === "read") return AMS_ACCESS_VIEW;
+    if (value === AMS_ACCESS_FULL || value === true || value === "true" || value === 1 || value === "1" || value === "Y" || value === "YES") return AMS_ACCESS_FULL;
+    if (value == null || value === "") return AMS_ACCESS_NONE;
+    return AMS_ACCESS_FULL;
+}
 
 function amsDefaultRoleAccessMap() {
     const map = {};
     AMS_USER_ROLES.forEach(role => { map[role] = {}; });
     AMS_PAGE_REGISTRY.forEach(p => {
-        const key = p.key;
+        const rec = AMS_ROLE_ACCESS_RECOMMENDED[p.key] || {};
         AMS_USER_ROLES.forEach(role => {
-            let allowed = true;
-            if (role === "Standard User") allowed = !["systemAdmin", "accessRights", "roleAccess", "userMaster", "company", "accessory", "log"].includes(key);
-            if (key === "accessRights" || key === "roleAccess") allowed = role === "Supreme Root";
-            if (key === "log") allowed = role === "Super Root" || role === "Supreme Root";
-            map[role][key] = allowed;
+            let level = rec[role] || AMS_ACCESS_NONE;
+            if (p.key === "accessRights" || p.key === "roleAccess") {
+                level = role === "Supreme Root" ? AMS_ACCESS_FULL : AMS_ACCESS_NONE;
+            }
+            if (p.key === "log") {
+                level = (role === "Super Root" || role === "Supreme Root") ? AMS_ACCESS_FULL : AMS_ACCESS_NONE;
+            }
+            if (p.key === "sqlBackup") {
+                level = AMS_ACCESS_NONE;
+            }
+            map[role][p.key] = level;
         });
     });
     return map;
 }
 
+function amsRoleAccessMapLooksLegacy(map) {
+    if (!map || typeof map !== "object") return true;
+    const roles = Object.keys(map);
+    if (!roles.length) return true;
+    for (let i = 0; i < roles.length; i++) {
+        const pages = map[roles[i]];
+        if (!pages || typeof pages !== "object") continue;
+        const keys = Object.keys(pages);
+        for (let j = 0; j < keys.length; j++) {
+            const v = pages[keys[j]];
+            if (v === true || v === false) return true;
+        }
+    }
+    return false;
+}
+
+function amsMigrateRoleAccessDocument() {
+    const current = AMS_ROLE_ACCESS_DEFAULTS;
+    if (!amsRoleAccessMapLooksLegacy(current)) return;
+    const next = amsDefaultRoleAccessMap();
+    Object.keys(AMS_ROLE_ACCESS_DEFAULTS).forEach(k => delete AMS_ROLE_ACCESS_DEFAULTS[k]);
+    Object.assign(AMS_ROLE_ACCESS_DEFAULTS, next);
+    try { localStorage.setItem(AMS_ROLE_ACCESS_STORAGE_KEY, JSON.stringify(next)); } catch (e) { /* storage full */ }
+    amsDbSaveDocAsync("roleAccess");
+}
+
+function amsFillMissingRoleAccessKeys(map) {
+    const filled = map && typeof map === "object" ? map : {};
+    const defaults = amsDefaultRoleAccessMap();
+    AMS_USER_ROLES.forEach(role => {
+        if (!filled[role] || typeof filled[role] !== "object") filled[role] = {};
+        AMS_PAGE_REGISTRY.forEach(p => {
+            if (filled[role][p.key] === undefined) {
+                filled[role][p.key] = (defaults[role] && defaults[role][p.key]) || AMS_ACCESS_NONE;
+            }
+        });
+    });
+    return filled;
+}
+
 function amsGetRoleAccessDefaults() {
-    if (AMS_ROLE_ACCESS_DEFAULTS && Object.keys(AMS_ROLE_ACCESS_DEFAULTS).length) return AMS_ROLE_ACCESS_DEFAULTS;
-    try {
-        const raw = localStorage.getItem(AMS_ROLE_ACCESS_STORAGE_KEY);
-        if (raw) return JSON.parse(raw);
-    } catch (e) { /* corrupt storage - fall back to defaults */ }
-    return amsDefaultRoleAccessMap();
+    let map = null;
+    if (AMS_ROLE_ACCESS_DEFAULTS && Object.keys(AMS_ROLE_ACCESS_DEFAULTS).length) map = AMS_ROLE_ACCESS_DEFAULTS;
+    if (!map) {
+        try {
+            const raw = localStorage.getItem(AMS_ROLE_ACCESS_STORAGE_KEY);
+            if (raw) map = JSON.parse(raw);
+        } catch (e) { /* corrupt storage - fall back to defaults */ }
+    }
+    if (!map) map = amsDefaultRoleAccessMap();
+    return amsFillMissingRoleAccessKeys(map);
+}
+
+function amsAccessLevelForUserPage(user, registryKey) {
+    if (!registryKey) return AMS_ACCESS_FULL;
+    const role = (user && user.role) || ((typeof amsGetViewingAsRole === "function") ? amsGetViewingAsRole() : "Standard User");
+    if (registryKey === "accessRights" || registryKey === "roleAccess") {
+        if (role !== "Supreme Root") return AMS_ACCESS_NONE;
+    }
+    if (registryKey === "sqlBackup") {
+        return AMS_ACCESS_NONE;
+    }
+    if (registryKey === "log") {
+        if (role !== "Supreme Root" && role !== "Super Root") return AMS_ACCESS_NONE;
+    }
+    if (user && user.allowedPages !== null && user.allowedPages !== undefined) {
+        if (Array.isArray(user.allowedPages)) {
+            return user.allowedPages.indexOf(registryKey) !== -1 ? AMS_ACCESS_FULL : AMS_ACCESS_NONE;
+        }
+        if (typeof user.allowedPages === "object") {
+            return amsNormalizeAccessLevel(user.allowedPages[registryKey]);
+        }
+    }
+    const roleMap = amsGetRoleAccessDefaults()[role] || {};
+    return amsNormalizeAccessLevel(roleMap[registryKey]);
 }
 function amsSaveRoleAccessDefaults(map) {
     Object.assign(AMS_ROLE_ACCESS_DEFAULTS, map);
     try { localStorage.setItem(AMS_ROLE_ACCESS_STORAGE_KEY, JSON.stringify(map)); } catch (e) { /* storage full */ }
     amsDbSaveDocAsync("roleAccess");
+}
+
+/* Nav / hub page id -> Access Rights registry key. Pages with no mapping stay visible. */
+const AMS_NAV_TO_REGISTRY = {
+    dashboard: "dashboard",
+    employees: "employee",
+    assets: "asset",
+    mobiles: "mobile",
+    "asset-distribution": "assetDistribution",
+    consumables: "consumable",
+    "spare-parts": "spareParts",
+    accessories: "accessory",
+    "sim-cards": "simCards",
+    vendors: "vendors",
+    reports: "reports",
+    "system-admin": "systemAdmin",
+    settings: "settings",
+    "user-master": "userMaster",
+    company: "company",
+    "access-rights": "accessRights",
+    "role-access": "roleAccess",
+    log: "log",
+    "sql-backup": "sqlBackup",
+    "master-asset-type": "assetType",
+    "master-asset-make": "assetMake",
+    "master-asset-category": "assetCategory",
+    "master-site": "site",
+    "master-department": "department",
+    "master-designation": "designation",
+    "master-sim-operator": "simOperator",
+    "master-sim-plan": "simPlan",
+    "master-consumable-category": "consumableCategory",
+    "master-unit-of-measure": "unitOfMeasure",
+    "master-spare-part-category": "sparePartCategory",
+    "master-vendor-category": "vendorCategory",
+};
+
+function amsGetCurrentUserRecord() {
+    const sess = (typeof amsGetSession === "function") ? amsGetSession() : null;
+    if (!sess || !sess.username) return null;
+    return AMS_DUMMY_USERS.find(u => u.username === sess.username) || null;
+}
+
+function amsEnsureSessionUserProfile() {
+    const sess = (typeof amsGetSession === "function") ? amsGetSession() : null;
+    if (!sess || !sess.username) return;
+    if (AMS_DUMMY_USERS.some(u => u.username === sess.username)) return;
+    AMS_DUMMY_USERS.push({
+        username: sess.username,
+        role: sess.role || "Standard User",
+        displayName: sess.displayName || sess.name || sess.username,
+        linkedEmployee: sess.linkedEmployee || "",
+        email: sess.email || "",
+        remarks: "",
+        active: true,
+        allowedPages: null,
+    });
+}
+
+async function amsMergeLoginUsersIntoProfiles() {
+    amsEnsureSessionUserProfile();
+    try {
+        const list = await amsApiGet("/api/auth/users");
+        if (!Array.isArray(list)) return;
+        list.forEach(u => {
+            if (!u || !u.username) return;
+            const existing = AMS_DUMMY_USERS.find(x => x.username === u.username);
+            if (existing) {
+                if (u.role) existing.role = u.role;
+                if (u.displayName && !existing.displayName) existing.displayName = u.displayName;
+                if (u.email && !existing.email) existing.email = u.email;
+                if (u.linkedEmployee && !existing.linkedEmployee) existing.linkedEmployee = u.linkedEmployee;
+                if (existing.active === undefined) existing.active = u.active !== false;
+            } else {
+                AMS_DUMMY_USERS.push({
+                    username: u.username,
+                    role: u.role || "Standard User",
+                    displayName: u.displayName || u.username,
+                    linkedEmployee: u.linkedEmployee || "",
+                    email: u.email || "",
+                    remarks: u.remarks || "",
+                    active: u.active !== false,
+                    allowedPages: null,
+                });
+            }
+        });
+    } catch (e) { /* Standard User cannot list accounts - session stub is enough */ }
+}
+
+function amsResolveAllowedPages(user) {
+    if (!user) return AMS_PAGE_REGISTRY.map(p => p.key);
+    return AMS_PAGE_REGISTRY.filter(p => amsAccessLevelForUserPage(user, p.key) !== AMS_ACCESS_NONE).map(p => p.key);
+}
+
+function amsUserCanAccessPage(registryKey) {
+    if (!registryKey) return true;
+    const role = (typeof amsGetViewingAsRole === "function") ? amsGetViewingAsRole() : "Standard User";
+    const user = amsGetCurrentUserRecord() || { username: "", role: role, allowedPages: null };
+    return amsAccessLevelForUserPage(user, registryKey) !== AMS_ACCESS_NONE;
+}
+
+function amsUserCanAccessNavPage(pageId) {
+    const key = AMS_NAV_TO_REGISTRY[pageId];
+    if (!key) return true;
+    return amsUserCanAccessPage(key);
+}
+
+function amsCurrentPageRegistryKey() {
+    if (typeof AMS_NAV_TO_REGISTRY !== "object") return "";
+    const path = (window.location.pathname || "").replace(/\\/g, "/");
+    const file = path.split("/").pop() || "";
+    if (file === "" || file === "index.html") return "dashboard";
+    const pageId = file.replace(/\.html$/, "");
+    if (pageId === "masters") {
+        const type = new URLSearchParams(window.location.search).get("type") || "";
+        return AMS_NAV_TO_REGISTRY["master-" + type] || "";
+    }
+    return AMS_NAV_TO_REGISTRY[pageId] || "";
+}
+
+function amsUserCanWriteCurrentPage() {
+    const key = amsCurrentPageRegistryKey();
+    if (!key) return true;
+    const role = (typeof amsGetViewingAsRole === "function") ? amsGetViewingAsRole() : "Standard User";
+    const user = amsGetCurrentUserRecord() || { username: "", role: role, allowedPages: null };
+    return amsAccessLevelForUserPage(user, key) === AMS_ACCESS_FULL;
+}
+
+function amsGuardViewOnlyWrite() {
+    if (amsUserCanWriteCurrentPage()) return false;
+    if (typeof amsToast === "function") amsToast("View only - you cannot change records on this page.", "warning");
+    return true;
+}
+
+function amsApplyViewOnlyChrome() {
+    if (typeof amsUserCanWriteCurrentPage !== "function") return;
+    if (amsUserCanWriteCurrentPage()) return;
+    document.body.classList.add("ams-view-only");
+    const heading = document.querySelector(".page-heading");
+    if (heading && !document.getElementById("amsViewOnlyBanner")) {
+        const banner = document.createElement("p");
+        banner.id = "amsViewOnlyBanner";
+        banner.className = "form-hint";
+        banner.textContent = "View only - you can open records on this page but cannot save, import, or delete.";
+        heading.appendChild(banner);
+    }
 }
 
 /* =============================================================================
@@ -1818,26 +2898,6 @@ function amsSaveReportHeaderPrefs(prefs) {
     amsDbSaveDocAsync("reportPrefs");
 }
 
-/* Wipes every localStorage-backed demo preference + data (Settings > Data).
-   The in-memory seed arrays are untouched, so a page reload brings the demo
-   data back exactly as shipped. */
-function amsResetDemoData() {
-    ["ams-theme", "ams_notifications", "ams_activity_log", "ams_viewing_as_role",
-     "ams_role_access_defaults", "ams_company_details",
-     AMS_PORTAL_NAME_STORAGE_KEY, AMS_FONT_SIZE_STORAGE_KEY,
-     AMS_PAGE_SIZE_STORAGE_KEY, AMS_TOAST_STORAGE_KEY,
-     AMS_REPORT_HEADER_STORAGE_KEY].forEach(key => {
-        try { localStorage.removeItem(key); } catch (e) { /* storage unavailable */ }
-    });
-
-    /* Runtime doc globals hold whatever was loaded from the DB this page-session;
-       reset them too so "restore demo defaults" takes effect immediately without
-       a reload. */
-    Object.keys(AMS_REPORT_HEADER_PREFS).forEach(k => delete AMS_REPORT_HEADER_PREFS[k]);
-    Object.keys(AMS_ROLE_ACCESS_DEFAULTS).forEach(k => delete AMS_ROLE_ACCESS_DEFAULTS[k]);
-    Object.keys(AMS_DUMMY_COMPANY_DETAILS).forEach(k => delete AMS_DUMMY_COMPANY_DETAILS[k]);
-}
-
 /* =============================================================================
    12) EXIT RECORDS  (snapshot of employee exits, for printable Handover Forms)
    ===========================================================================*/
@@ -1848,8 +2908,14 @@ const AMS_DUMMY_EXIT_RECORDS = [];
 
 
 function amsGenerateExitId() {
-    const n = AMS_DUMMY_EXIT_RECORDS.length + 1;
-    return `EXIT-${String(n).padStart(6, "0")}`;
+    /* max+1 (not count+1): a count-based sequence reuses IDs after a delete,
+       colliding on the server's natural key (record_key) and failing the save. */
+    let maxSeq = 0;
+    AMS_DUMMY_EXIT_RECORDS.forEach(r => {
+        const m = String(r.exitId || "").match(/^EXIT-(\d+)$/);
+        if (m) maxSeq = Math.max(maxSeq, parseInt(m[1], 10));
+    });
+    return `EXIT-${String(maxSeq + 1).padStart(6, "0")}`;
 }
 
 const AMS_EXIT_FACILITIES_CHECKLIST = [
@@ -1959,7 +3025,9 @@ function getAssetsByStatus() {
 function getEmployeeSummary() {
     const active = DUMMY_EMPLOYEES.filter(e => e.status === "Active").length;
     const inactive = DUMMY_EMPLOYEES.length - active;
-    const assignedAssets = DUMMY_ASSETS.filter(a => a.assignedTo).length;
+    const assignedAssets = DUMMY_ASSETS.filter(a => a.assignedTo).length
+        + DUMMY_MOBILES.filter(a => a.assignedTo).length
+        + AMS_DUMMY_SIM_CARDS.filter(s => s.assignedTo).length;
     return { total: DUMMY_EMPLOYEES.length, active, inactive, assignedAssets };
 }
 

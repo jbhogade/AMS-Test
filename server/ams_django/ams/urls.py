@@ -9,4 +9,5 @@ urlpatterns = [
     path("api/auth/users/<str:username>", views.user_detail, name="user_detail"),
     path("api/collection/<str:key>", views.collection, name="collection"),
     path("api/health", views.health, name="health"),
+    path("api/backup", views.backup, name="backup"),
 ]

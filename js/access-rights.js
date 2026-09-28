@@ -28,7 +28,7 @@ function amsApplyAccessGate() {
            being shown an "Access Denied" wall - the entry point (System Admin
            tab) is hidden for them anyway, so this only guards direct-URL
            access. */
-        window.location.replace("../index.html");
+        window.location.replace((typeof amsHref === "function") ? amsHref("index.html") : "../index.html");
         return;
     }
     document.getElementById("unlockedView").style.display = "block";
@@ -42,27 +42,26 @@ function amsWireAccessGate() {
 }
 /*-------------- End of the code ------------------------------------------------*/
 
-/*-------------- Start Code for HELPER: resolve a user's EFFECTIVE page access ---*/
-/* A per-user override (allowedPages set to an explicit array, even an empty one)
-   always wins. Without one, access resolves to that user's ROLE default from
-   Role Access Master (amsGetRoleAccessDefaults()) instead of blanket full access.
-   Supreme-Root-exclusive pages (accessRights, roleAccess) and the Super Root/
-   Supreme Root-only Log Report still ignore this and gate purely on the role. */
-function amsResolveAllowedPages(user) {
-    if (user.allowedPages !== null && user.allowedPages !== undefined) return user.allowedPages;
-    const roleMap = amsGetRoleAccessDefaults()[user.role] || {};
-    return AMS_PAGE_REGISTRY.filter(p => roleMap[p.key] !== false).map(p => p.key);
-}
-/*-------------- End of the code ------------------------------------------------*/
-
 /*-------------- Start Code for RENDER: USER ACCESS TABLE ------------------------*/
 function renderAccessTable() {
     const searchTerm = (document.getElementById("searchBox").value || "").toLowerCase();
     const total = AMS_PAGE_REGISTRY.length;
 
-    const rows = AMS_DUMMY_USERS
-        .filter(u => !searchTerm || u.username.toLowerCase().includes(searchTerm) || u.role.toLowerCase().includes(searchTerm))
-        .map(u => {
+    const users = AMS_DUMMY_USERS
+        .filter(u => !searchTerm || u.username.toLowerCase().includes(searchTerm) || u.role.toLowerCase().includes(searchTerm));
+    const getters = {
+        username: u => u.username,
+        role: u => u.role,
+        access: u => {
+            const isDefault = u.allowedPages === null || u.allowedPages === undefined;
+            const granted = amsResolveAllowedPages(u).length;
+            return isDefault ? `${granted} Role Default` : `${granted} Custom`;
+        },
+    };
+    if (typeof amsSortRegisterRenderer === "function") amsSortRegisterRenderer("accessTable", renderAccessTable);
+    const colFiltered = typeof amsFilterRows === "function" ? amsFilterRows("accessTable", users, getters) : users;
+    const sorted = typeof amsSortRows === "function" ? amsSortRows("accessTable", colFiltered, getters) : colFiltered;
+    const rows = sorted.map(u => {
             const isDefault = u.allowedPages === null || u.allowedPages === undefined;
             const effective = amsResolveAllowedPages(u);
             const granted = effective.length;
@@ -81,9 +80,14 @@ function renderAccessTable() {
             </tr>`;
         }).join("");
 
+    const th = (key, label) => (typeof amsSortableTh === "function")
+        ? amsSortableTh("accessTable", key, label)
+        : `<th>${label}</th>`;
     document.getElementById("accessTable").innerHTML = `
-        <thead><tr><th>Username</th><th>Role</th><th>Access</th><th></th></tr></thead>
+        <thead><tr>${th("username", "Username")}${th("role", "Role")}${th("access", "Access")}<th></th></tr>
+        ${typeof amsFilterHeadRow === "function" ? amsFilterHeadRow("accessTable", ["username", "role", "access", ""]) : ""}</thead>
         <tbody>${rows || `<tr><td colspan="4" style="color:var(--text-muted)">No users found</td></tr>`}</tbody>`;
+    if (typeof amsFilterRestoreFocus === "function") amsFilterRestoreFocus("accessTable");
 }
 /*-------------- End of the code ------------------------------------------------*/
 
@@ -95,17 +99,25 @@ document.addEventListener("click", (e) => {
     if (!btn) return;
     amsEditingUsername = btn.getAttribute("data-edit-access");
     const user = AMS_DUMMY_USERS.find(u => u.username === amsEditingUsername);
+    if (!user) return;
     document.getElementById("editAccessUsername").textContent = amsEditingUsername;
 
     const currentlyAllowed = amsResolveAllowedPages(user);
+    const rootRole = user.role === "Super Root" || user.role === "Supreme Root";
 
-    const pages = AMS_PAGE_REGISTRY.filter(p => !p.key.startsWith("report."));
+    const pages = AMS_PAGE_REGISTRY.filter(p => !p.key.startsWith("report.") && p.key !== "sqlBackup");
     const reports = AMS_PAGE_REGISTRY.filter(p => p.key.startsWith("report."));
-    const checkboxHtml = p => `
+    const checkboxHtml = p => {
+        const locked = p.key === "log" || p.key === "accessRights" || p.key === "roleAccess";
+        let checked = currentlyAllowed.includes(p.key);
+        if (p.key === "log") checked = rootRole;
+        if (p.key === "accessRights" || p.key === "roleAccess") checked = user.role === "Supreme Root";
+        return `
         <label>
-            <input type="checkbox" class="access-page-check" value="${amsEsc(p.key)}" ${currentlyAllowed.includes(p.key) ? "checked" : ""}>
-            ${amsEsc(p.label)}
+            <input type="checkbox" class="access-page-check" value="${amsEsc(p.key)}" ${checked ? "checked" : ""}${locked ? " disabled" : ""}>
+            ${amsEsc(p.label)}${locked ? " (role-locked)" : ""}
         </label>`;
+    };
 
     document.getElementById("accessChecklist").innerHTML = `
         <div class="checklist-section">Pages</div>
@@ -126,8 +138,16 @@ document.getElementById("btnClearAllAccess").addEventListener("click", () => {
 
 document.getElementById("btnSaveAccess").addEventListener("click", () => {
     const user = AMS_DUMMY_USERS.find(u => u.username === amsEditingUsername);
+    if (!user) return;
     const checked = [...document.querySelectorAll(".access-page-check:checked")].map(c => c.value);
-    user.allowedPages = checked;
+    const keep = checked.filter(k => k !== "sqlBackup" && k !== "log" && k !== "accessRights" && k !== "roleAccess");
+    if (user.role === "Super Root" || user.role === "Supreme Root") {
+        keep.push("log");
+    }
+    if (user.role === "Supreme Root") {
+        keep.push("accessRights", "roleAccess");
+    }
+    user.allowedPages = keep;
     amsDbSaveAsync("users");
 
     amsNotify(`Access rights updated for ${amsEditingUsername}: ${checked.length} / ${AMS_PAGE_REGISTRY.length} pages`, "warning");
@@ -145,6 +165,8 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     document.getElementById("searchBox").addEventListener("input", renderAccessTable);
+    const accessClear = document.getElementById("btnAccessClearFilters");
+    if (accessClear) accessClear.addEventListener("click", () => amsFilterClearAndRender("accessTable"));
 
     amsWireAccessGate();
     (typeof amsDbEnsureLoaded === "function" ? amsDbEnsureLoaded() : Promise.resolve()).then(() => amsApplyAccessGate());
