@@ -1,0 +1,275 @@
+"# Fields marked with * are required: empId, firstName, lastName, dept, designation.",,,,,,,,,,
+# AMS Employee ID is auto-generated - do not add it here. empId is the company ID (must be unique).,,,,,,,,,,
+# dept must match a Department in the Department Master. designation is auto-created if new.,,,,,,,,,,
+# reportsTo = the manager's company Employee ID or AMS ID. managerId = the manager's AMS ID (auto-filled on the form).,,,,,,,,,,
+# status = Active or Inactive (default Active).,,,,,,,,,,
+empId*,firstName*,middleName,lastName*,dept*,designation*,reportsTo,managerId,contact,email,status
+00005,Sandip,Nivrutti,Jadhav,Boiler,Jr. Officer,00604,Vinayak Shankar Bagalatti,7385146689,Sandip00005456@TEST.COM,Active
+00006,Pandit,Mahadeo,Hanjage,Production,Officer,00106,Ganesh Vitthal Tadaka,9922523249,Pandit00006456@TEST.COM,Active
+00012,Arvind,Tanaji,Devkar,PD Lab,Officer,00341,Pramod Shrikrishna Bhosale,9881186708,Arvind00012456@TEST.COM,Active
+00014,Prashant,Sukhdev,Ingale,HR,HR Associate,00166,Anand Shrikant Kanaka,8485880283,Prashant00014456@TEST.COM,Active
+00015,Ulhas,Dilip,Byale,QC & QA,Sr. Executive,00071,Vinod Umashankar Nimbalkar,9096257278,Ulhas00015456@TEST.COM,Active
+00022,Savala,Jagannath,Kumbhar,Electrical,Executive,00339,Manik Sarjerao Hasabe,9881886539,Savala00022456@TEST.COM,Active
+00030,Ravindra,Vitthal,Kashid,Electrical,Officer,00022,Savala Jagannath Kumbhar,9881708225,kashidrvk123@gmail.com,Active
+00032,Shital,Ramchandra,Sathe,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9373871040,Shital00032456@TEST.COM,Active
+00035,Krishna,Balaprasad,Kushwaha,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9131052600,Krishna00035456@TEST.COM,Active
+00039,Shrishail,Shantappa,Mali,Maintenance,Jr. Officer,00603,Dattatray Deepak Chavan,9860630848,Shrishail00039456@TEST.COM,Active
+00041,Arjun,Guruling,Wale,Production,Asst.General Manager,00738,Manoj Hanmant Bagal,8983389325,arjun.wale@ocspl.com,Active
+00042,Amar,Dattatray,Paul,Production,Jr. Officer,00106,Ganesh Vitthal Tadaka,8055637848,Amar00042456@TEST.COM,Active
+00043,Madhukar,Balu,Kambale,Boiler,Fireman,00603,Dattatray Deepak Chavan,9527584291,Madhukar00043456@TEST.COM,Active
+00048,Dilip,Mahadev,Aldar,Maintenance,Jr. Officer,00603,Dattatray Deepak Chavan,9822780983,Dilip00048456@TEST.COM,Active
+00054,Balasaheb,Nivrutti,Khandeker,Maintenance,Maintenance Associate (Mechanical),00603,Dattatray Deepak Chavan,9881690166,Balasaheb00054456@TEST.COM,Active
+00056,Santosh,Madhukar,Kavale,Maintenance,Jr. Officer,00603,Dattatray Deepak Chavan,9822485162,Santosh00056456@TEST.COM,Active
+00057,Sandeep,Sonelal,Singh,Production,Jr. Officer,00106,Ganesh Vitthal Tadaka,8669615326,SandeepKumar00057456@TEST.COM,Active
+00059,Vaijinath,Hanumant,Doke,Production,Executive,00106,Ganesh Vitthal Tadaka,9767879522,Vaijinath00059456@TEST.COM,Active
+00064,Somnath,Khushal,Mali,Production,Jr. Officer,00106,Ganesh Vitthal Tadaka,9730164686,Somnath00064456@TEST.COM,Active
+00068,Namdev,Navnath,Sonne,Production,Executive,00106,Ganesh Vitthal Tadaka,9049731534,Namdev00068456@TEST.COM,Active
+00070,Mustajibahmed,Jahangir,Shaikh,QC & QA,Executive,00071,Vinod Umashankar Nimbalkar,9850212110,MustajibahmedJ00070456@TEST.COM,Active
+00071,Vinod,Umashankar,Nimbalkar,Quality Control,Senior Manager,00350,Kausar Abdul Rajjak Sayyad,9923602890,vinod.nimbalkar@ocspl.com,Active
+00074,Shakir,Isamil,Sayyad,QC & QA,Executive,00071,Vinod Umashankar Nimbalkar,9763362205,Shakir00074456@TEST.COM,Active
+00075,Avinash,Vasant,Sathe,Production,Jr. Officer,00106,Ganesh Vitthal Tadaka,9922737533,Avinash00075456@TEST.COM,Active
+00077,Vijayashri,Sidramappa,Karande,Accounts,Dy. Manager,03019,Sanket Holam,7058460752,Vijayashri00077456@TEST.COM,Active
+00086,Rakesh,Jagdish,Kushvah,Production,Production Associate,00106,Ganesh Vitthal Tadaka,8975344961,Rakesh00086456@TEST.COM,Active
+00087,Satish,Girmal,Padsalgi,Admin,HR Associate,00166,Anand Shrikant Kanaka,9822644065,Satish00087456@TEST.COM,Active
+00100,Pandurang,Kalyan,Chougule,Production,Jr. Officer,00041,Arjun Guruling Wale,9960309934,Pandurang00100456@TEST.COM,Active
+00101,Saudagar,Bajirao,More,Production,Jr. Officer,00106,Ganesh Vitthal Tadaka,7972819032,Saudagar00101456@TEST.COM,Active
+00105,Shivaji,Sugriv,Narwade,Production,Officer,00106,Ganesh Vitthal Tadaka,9373261185,Shivaji00105456@TEST.COM,Active
+00106,Ganesh,Vitthal,Tadaka,Production,Dy. Manager,00041,Arjun Guruling Wale,9028956627,Ganesh00106456@TEST.COM,Active
+00111,Ajit,Ramchandra,Mane,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9922894558,Ajit00111456@TEST.COM,Active
+00113,Vilas,Gurunath,Birajdar,Maintenance,Jr. Officer,00603,Dattatray Deepak Chavan,9049204010,Vilas00113456@TEST.COM,Active
+00115,Raju,Rambilas,Tadamali,Production,Production Associate,00106,Ganesh Vitthal Tadaka,8329192715,Raju00115456@TEST.COM,Active
+00117,Suresh,Gurunath,Borkar,Production,Officer,00106,Ganesh Vitthal Tadaka,9881360093,Suresh00117456@TEST.COM,Active
+00118,Dattatray,Ananta,Pagade,Production,Officer,00106,Ganesh Vitthal Tadaka,9359909355,Dattatray00118456@TEST.COM,Active
+00127,Samadhan,Rajabhau,Patil,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9881564923,Samadhan00127456@TEST.COM,Active
+00131,Ram,Anand,Waghmode,Electrical,Maintenance Associate (Electrical),00022,Savala Jagannath Kumbhar,9527264391,Ram00131456@TEST.COM,Active
+00134,Sandip,Namdev,Khatal,QC & QA,Jr. Officer,00071,Vinod Umashankar Nimbalkar,9561452880,Sandip00134456@TEST.COM,Active
+00136,Satish,Ramdas,Reddy,Production,Officer,00106,Ganesh Vitthal Tadaka,8888191753,Satish00136456@TEST.COM,Active
+00140,Mahesh,Dhondiba,Hanchate,Accounts,Asst. Manager,03019,Sanket Holam,9970464988,Mahesh00140456@TEST.COM,Active
+00144,Pravinkumar,Shankar,Patil,EHS,Asst.General Manager,00738,Manoj Hanmant Bagal,8390591510,pravin.patil@ocspl.com,Active
+00159,Hanumant,Angad,Chunge,Production,Jr. Officer,00106,Ganesh Vitthal Tadaka,7620762863,Hanumant00159456@TEST.COM,Active
+00160,Ramchandra,Ambadas,Waghmare,Production,Officer,00106,Ganesh Vitthal Tadaka,7507633257,Ramchandra00160456@TEST.COM,Active
+00163,Akshay,Dashrath,Patil,QC & QA,Jr. Officer,00071,Vinod Umashankar Nimbalkar,7972818098,Akshay00163456@TEST.COM,Active
+00166,Anand,Shrikant,Kanaka,HR,Dy. Manager,01027,Sachin Chandrakant Padwal,8378984310,anand.kanaka@ocspl.com,Active
+00171,Parshuram,Bharat,Kokane,Utility,Utility Associate,00383,Siddeshwar Mahadev More,8888449495,Parshuram00171456@TEST.COM,Active
+00173,Vishal,Vishwanath,Dhavan,Production,Jr. Officer,00106,Ganesh Vitthal Tadaka,9665453181,Vishal00173456@TEST.COM,Active
+00185,Ratanesh,Jayhind,Kumar,Maintenance,Jr. Officer,00603,Dattatray Deepak Chavan,8866707326,Ratanesh00185456@TEST.COM,Active
+00186,Krishnkumar,Bhuneshwar,Singh,Maintenance,Jr. Officer,00603,Dattatray Deepak Chavan,8789458113,Krishnkumar00186456@TEST.COM,Active
+00203,Sameer,Kadar,Shaikh,Utility,Utility Associate,00383,Siddeshwar Mahadev More,7020444969,Sameer00203456@TEST.COM,Active
+00205,Santosh,Devalu,Chavan,Production,Officer,00106,Ganesh Vitthal Tadaka,9158167047,Santosh00205456@TEST.COM,Active
+00217,Chandrashekhar,Shambhu,Shah,Maintenance,Maintenance Associate (Mechanical),00603,Dattatray Deepak Chavan,8238868631,Chandrashekhar00217456@TEST.COM,Active
+00220,Ajay,Jayhind,Yadav,Maintenance,Maintenance Associate (Mechanical),00603,Dattatray Deepak Chavan,9033831697,Ajay00220456@TEST.COM,Active
+00222,Anand,Pandharinath,Adalinge,Production,Sr. Executive,00106,Ganesh Vitthal Tadaka,9923215445,Anand00222456@TEST.COM,Active
+00224,Bandu,Shridhar,Patil,QC & QA,Jr. Officer,00071,Vinod Umashankar Nimbalkar,9623498768,Bandu00224456@TEST.COM,Active
+00234,Sarjerav,Laxman,Mane,Production,Production Associate,00166,Anand Shrikant Kanaka,9975660685,Sarjerav00234456@TEST.COM,Active
+00237,Salim,Babu,Patil,Utility,Utility Associate,00383,Siddeshwar Mahadev More,9922837271,Salim00237456@TEST.COM,Active
+00239,Prashant,Rajkumar,Ghogare,Technical Services,Executive,00341,Pramod Shrikrishna Bhosale,9422039497,Prashant00239456@TEST.COM,Active
+00243,Dattatray,Ravikiran,Harkud,SCM,Dy. Manager,00738,Manoj Hanmant Bagal,9923146997,d.harkud@ocspl.com,Active
+00245,Balbhim,Dadarao,Kale,Maintenance,Sr. Executive,00603,Dattatray Deepak Chavan,8412837277,shift.maintenance@ocspl.com,Active
+00252,Johnson,Joseph,Paul,Maintenance,Maintenance Associate (Mechanical),00603,Dattatray Deepak Chavan,7709799079,Johnson00252456@TEST.COM,Active
+00262,Khairul,Basar,Mollah,Electrical,Manager,00723,Pravin Shantaram Deshmukh,9874397575,khairul.basar@ocspl.com,Active
+00263,Santosh,Singeshwar,Barma,QC & QA,Jr. Officer,00071,Vinod Umashankar Nimbalkar,9156235680,Santosh00263456@TEST.COM,Active
+00272,Bharat,Nandkumar,Gaikwad,Store,Forklift Pilot,00243,Dattatray Ravikiran Harkud,9503127647,Bharat00272456@TEST.COM,Active
+00273,Balaji,Ganpat,Chavan,Store,Forklift Pilot,00243,Dattatray Ravikiran Harkud,9850563625,Balaji00273456@TEST.COM,Active
+00274,Suhas,Sunil,Sathe,Electrical,Maintenance Associate (Electrical),00022,Savala Jagannath Kumbhar,8605491998,Suhas00274456@TEST.COM,Active
+00275,Mahadev,Navnath,Kengar,Boiler,Boiler Associate,00604,Vinayak Shankar Bagalatti,9766050239,Mahadev00275456@TEST.COM,Active
+00276,Balasaheb,Sitaram,Shendage,Store,Sr. Executive,00243,Dattatray Ravikiran Harkud,9975149503,balasaheb.shendage@ocspl.com,Active
+00279,Akash,Mukesh,Bandpatte,QC & QA,Officer,00071,Vinod Umashankar Nimbalkar,9921950111,Akash00279456@TEST.COM,Active
+00292,Sagar,Sadashiv,Bhajibhakare,Utility,Jr. Officer,00383,Siddeshwar Mahadev More,9860194301,Sagar00292456@TEST.COM,Active
+00302,Pandurang,Dagadu,Ingale,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9370625658,Pandurang00302456@TEST.COM,Active
+00303,Ranjit,Sudhakar,Patil,Production,Data Entry Operator,00106,Ganesh Vitthal Tadaka,8600791475,Ranjit00303456@TEST.COM,Active
+00305,Ganesh,Shivaji,Niture,Maintenance,Assistant,00603,Dattatray Deepak Chavan,7972630678,Ganesh00305456@TEST.COM,Active
+00307,Pramod,Sarjerao,Shikhare,Electrical,Maintenance Associate (Electrical),00022,Savala Jagannath Kumbhar,8459745342,Pramod00307456@TEST.COM,Active
+00308,Sourabh,Subhash,Magar,QC & QA,Jr. Officer,00071,Vinod Umashankar Nimbalkar,9673736156,Sourabh00308456@TEST.COM,Active
+00319,Nagesh,Maruti,Pawar,QC & QA,Lab Associate,00071,Vinod Umashankar Nimbalkar,9011424200,Nagesh00319456@TEST.COM,Active
+00320,Surajitsing,Panchamsing,Raghuvanshi,Electrical,Maintenance Associate (Electrical),00022,Savala Jagannath Kumbhar,7972484045,Surajitsing00320456@TEST.COM,Active
+00326,Ramesh,Hanmant,Linbitote,Production,Production Associate,00106,Ganesh Vitthal Tadaka,7875973424,Ramesh00326456@TEST.COM,Active
+00328,Sayyad,Ieesmaieel,Karbhari,Production,Sr. Executive,00106,Ganesh Vitthal Tadaka,7875749670,Sayyad00328456@TEST.COM,Active
+00330,Krushnat,Ramdas,Ingole,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9637929438,krushnaingole00332456@TEST.COM,Active
+00332,Pramod,Tanaji,Koli,Production,Jr. Officer,00106,Ganesh Vitthal Tadaka,9503820853,pramodkoli00332456@TEST.COM,Active
+00339,Manik,Sarjerao,Hasabe,Instrument,Asst.General Manager,00723,Pravin Shantaram Deshmukh,9823646893,manik.h@ocspl.com,Active
+00341,Pramod,Shrikrishna,Bhosale,Technical Services,Asst.General Manager,00738,Manoj Hanmant Bagal,9702868546,pramod.b@ocspl.com,Active
+00342,Amol,Prakash,Chaudhari,Project,Senior Manager,00723,Pravin Shantaram Deshmukh,9601829334,amol.c@ocspl.com,Active
+00344,Vijay,Vyankappa,Magnur,Electrical,Maintenance Associate (Electrical),00022,Savala Jagannath Kumbhar,9028503082,vijaymagnur00344456@TEST.COM,Active
+00350,Kausar,Rajjak,Sayyad,QC & QA,General Manager,00738,Manoj Hanmant Bagal,8459614178,kausar.s@ocspl.com,Active
+00360,Navanath,Arjun,Shep,Instrument,Manager,00339,Manik Sarjerao Hasabe,8793134493,navnath.s@ocspl.com,Active
+00361,Daulatrao,Balasaheb,Patil,Electrical,Maintenance Associate (Electrical),00022,Savala Jagannath Kumbhar,9922455210,daulatraopatil00361456@TEST.COM,Active
+00364,Basawaraj,Sanjay,Swami,Production,Jr. Officer,00106,Ganesh Vitthal Tadaka,9689471525,basawarajswami00364456@TEST.COM,Active
+00366,Abdul,Afsar,Shaikh,Production,Jr. Officer,00106,Ganesh Vitthal Tadaka,7620901963,abdulshaikh00366456@TEST.COm,Active
+00370,Ajhar,Akbar,Shaikh,Production,Jr. Officer,00106,Ganesh Vitthal Tadaka,9373344645,ajharshaikh00370456@TEST.COM,Active
+00379,Yogesh,Laxmaiah,Ailolla,Project,Executive,00342,Amol Prakash Chaudhari,9966891338,yogeshailolla00379@TEST.COM,Active
+00380,Amir,Abbasali,Pathan,Store,Forklift Pilot,00243,Dattatray Ravikiran Harkud,9096545942,amirpathan00380@TEST.COM,Active
+00381,Adinath,Bhojling,Sonavane,Instrument,Jr. Officer,00360,Navanath Arjun Shep,7090561954,adinathsonavane00381@TEST.COM,Active
+00383,Siddeshwar,Mahadev,More,Utility,Sr. Executive,00723,Pravin Shantaram Deshmukh,7218009210,Siddeswarmore00383@TEST.COM,Active
+00387,Samadhan,Kalyan,Wabale,Quality Assurance,Executive,00614,Shivaji Ananda Kadam,9307789057,samadhanwabale00387@TEST.COM,Active
+00389,Amol,Shrinivas,Adaki,Production,Jr. Officer,00106,Ganesh Vitthal Tadaka,8975489858,amoladaki00389@TEST.COM,Active
+00391,Mahadev,Balu,Fand,Electrical,Maintenance Associate (Electrical),00022,Savala Jagannath Kumbhar,9049868709,mahadevfand00391@TEST.COM,Active
+00393,Amarnath,Suresh,Karpe,Maintenance,Maintenance Associate (Mechanical),00603,Dattatray Deepak Chavan,9689288133,amarnathkarpe00393@TEST.COM,Active
+00398,Taufik,Hanif,Shaikh,Store,Jr. Officer,00243,Dattatray Ravikiran Harkud,9503627163,taufikshiakh00398@TEST.COM,Active
+00399,Sangram,Shrikant,Dhavane,Store,Store Associate,00714,Sushant Popat Masane,9067181491,sangramdhavane00399@TEST.COM,Active
+00400,Tukaram,Vitthal,Rajmane,Store,Tanker Unloader,00243,Dattatray Ravikiran Harkud,9767576737,tukaramrajmane00400@TEST.COM,Active
+00402,Sachin,Jyotiram,Kusekar,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9405272658,sachinkusekar00402@TEST.COM,Active
+00413,Dipak,Tulshiram,Tiwarase,QC & QA,Officer,00071,Vinod Umashankar Nimbalkar,9767946788,dipaktiwarase00413@TEST.COM,Active
+00414,Rahul,Sanjivan,Kharadkar,Technical Services,Executive,00341,Pramod Shrikrishna Bhosale,8862022258,rahulkharadkar00414@TEST.COM,Active
+00418,Sudarshan,Indrajit,Jadhav,Store,Executive,00243,Dattatray Ravikiran Harkud,8605701782,sudarshanjadhav00418@TEST.COm,Active
+00422,Channappa,Sanganna,Balundagi,QC & QA,Officer,00071,Vinod Umashankar Nimbalkar,7276895277,channappabalundagi00422@TEST.COM,Active
+00423,Shivaji,Pandurang,Raut,Technical Services,Executive,00341,Pramod Shrikrishna Bhosale,7758810230,shivajiraut00423@TEST.COM,Active
+00428,Shekhar,Uttareshwar,Madiwal,Production,Production Associate,00106,Ganesh Vitthal Tadaka,8446071383,shekharmadiwal00428@TEST.COM,Active
+00429,Sanket,Udaysinh,Deshmukh,Production,Jr. Officer,00106,Ganesh Vitthal Tadaka,9503197010,sanketdeshmukh00429@TEST.COM,Active
+00430,Sameer,Ansar,Sayyad,Production,Jr. Officer,00106,Ganesh Vitthal Tadaka,9075303594,sameersayyad00430@TEST.COM,Active
+00437,Shahir,Prabhakar,Vadaje,Store,Forklift Pilot,00243,Dattatray Ravikiran Harkud,9834489364,shahirvadaje00437@TEST.COM,Active
+00451,Deepak,Ravindra,Mahajan,Maintenance,Maintenance Associate (Mechanical),00603,Dattatray Deepak Chavan,9096764809,deepakmahajan00451@TEST.COM,Active
+00453,Ravi,Balasaheb,Maske,Production,Executive,00106,Ganesh Vitthal Tadaka,9766465634,ravimaske00453@TEST.COM,Active
+00454,Dipak,Sudam,Gund,Production,Executive,00106,Ganesh Vitthal Tadaka,9834474727,dipakgund00454@TEST.COM,Active
+00473,Bhagyawan,Chandrakant,Gaikwad,Production,Dy. Manager,00041,Arjun Guruling Wale,9665735695,bhagyawangaikwad00473@TEST.COM,Active
+00476,Dhirajkumar,Shivaji,Hadule,Production,Jr. Officer,00106,Ganesh Vitthal Tadaka,8605675485,dhirajkumar00476@TEST.COM,Active
+00477,Shrinivas,Vyankatesh,Wakitol,Accounts,Assistant,03019,Sanket Holam,9767422600,shirnivaswakitol00477@TEST.COM,Active
+00480,Vikas,Raghunath,Yete,Maintenance,Maintenance Associate (Mechanical),00603,Dattatray Deepak Chavan,7709475487,vikasyete00480@TEST.COM,Active
+00486,Krishna,Chandrika,Yadav,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9391872032,krishnakumaryadav00486@TEST.COM,Active
+00487,Pravinsing,Onkarsing,Pardeshi,Electrical,Maintenance Associate (Electrical),00022,Savala Jagannath Kumbhar,9637700561,pravinsingpardeshi00487@TEST.COM,Active
+00489,Prathmesh,Balkrishna,Patil,Production,Jr. Officer,00106,Ganesh Vitthal Tadaka,9665781296,prathmeshpatil00489@TEST.COM,Active
+00491,Govind,Maroti,Tate,Store,Assistant,00714,Sushant Popat Masane,9011701526,govindtate00491@TEST.COM,Active
+00494,Saifan,Dadalal,Patel,Electrical,Maintenance Associate (Electrical),00022,Savala Jagannath Kumbhar,9423219768,saifanpatel00494@TEST.COM,Active
+00501,Bhagavan,Vishnu,Bhange,EHS,Dy. Manager,00144,Pravinkumar Shankar Patil,9850150686,bhagavanbhange00501@TEST.COM,Active
+00502,Omkar,Rachayya,Swami,Production,Executive,00106,Ganesh Vitthal Tadaka,8208169916,omkarswami00502@TEST.COM,Active
+00503,Bhushan,Ganesh,Chaudhari,EHS,Officer,00144,Pravinkumar Shankar Patil,9730373698,bhushanchaudhari00503@TEST.COM,Active
+00504,Raju,Natu,Rathod,HR,Officer,00166,Anand Shrikant Kanaka,9689166271,admin.solapur@ocspl.com,Active
+00511,Kishor,Bhausaheb,Hapase,Production,Jr. Officer,00106,Ganesh Vitthal Tadaka,8446914089,kishorhapase00511@TEST.COM,Active
+00516,Shivraj,Parmeshwar,Dahitane,EHS,Officer,00144,Pravinkumar Shankar Patil,8805202253,shivrajdahitane97@gmail.com,Active
+00517,Ajay,Matadeen,Kushwaha,Production,Production Associate,00106,Ganesh Vitthal Tadaka,7083592726,ajaykushwaha00517@TEST.COM,Active
+00520,Sunil,Bhivaji,Bhosale,Store,Forklift Pilot,00243,Dattatray Ravikiran Harkud,9881881663,sunilbhosale00520@test.com,Active
+00529,Durgappa,Hanamant,Pawar,QC & QA,Officer,00071,Vinod Umashankar Nimbalkar,8805601055,durgappapawartest00529@gmail.com,Active
+00530,Pruthviraj,Gorakh,Jadhav,Production,Production Associate,00106,Ganesh Vitthal Tadaka,8180076267,PruthvirajJadhavtest530@gmail.com,Active
+00543,Dayanand,Rajshekhar,Majage,Production,Data Entry Operator,00106,Ganesh Vitthal Tadaka,9623808421,DAYANANDMAJAGETEST@GMAIL.COM,Active
+00545,Anil,Arun,Satav,Production,Executive,00106,Ganesh Vitthal Tadaka,9665890450,anilsatavtest@gmail.com,Active
+00549,Nandan,Madan,Kodarkar,Production,DCS Officer,00106,Ganesh Vitthal Tadaka,8830688854,nandankodarkartest@gmail.com,Active
+00556,Avinash,Kundlik,Deokar,Production,Executive,00106,Ganesh Vitthal Tadaka,9890999621,avinashtest@gmail.com,Active
+00559,Pintu,Dhanu,Rathod,Production,Production Associate,00106,Ganesh Vitthal Tadaka,8623854722,pinturathod559@gmail.com,Active
+00561,Dhananjay,Venkatesh,Konda,Production,Production Associate,00106,Ganesh Vitthal Tadaka,7249072865,dhananjaykondatest@gmail.com,Active
+00562,Ravi,Babasaheb,Chandanshive,Store,Tanker Unloader,00243,Dattatray Ravikiran Harkud,9860267379,ravichandanshive562@gmail.com,Active
+00563,Sachin,Ramchandra,Bansode,Store,Forklift Pilot,00243,Dattatray Ravikiran Harkud,9359295511,sachinbansodetest536@gmail.com,Active
+00565,Shrivallabh,Vilas,Gosavi,Environment,Executive,00144,Pravinkumar Shankar Patil,7620224739,shrivallabhgosavitest565@gmail.com,Active
+00567,Rohit,Shivaji,Kamble,Instrument,Maintenance Associate (Instrument),00360,Navanath Arjun Shep,8605601073,rohitkambletest567@gmail.com,Active
+00576,Vishal,Meninath,Waybhase,Production,Jr. Officer,00106,Ganesh Vitthal Tadaka,9022609818,vishalwaybhase576test@gmail.com,Active
+00580,Sachin,Siddharam,Konade,Production,Executive,00106,Ganesh Vitthal Tadaka,7776018701,sachinkonade580test@gmail.com,Active
+00587,Divyaratna,Dhanwade,Mokashi,Production,DCS Officer,00653,Piyush Dhanrajji Kapse,7840905005,divyaratnadhanwade587@text.com,Active
+00589,Rajkumar,Mallikarjun,Wagdari,Purchase,Sr. Executive,01085,Vaibhav Chandrakant Patil,8329044736,rajkumarwagdari589test@gmail.com,Active
+00593,Dnyaneshwar,Prakash,Chathe,QC & QA,Jr. Officer,00071,Vinod Umashankar Nimbalkar,9011760421,dnyaneshwarchathe@593gmail.com,Active
+00594,Ritesh,Satyavijay,Chimote,Technical Services,Executive,00341,Pramod Shrikrishna Bhosale,9545689950,RITESH.C@OCSPL.COM,Active
+00596,Rahul,Bhima,Jadhav,Maintenance,Maintenance Associate (Mechanical),00603,Dattatray Deepak Chavan,8830894294,Rahuljadhav596@gmail.com,Active
+00598,Tohid,Akbar,Mulani,Maintenance,Maintenance Associate (Mechanical),00603,Dattatray Deepak Chavan,9373041230,tohidmulani598@gmail.com,Active
+00599,Parmeshwar,Nagappa,Barse,Maintenance,Maintenance Associate (Mechanical),00603,Dattatray Deepak Chavan,9075969335,parmeshwarbarse599@gmail.com,Active
+00600,Rushikesh,Vinod,Powar,Maintenance,Maintenance Associate (Mechanical),00603,Dattatray Deepak Chavan,9156427898,rushikeshpowar600@gmail.com,Active
+00602,Vinayak,Shivaji,Dorage,Instrument,Executive,00360,Navanath Arjun Shep,9518332417,vinayakdorage602@gmail.com,Active
+00603,Dattatray,Deepak,Chavan,Maintenance,Dy. Manager,00723,Pravin Shantaram Deshmukh,9561664624,Dattatraychavan603@gmail.com,Active
+00604,Vinayak,Shankar,Bagalatti,Utility,Asst. Manager,00723,Pravin Shantaram Deshmukh,9663393564,vinayakbglt@gmail.com,Active
+00605,Avinash,Hanmantu,Naik,Technical Services,Draftsman,00341,Pramod Shrikrishna Bhosale,8975729283,avinaik1232@gmail.com,Active
+00606,Parmeshwar,Mohan,Kumbhar,Electrical,Maintenance Associate (Electrical),00022,Savala Jagannath Kumbhar,9527686333,parmeshwarkumbhar7@gmail.com,Active
+00607,Sachin,Shivasharan,Chhure,Instrument,Sr. Executive,00360,Navanath Arjun Shep,9881702787,sachinchhure@gmail.com,Active
+00609,Jairaj,Meghraj,Bhogade,IT,Jr. Officer,01076,Vikas Gajanan Mestry,9975724334,work.jbhogade@gmail.com,Active
+00612,Vishal,Tukaram,Gadekar,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9404205916,gadekarvishal11@gmail.com,Active
+00614,Shivaji,Ananda,Kadam,Quality Assurance,Asst. Manager,00350,Kausar Abdul Rajjak Sayyad,7219435867,Shivajikadam@ocspl.com,Active
+00615,Santosh,Annarao,Birajdar,Production,Executive,00041,Arjun Guruling Wale,7387609183,santoshbirajdar@ocspl.com,Active
+00616,Satishkumar,Sidramappa,Devdurgkar,Instrument,Jr. Officer,00360,Navanath Arjun Shep,7057126618,satishkumardevdurgkar@ocspl.com,Active
+00617,Laxmikant,Sharanbasappa,Kapase,Boiler,Boiler Associate,00604,Vinayak Shankar Bagalatti,9579727911,kapaselaxmikant@ocspl.com,Active
+00618,Vitthal,Bharat,Gaikwad,Boiler,Boiler Associate,00604,Vinayak Shankar Bagalatti,8600795232,gaikwadvitthal@ocspl.com,Active
+00620,Ganesh,Maruti,More,Boiler,Boiler Associate,00604,Vinayak Shankar Bagalatti,9049767188,ganeshmore@ocspl.com,Active
+00621,Shivsharan,Shivanand,Koli,Boiler,Boiler Associate,00604,Vinayak Shankar Bagalatti,9370515113,shivsharankoli@gmail.com,Active
+00622,Hruthik,Raju,Nigade,Boiler,Boiler Associate,00604,Vinayak Shankar Bagalatti,9881345778,hruthiknigade@ocspl.com,Active
+00624,Vishnu,Dinkar,Nanaware,Boiler,Boiler Associate,00604,Vinayak Shankar Bagalatti,8010818072,vishnunanaware@gmail.com,Active
+00625,Sachin,Tukaram,Bodake,Boiler,Boiler Associate,00604,Vinayak Shankar Bagalatti,8329678991,Sachinbodake@gmail.com,Active
+00626,Tushar,Dipak,Panshetti,Instrument,Technician,00360,Navanath Arjun Shep,9970657691,tusharpanshetti@gmail.com,Active
+00627,Mustak,Javid,Mujawar,Maintenance,Maintenance Associate (Mechanical),00603,Dattatray Deepak Chavan,8055430506,mustakmujawar@gmail.com,Active
+00629,Akshay,Ambadas,Baddal,Maintenance,Executive,00603,Dattatray Deepak Chavan,7775056279,akshaybaddal@ocspl.com,Active
+00634,Akash,Abhimanu,Kadam,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9284494787,,Active
+00635,Keshav,Sunil,Wadne,Production,Production Associate,00106,Ganesh Vitthal Tadaka,8999002624,,Active
+00636,Sudhakar,Shivanand,Bamchande,Maintenance,Draftsman,00603,Dattatray Deepak Chavan,7822968020,sudhakarbamchande@gmail.com,Active
+00639,Rahul,Bhagwat,Dhakane,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9529915872,rahuldhakane2003@gmail.com,Active
+00640,Pramod,Mahadev,Gavhane,Production,Production Associate,00106,Ganesh Vitthal Tadaka,8668593263,pramodmahadevgavhane@gmail.com,Active
+00642,Samir,Hamid,Mulani,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9130072693,samirmulani199@gmail.com,Active
+00646,Umesh,Ramchandra,Waichal,Technical Services,Jr. Officer,00652,Vishvajit Shivdas Nalawade,7499148434,umeshwaichal9527@gmail.com,Active
+00647,Samir,Nabilal,Shaikh,Production,Production Associate,00106,Ganesh Vitthal Tadaka,7028469541,samirs4366@gmail.com,Active
+00648,Vishal,Ganpat,Koli,Maintenance,Maintenance Associate (Mechanical),00603,Dattatray Deepak Chavan,9834230545,vishalgkoli1995@gmail.com,Active
+00649,Ramhari,Sudam,Nawale,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9923021342,ramhari0294@gmail.com,Active
+00651,Sagar,Govardhan,Thorat,Utility,Utility Associate,00383,Siddeshwar Mahadev More,7028780282,sagar0282thorat@gmail.com,Active
+00652,Vishvajit,Shivdas,Nalawade,Technical Services,Asst.General Manager,00738,Manoj Hanmant Bagal,8329091061,Vishvajit.nalawade@gmail.com,Active
+00653,Piyush,Dhanrajji,Kapse,Production,Dy. Manager,00041,Arjun Guruling Wale,8421971587,kapsepiyush@ymail.com,Active
+00654,Kailas,Eknath,Adhav,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9146451546,adhavkailas2000@gmail.com,Active
+00655,Laxman,Hanuman,Kardile,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9823110203,kardilelaxman7@gmail.com,Active
+00656,Mahesh,Kisan,Gadakh,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9766290644,maheshgadakh1999@gmail.com,Active
+00657,Laxman,Rajendra,Raut,Production,Production Associate,00106,Ganesh Vitthal Tadaka,7410108912,laxmantaut@gmail.com,Active
+00659,Shaktiprasad,Nagnath,Jagtap,IT,Officer,01076,Vikas Gajanan Mestry,9764078870,it.solapur@ocspl.com,Active
+00661,Nageshwar,Dashrath,Pawar,Electrical,Officer,00022,Savala Jagannath Kumbhar,9834980857,nageshwarpawar15@gmail.com,Active
+00662,Ashutosh,Dattatray,Chaugule,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9226650334,ashutoshchaugule93@gmail.com,Active
+00664,Vikas,Sudhir,Masalkar,Utility,Utility Associate,00383,Siddeshwar Mahadev More,9699285259,vikasmasalkar03@gmail.com,Active
+00665,Vikas,Baburao,Kursule,Production,DCS Executive,00473,Bhagyawan Chandrakant Gaikwad,9156779623,vikaskursule1993@gmail.com,Active
+00666,Ganesh,Balasaheb,Pol,Production,Production Associate,00106,Ganesh Vitthal Tadaka,8408005124,ganeshpol2525@gmail.com,Active
+00669,Akshay,Sambhaji,Thakur,PD Lab,Officer,00341,Pramod Shrikrishna Bhosale,8999932213,akshuthakur1410@gmail.com,Active
+00673,Arjun,Chediram,Rajbhar,Production,DCS Officer,00653,Piyush Dhanrajji Kapse,7276077923,rajbhararjun833@gmail.com,Active
+00674,Shital,Nagnath,Sindagi,Operation,Executive Assistant,01027,Sachin Chandrakant Padwal,9511811380,shitalsindagi299@gmail.com,Active
+00676,Shivam,Pardeep,Gawali,Production,Production Associate,00106,Ganesh Vitthal Tadaka,7057286574,shivagavali5050@gmail.com,Active
+00677,Dipesh,Daji,Gaikwad,Instrument,Technician,00360,Navanath Arjun Shep,9326561553,dipeshdgaikwad@gmail.com,Active
+00678,Tulashiram,Shivaji,Mote,Production,Production Associate,00106,Ganesh Vitthal Tadaka,7218849499,tulshirammote1999@gmail.com,Active
+00679,Nagesh,Sharanappa,Gangade,Instrument,Executive,00360,Navanath Arjun Shep,9657652544,nageshgangade@gmail.com,Active
+00680,Amol,Balu,Darekar,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9021867496,amoldarekar2000@gamil.com,Active
+00682,Aditya,Chandrakant,Wandhekar,Production,Production Associate,00106,Ganesh Vitthal Tadaka,8262055642,adityawandhekar485@gmail.com,Active
+00683,Shreekant,Sambhaji,Sawant,Production,Production Associate,00106,Ganesh Vitthal Tadaka,8010671778,shrikantsawant053@gmail.com,Active
+00684,Sharad,Hambirao,Chaudhari,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9552064276,csharad915@gmail.com,Active
+00685,Vaibhav,Subhash,Gandhi,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9421063415,vaibhavgandhi537@gmail.com,Active
+00686,Nilesh,Pandharinath,Kasabe,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9359382166,nilesh.kasabe2017@gmail.com,Active
+00687,Pravin,Shankar,Gund,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9359151762,pravingund049@gmail.com,Active
+00688,Mahesh,Laxman,Wandhekar,Production,Production Associate,00106,Ganesh Vitthal Tadaka,8080608829,maheshwandhekar27@gmail.com,Active
+00690,Shahrukh,Siraj,Sayyad,Production,Production Associate,00106,Ganesh Vitthal Tadaka,8010259483,sayyadshahruk077@gmail.com,Active
+00692,Sahil,Pramod,Ujgare,Utility,Utility Associate,00383,Siddeshwar Mahadev More,8600556330,sahilujagare23@gmail.com,Active
+00695,Tushar,Ramdas,Mote,Production,DCS Officer,00106,Ganesh Vitthal Tadaka,7378318785,tusharmote00427@TEST.COM,Active
+00696,Mayur,Madhukar,Shinde,IT,Officer,01076,Vikas Gajanan Mestry,7208190280,it@ocspl.com,Active
+00705,Aashish,Shamrao,Mundhe,Production,Production Associate,00106,Ganesh Vitthal Tadaka,7741992401,mundheashish2@gmail.com,Active
+00706,Atharv,Shriram,Adsul,Production,Production Associate,00106,Ganesh Vitthal Tadaka,7447491386,atharvadsul94@gmail.com,Active
+00707,Jayant,Swamirao,Salunke,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9960362967,jayantsalunke10@gmail.com,Active
+00708,Prasad,Parshuram,Chavan,Production,Production Associate,00106,Ganesh Vitthal Tadaka,8411928139,prasadchavan18feb@gmail.com,Active
+00709,Prakash,Govardhan,Zendage,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9307006828,prakashzendage12@gmail.com,Active
+00710,Bappu,Pandurang,Gaikwad,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9529175117,gaikwadbapu3007@gmail.com,Active
+00711,Vinay,Santosh,Waghmode,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9322071345,vinaywaghmode123@gmail.com,Active
+00712,Sanket,Dattatray,Gavli,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9096417418,gaikwadsanket67@gmail.com,Active
+00713,Pravin,Sadanand,Nakka,QC & QA,Officer,00071,Vinod Umashankar Nimbalkar,8483930591,nakka.praaveen@gmail.com,Active
+00714,Sushant,Popat,Masane,Store,Asst. Manager,00243,Dattatray Ravikiran Harkud,9594252668,masanesushant@gmail.com,Active
+00716,Ratan,Dadaso,Sonavale,Production,Production Associate,00106,Ganesh Vitthal Tadaka,7822907765,sonawaleratan608@gmail.com,Active
+00717,Shivaraj,Ashok,Jamunkar,Electrical,Maintenance Associate (Electrical),00022,Savala Jagannath Kumbhar,8766955246,shivrajjamunakar750@gmail.com,Active
+00718,Pranit,Dagadu,Kadam,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9325854132,pranitkadam163@gmail.com,Active
+00719,Eknath,Balu,Avtade,Production,Production Associate,00653,Piyush Dhanrajji Kapse,9420276318,eknathavatade3@gmail.com,Active
+00720,Vijay,Haridas,Pawar,Maintenance,Maintenance Associate (Mechanical),00603,Dattatray Deepak Chavan,9325698787,vijaypawar221004@gmail.com,Active
+00721,Sunil,Sanjay,Chanmal,Maintenance,Executive,00603,Dattatray Deepak Chavan,9970028041,sunilchanmal95@gmail.com,Active
+00722,Mahesh,Siddheshwar,Jadhav,Maintenance,Maintenance Associate (Mechanical),00603,Dattatray Deepak Chavan,9545948325,maheshjadhav5085@gmail.com,Active
+00723,Pravin,Shantaram,Deshmukh,Engineering,Assistant Vice President,00738,Manoj Hanmant Bagal,8805174626,pravin.d@ocspl.com,Active
+00724,Jitendra,Balkrushna,Navarkar,PD Lab,Dy. Manager,00341,Pramod Shrikrishna Bhosale,9689272959,,Active
+00726,Vikas,Vaman,Chavan,Instrument,Asst. Manager,00339,Manik Sarjerao Hasabe,9284400148,vikaschavan726@yahoo.com,Active
+00727,Nikhil,Gopal,Jadhav,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9309337896,nikhiljadhav727@gmail.com,Active
+00728,Parth,Shrikant,Yadav,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9175404941,parthyadhav728@gmail.com,Active
+00729,Ganesh,Balasaheb,Kashid,Production,Production Associate,00106,Ganesh Vitthal Tadaka,7517937394,,Active
+00730,Abhijit,Nitin,More,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9356351822,abhijitmore730@gmail.com,Active
+00731,Dilip,Kumar,Arabole,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9923421052,diliparbole731@gmail.com,Active
+00732,Mahesh,Eknath,Gavali,Production,Production Associate,00106,Ganesh Vitthal Tadaka,8625822830,maheshgavali732@gmail.com,Active
+00733,Dnyaneshwar,Rajendra,Chaugule,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9834626768,dyaneshwarchaugule733@gmail.com,Active
+00734,Abhishek,Mallinath,Dhumma,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9322246926,abhishekdumma734@gmail.com,Active
+00735,Yogiraj,Arun,Kshirsagar,HR,Officer,00166,Anand Shrikant Kanaka,9763647577,yogirajkshirsagar735@gmail.com,Active
+00736,Parmeshwar,Dayanand,Birajdar,Environment,Asst. Manager,00144,Pravinkumar Shankar Patil,9527884752,,Active
+00737,Pradeep,Vasantappa,Daruwale,Production,Asst. Manager,00041,Arjun Guruling Wale,7798220046,pradeepdaruwale@gmail.com,Active
+00738,Manoj,Hanmant,Bagal,Operation,Sr.Vice President,D0002,Vikas Mangilal Shah,9870781424,,Active
+00739,Rajendra,Ambaji,Ghodke,Project,Dy. Manager,00342,Amol Prakash Chaudhari,8421418919,rajendra.ghodke1990@gmail.com,Active
+00741,Gajanand,Basappa,Umrani,Instrument,Executive,00360,Navanath Arjun Shep,9604139007,,Active
+00742,Nihal,Manjur,Mulani,Production,Production Associate,00106,Ganesh Vitthal Tadaka,8767444163,nihalmulani022@gmail.com,Active
+00743,Sagar,Khandu,Gund,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9325082582,sagargund862@gmail.com,Active
+00745,Kalyani,Rajdeep,Kulkarni,Quality Control,Officer,00071,Vinod Umashankar Nimbalkar,8208111761,kalyanipatil584@gmail.com,Active
+00746,Balasaheb,Gorakh,Kalekar,PD Lab,Officer,00341,Pramod Shrikrishna Bhosale,9527252696,balasahebkalekar95@gmail.com,Active
+00747,Tanaji,Nagorao,Kadam,Technical Services,Dy. Manager,00652,Vishvajit Shivdas Nalawade,9096442140,tanaji08ch@yahoo.com,Active
+00748,Saurabh,Mathurdas,Shirke,Production,Production Associate,00106,Ganesh Vitthal Tadaka,8459848704,saurbhshirke119@gmail.com,Active
+00749,Vishwanath,Somshekhar,Karajagi,Maintenance,Officer,00603,Dattatray Deepak Chavan,8999213571,vishwanathkarajagi90@gmail.com,Active
+00750,Madhav,Manohar,Gaikwad,Quality Control,Asst. Manager,00071,Vinod Umashankar Nimbalkar,7276566207,gaikwadmadhav600@gmail.com,Active
+00751,Jivan,Somaning,Gotsurve,Production,Dy. Manager,00041,Arjun Guruling Wale,9766146369,jivansurve9591@gmail.com,Active
+00752,Arbaz,Baktavar,Patel,Production,Production Associate,00106,Ganesh Vitthal Tadaka,8459583677,arbazpatel5556@gmail.com,Active
+00753,Pramod,Vilas,Pawar,EHS,Dy. Manager,00144,Pravinkumar Shankar Patil,9867471625,pramodnife20@gmail.com,Active
+00754,Suhas,Suresh,Yelane,Production,Production Associate,00106,Ganesh Vitthal Tadaka,7517343454,suhasyelane1999@gmail.com,Active
+00755,Amar,Bhairu,Magar,Production,Production Associate,00106,Ganesh Vitthal Tadaka,7709804647,amarmagar2350@gmail.com,Active
+00756,Hasan,Babasaheb,Shaikh,Production,Production Associate,00106,Ganesh Vitthal Tadaka,9766454147,hasanshaikh3436@gmail.com,Active
+00757,Ravikumar,Rajendra,Tiparadi,Purchase,Officer,00589,Rajkumar Mallikarjun Wagdari,8698415359,ravitiparadi1998@gmail.com,Active
+01027,Sachin,Chandrakant,Padwal,HR,Asst.General Manager,D0002,Vikas Mangilal Shah,9702742722,sachin.padwal@ocspl.com,Active
+D0002,Vikas,Mangilal,Shah,Management,Director,,,9819807073,vikas@ocspl.com,Active

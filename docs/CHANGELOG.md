@@ -1,25 +1,5 @@
 # AMS-Test change log
 
-## 2026-09-27 — Unused connections and page links
-
-Sidebar, Profile, and login redirects now resolve from both the dashboard
-and `/pages/` (`amsHref`). Unused CORS policy removed (UI is same-origin).
-Settings no longer has Reset Demo Data. Stale "not connected" comments
-updated. Hard-refresh (Ctrl+F5).
-
-## 2026-09-24 — Vector glassy login pane, gold-to-charcoal backdrop
-
-Login card uses Vector pane glass (theme tokens, no Halo SVG field).
-Backdrop is a smooth accent-to-charcoal gradient instead of the lattice.
-Username / password only. Hard-refresh (Ctrl+F5).
-
-## 2026-09-23 — Platinum default, clearer glass, Django migrate
-
-Default Theme stays Platinum. Glass panels are more transparent.
-Django `DATABASES.OPTIONS` includes `extra_params: TrustServerCertificate=yes`
-so `python manage.py migrate` works with ODBC Driver 18. README Django
-steps include migrate. Hard-refresh (Ctrl+F5).
-
 ## 2026-09-19 — SQL database backup (Super Root / Supreme Root)
 
 SQL Database Backup stays in the codebase for a later host-folder copy

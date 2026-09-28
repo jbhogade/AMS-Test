@@ -1,0 +1,6 @@
+name,description,active
+Assets,Supplies assets / capital equipment,true
+Consumables,Supplies consumable items,true
+Spare Parts,Supplies spare / repair parts,true
+Services,"Provides services (AMC, repair, etc.)",true
+All,General supplier - multiple categories,true

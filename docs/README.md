@@ -143,14 +143,10 @@ venv\Scripts\activate          # Windows
 # 3. Install required packages
 pip install -r requirements.txt
 
-# 4. Connect to SQL Server (ODBC Driver 18 needs TrustServerCertificate;
-#    that extra_params flag is already in ams_django/settings.py DATABASES)
-python manage.py migrate
-
-# 5. Run the local development server (schema/users are created on first request)
+# 4. Run the local development server (schema/users are created on first request)
 python manage.py runserver
 
-# 6. Stop virtual environment
+# 5. Stop virtual environment
 deactivate
 ```
 

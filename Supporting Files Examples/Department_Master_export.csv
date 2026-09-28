@@ -1,0 +1,25 @@
+name,shortform,active
+Boiler,BO,true
+PD Lab,PDL,true
+QC & QA,QCA,true
+Electrical,EL,true
+Maintenance,ME,true
+Quality Control,QC,true
+Accounts,FA,true
+EHS,EHS,true
+Utility,UT,true
+Technical Services,TS,true
+SCM,SCM,true
+Store,ST,true
+Instrument,INS,true
+Project,PRO,true
+Environment,EHS,true
+Quality Assurance,QA,true
+Purchase,PU,true
+Operation,OP,true
+Engineering,ENG,true
+Management,MAN,true
+Production,PRD,true
+HR,HR,true
+Admin,ADM,true
+IT,IT,true
