@@ -68,6 +68,7 @@ plotly==6.9.0
 ply==3.11
 prompt_toolkit==3.0.53
 Pygments==2.21.0
+PyJWT==2.13.0
 pyodbc==5.3.0
 pyparsing==3.3.2
 python-crontab==3.4.0
