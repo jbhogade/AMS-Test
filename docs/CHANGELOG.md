@@ -1,5 +1,12 @@
 # AMS-Test change log
 
+## 2026-09-30 — Django PyJWT dependency fix
+
+`crypto.py` imports `jwt` at load, but the uploaded `requirements-2*.txt`
+files omitted `PyJWT`, so `python manage.py migrate` / `runserver` failed
+with `ModuleNotFoundError: No module named 'jwt'`. `PyJWT==2.13.0` is now
+in every requirements file. Install with `pip install -r requirements.txt`.
+
 ## 2026-09-27 — Unused connections and page links
 
 Sidebar, Profile, and login redirects now resolve from both the dashboard
