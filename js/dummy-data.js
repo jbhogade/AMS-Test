@@ -2634,19 +2634,25 @@ function amsBuildPrintSimCardsSectionHtml(directList, subList, opts) {
 
 function amsBuildPrintMobileSimHtml(amsId, opts) {
     const exitRecord = opts && opts.exitRecord;
+    const includeDirect = !(opts && opts.includeDirect === false);
+    const includeTeam = !(opts && opts.includeTeam === false);
     const mobiles = exitRecord
         ? { direct: exitRecord.directMobilesHeld || [], subordinate: exitRecord.subordinateMobilesHeld || [] }
         : amsCollectPrintMobilesForEmp(amsId);
     const sims = exitRecord
         ? { direct: exitRecord.directSimCardsHeld || [], subordinate: exitRecord.subordinateSimCardsHeld || [] }
         : amsCollectPrintSimsForEmp(amsId);
+    const mobileDirect = includeDirect ? mobiles.direct : [];
+    const mobileTeam = includeTeam ? mobiles.subordinate : [];
+    const simDirect = includeDirect ? sims.direct : [];
+    const simTeam = includeTeam ? sims.subordinate : [];
     return {
-        html: amsBuildPrintMobilesSectionHtml(mobiles.direct, mobiles.subordinate, opts)
-            + amsBuildPrintSimCardsSectionHtml(sims.direct, sims.subordinate, opts),
-        mobileDirect: mobiles.direct.length,
-        mobileTeam: mobiles.subordinate.length,
-        simDirect: sims.direct.length,
-        simTeam: sims.subordinate.length,
+        html: amsBuildPrintMobilesSectionHtml(mobileDirect, mobileTeam, opts)
+            + amsBuildPrintSimCardsSectionHtml(simDirect, simTeam, opts),
+        mobileDirect: mobileDirect.length,
+        mobileTeam: mobileTeam.length,
+        simDirect: simDirect.length,
+        simTeam: simTeam.length,
     };
 }
 
