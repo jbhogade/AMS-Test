@@ -33,6 +33,30 @@ public class CollectionsController : ControllerBase
         _db = db;
     }
 
+    [HttpGet("/api/collections")]
+    public async Task<IActionResult> GetAll()
+    {
+        var payload = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
+        foreach (var key in AllowedKeys)
+        {
+            var json = await _db.GetCollectionAsync(key);
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                payload[key] = JsonDocument.Parse("[]").RootElement.Clone();
+                continue;
+            }
+            try
+            {
+                payload[key] = JsonDocument.Parse(json).RootElement.Clone();
+            }
+            catch (JsonException)
+            {
+                payload[key] = JsonDocument.Parse("[]").RootElement.Clone();
+            }
+        }
+        return Ok(payload);
+    }
+
     [HttpGet("{key}")]
     public async Task<IActionResult> Get(string key)
     {

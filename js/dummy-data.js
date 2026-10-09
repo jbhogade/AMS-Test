@@ -172,25 +172,48 @@ const AMS_DOC_COLLECTIONS = {
 let AMS_DB_LOADING = null;   /* idempotent load promise */
 let AMS_DB_READY   = false;
 
+function amsDbApplyPayload(payload) {
+    if (!payload || typeof payload !== "object") return false;
+    Object.keys(AMS_COLLECTIONS).forEach(key => {
+        const arr = AMS_COLLECTIONS[key]();
+        arr.length = 0;
+        if (Array.isArray(payload[key])) arr.push.apply(arr, payload[key]);
+    });
+    Object.keys(AMS_DOC_COLLECTIONS).forEach(key => {
+        const doc = payload[key];
+        const target = AMS_DOC_COLLECTIONS[key]();
+        if (doc && typeof doc === "object" && !Array.isArray(doc)) Object.assign(target, doc);
+    });
+    return true;
+}
+
 async function amsDbLoadAll() {
     if (AMS_DB_READY) return;
     if (AMS_DB_LOADING) return AMS_DB_LOADING;
     AMS_DB_LOADING = (async () => {
-        await Promise.all(Object.keys(AMS_COLLECTIONS).map(async key => {
-            let items = [];
-            try { items = await amsApiGet("/api/collection/" + key); }
-            catch (e) { console.warn("[amsDb] load " + key + " failed: " + e.message); }
-            const arr = AMS_COLLECTIONS[key]();
-            arr.length = 0;
-            if (Array.isArray(items)) arr.push.apply(arr, items);
-        }));
-        await Promise.all(Object.keys(AMS_DOC_COLLECTIONS).map(async key => {
-            let doc = null;
-            try { doc = await amsApiGet("/api/collection/" + key); }
-            catch (e) { console.warn("[amsDb] load " + key + " failed: " + e.message); }
-            const target = AMS_DOC_COLLECTIONS[key]();
-            if (doc && typeof doc === "object") Object.assign(target, doc);
-        }));
+        let loaded = false;
+        try {
+            loaded = amsDbApplyPayload(await amsApiGet("/api/collections"));
+        } catch (e) {
+            console.warn("[amsDb] bulk load failed, falling back: " + (e && e.message ? e.message : e));
+        }
+        if (!loaded) {
+            await Promise.all(Object.keys(AMS_COLLECTIONS).map(async key => {
+                let items = [];
+                try { items = await amsApiGet("/api/collection/" + key); }
+                catch (e) { console.warn("[amsDb] load " + key + " failed: " + e.message); }
+                const arr = AMS_COLLECTIONS[key]();
+                arr.length = 0;
+                if (Array.isArray(items)) arr.push.apply(arr, items);
+            }));
+            await Promise.all(Object.keys(AMS_DOC_COLLECTIONS).map(async key => {
+                let doc = null;
+                try { doc = await amsApiGet("/api/collection/" + key); }
+                catch (e) { console.warn("[amsDb] load " + key + " failed: " + e.message); }
+                const target = AMS_DOC_COLLECTIONS[key]();
+                if (doc && typeof doc === "object") Object.assign(target, doc);
+            }));
+        }
         const accMax = AMS_DUMMY_ACCESSORIES.reduce((m, a) =>
             Math.max(m, parseInt(String(a.accCode || "0").replace(/\D/g, ""), 10) || 0), 0);
         if (accMax >= AMS_ACC_SEQ) AMS_ACC_SEQ = accMax + 1;

@@ -286,6 +286,30 @@ def user_detail(request, username):
     return HttpResponse(status=405)
 
 
+# ---- /api/collections (bulk load) --------------------------------------------
+
+
+@require_auth
+def collections_all(request):
+    if request.method != "GET":
+        return HttpResponse(status=405)
+    try:
+        db = get_db()
+        payload = {}
+        for key in ALLOWED_KEYS:
+            stored = db.get_collection(key)
+            if not stored or not str(stored).strip():
+                payload[key] = []
+                continue
+            try:
+                payload[key] = json.loads(stored)
+            except (TypeError, ValueError, json.JSONDecodeError):
+                payload[key] = []
+        return JsonResponse(payload)
+    except pyodbc.Error:
+        return _db_error()
+
+
 # ---- /api/collection ---------------------------------------------------------
 
 
