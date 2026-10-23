@@ -36,23 +36,40 @@ public class CollectionsController : ControllerBase
     [HttpGet("/api/collections")]
     public async Task<IActionResult> GetAll()
     {
+        /* The payload only changes when a row is written, so advertise an ETag
+           built from row counts + newest updated_at. Navigating between pages
+           then costs a 304 instead of re-sending every collection. */
+        var version = await _db.GetCollectionsVersionAsync();
+        var etag = "\"" + version + "\"";
+        Response.Headers.ETag = etag;
+        Response.Headers.CacheControl = "private, no-cache";
+
+        var ifNoneMatch = Request.Headers.IfNoneMatch.ToString();
+        if (!string.IsNullOrEmpty(ifNoneMatch) &&
+            (ifNoneMatch == etag || ifNoneMatch == "W/" + etag))
+        {
+            return StatusCode(StatusCodes.Status304NotModified);
+        }
+
+        /* One round-trip to SQL Server for every collection (see
+           AmsDb.GetAllCollectionsAsync) instead of ~28 sequential queries. */
+        var all = await _db.GetAllCollectionsAsync();
         var payload = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in AllowedKeys)
         {
-            var json = await _db.GetCollectionAsync(key);
-            if (string.IsNullOrWhiteSpace(json))
+            if (all.TryGetValue(key, out var json) && !string.IsNullOrWhiteSpace(json))
             {
-                payload[key] = JsonDocument.Parse("[]").RootElement.Clone();
-                continue;
+                try
+                {
+                    payload[key] = JsonDocument.Parse(json).RootElement.Clone();
+                    continue;
+                }
+                catch (JsonException)
+                {
+                    /* malformed stored JSON - fall through to an empty value */
+                }
             }
-            try
-            {
-                payload[key] = JsonDocument.Parse(json).RootElement.Clone();
-            }
-            catch (JsonException)
-            {
-                payload[key] = JsonDocument.Parse("[]").RootElement.Clone();
-            }
+            payload[key] = JsonDocument.Parse("[]").RootElement.Clone();
         }
         return Ok(payload);
     }
