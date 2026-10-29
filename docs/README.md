@@ -22,7 +22,7 @@ The portal is gated by `login.html`. On a Windows machine with SQL Server:
 
 How it works: business data is stored in per-entity SQL tables (plus `data_json` on each row). The frontend loads every collection at startup and PUTs a collection back whenever the in-memory data changes (`js/dummy-data.js` data layer). Login accounts live in `dbo.ams_users` (PBKDF2-SHA256 hashed passwords, JWT sessions). User profiles live in `dbo.ams_user_profiles`.
 
-Account management: the **User Master** page (`pages/user-master.html`) now has a password field - new accounts are synced to `dbo.ams_users` via the API so they can actually log in. The topbar user chip (display name, **My Profile**, **Logout**) opens the profile page (`pages/profile.html`) to edit profile fields or change the password.
+Account management: the **User Master** page (`pages/user-master.html`) has password and required **Site** (from Site Master). New accounts sync to `dbo.ams_users` via the API so they can log in. Super Root / Supreme Root still see all records even if a site is set. The topbar user chip (display name, **My Profile**, **Logout**) opens the profile page (`pages/profile.html`) to edit profile fields or change the password.
 
 ## Folder Structure
 
@@ -62,8 +62,8 @@ AMS-Test/                       <- live-testing project (SQL Server backed)
 ├── database/Setup-AMS-TEST.bat<- sqlcmd setup script (Windows)
 ├── SQL-DB-Backup/             <- full SQL .bak files (Super Root / Supreme Root)
 ├── css/
-│   ├── themes.css          <- color palettes (Platinum default; Blue removed)
-│   ├── ui-styles.css       <- always-on frosted glass + geometric lattice
+│   ├── themes.css          <- 9 color palettes (Dark Grey default)
+│   ├── ui-styles.css       <- Apple (default); also Plain / macOS / iOS / iPadOS
 │   ├── main.css            <- shared layout & components (incl. font-size attr)
 │   ├── dashboard.css       <- dashboard-only styles
 │   ├── master-table.css    <- generic master-table engine styles
@@ -78,7 +78,7 @@ AMS-Test/                       <- live-testing project (SQL Server backed)
 │   └── settings.css        <- Settings page tab strip, theme gallery, stat rows
 ├── js/
 │   ├── dummy-data.js       <- DB/API layer + in-memory cache + helpers
-│   ├── theme.js            <- Theme dropdown (per-user map; Platinum default)
+│   ├── theme.js            <- Theme dropdown (per-user map; Dark Grey default)
 │   ├── login.js            <- login submit + session + first-login Theme seed
 │   ├── app.js              <- shared helpers (escape, badges, formatting)
 │   ├── layout.js           <- sidebar + header; per-user sidebar Show/Hide pin
@@ -156,44 +156,35 @@ deactivate
 
 Then open your browser to: **http://127.0.0.1:8000/**
 
-Sign in, then use the Theme dropdown (top-right, also on the login page). Default
-is **Platinum**. Frosted glass is always on. Theme and desktop sidebar Show/Hide
-are stored per signed-in username.
+Sign in, then use the Theme and Style dropdowns (top-right, also on the login page). Default
+theme is **Dark Grey**. Default style is **Apple**. Theme, Style, and desktop sidebar Show/Hide are stored per
+signed-in username.
 
 ## Themes
 
-One Theme dropdown. Surface look is always frosted glass (`css/ui-styles.css`).
-Default is **Platinum**. Blue is removed (old `ams-theme=blue` maps to Platinum).
-Signed-in users keep their own Theme and sidebar pin (`ams-theme-by-user`,
-`ams-sidebar-show-by-user`). Login uses the shared Theme picker until someone
-signs in.
+One Theme dropdown. Nine palettes. Default is **Dark Grey**. Removed
+names map in `js/theme.js`. Style is **Apple** (default), **Plain**,
+**macOS**, **iOS**, or **iPadOS**.
+Signed-in users keep their own Theme, Style, and sidebar pin
+(`ams-theme-by-user`, `ams-ui-style-by-user`, `ams-sidebar-show-by-user`).
+Login uses the shared Theme and Style pickers until someone signs in.
 
 | Theme      | Type  | Notes                         |
 | ---------- | ----- | ----------------------------- |
-| Platinum   | light | **Default**                   |
-| Dark Gold  | dark  | Warm gold accent              |
+| Dark Grey  | dark  | **Default**                   |
 | Midnight   | dark  | Very dark, high contrast      |
-| Obsidian   | dark  | Near-black                    |
-| Dark Grey  | dark  | Low glare                     |
 | Slate Blue | dark  | Corporate blue-grey           |
-| Ice        | light | Cool pale                     |
-| Teal       | dark  | Teal accent                   |
-| Forest     | dark  | Dark green                    |
-| Emerald    | dark  | Green accent                  |
-| Purple     | dark  | Dark purple                   |
-| Violet     | dark  | Dark violet                   |
-| Wine       | dark  | Burgundy                      |
-| Crimson    | dark  | Dark crimson                  |
-| Rose Gold  | dark  | Rose metal                    |
-| Amber      | dark  | Warm amber                    |
-| Copper     | dark  | Copper accent                 |
 | Lite       | light | Bright / light                |
-| Contrast   | dark  | High-contrast mono            |
+| Forest     | dark  | Dark green                    |
+| Purple     | dark  | Dark purple                   |
+| Ice        | light | Cool pale-blue                |
+| Dark Gold  | dark  | Warm gold accent              |
+| Contrast   | dark  | Pure black high-contrast      |
 
 ## Build Roadmap (step by step)
 
 - [x] Project setup + folder structure
-- [x] Theme system (8 themes -> 11 themes, Phase 1)
+- [x] Theme system (9 themes, Dark Grey default)
 - [x] Shared layout (sidebar + header)
 - [x] Dashboard page (dummy data)
 - [x] Employee Master (AMS IDs, assets owned/team, Issue & Handover forms, Exit with facility check-off + immutable exit snapshot)
@@ -204,7 +195,7 @@ signs in.
 - [x] Accessories page (auto accCode, quick-add asset types, delete guarded while an asset has the accessory issued)
 - [x] System Administrator hub (Company + lookup masters embedded via ?embed=1, tabs)
 - [x] Company Master (single-record form feeding print letterheads)
-- [x] User Master (roles + delete guards driven by the "Viewing As" role simulator, no password field)
+- [x] User Master (roles + delete guards, password + required Site on create/edit)
 - [x] Access Rights Control Master (Supreme Root - per-user page checklists, hub tab)
 - [x] Role Access Master (Supreme Root - Role x Page default-access matrix, hub tab)
 - [x] Log Report (Super Root / Supreme Root - activity audit trail, visibility split, CSV export, hub tab)

@@ -80,7 +80,8 @@ BEGIN
         contact_no      NVARCHAR(50)   NULL,
         address         NVARCHAR(500)  NULL,
         dob             NVARCHAR(20)   NULL,
-        gender          NVARCHAR(20)   NULL
+        gender          NVARCHAR(20)   NULL,
+        site            NVARCHAR(200)  NULL
     );
 END
 GO
@@ -100,6 +101,7 @@ BEGIN
         address          NVARCHAR(500) NULL,
         dob              NVARCHAR(20)  NULL,
         gender           NVARCHAR(20)  NULL,
+        site             NVARCHAR(200) NULL,
         linked_employee  NVARCHAR(100) NULL,
         remarks          NVARCHAR(500) NULL,
         active           BIT           NOT NULL DEFAULT 1,
@@ -1097,6 +1099,10 @@ IF OBJECT_ID(N'dbo.ams_users', N'U') IS NOT NULL
    AND COL_LENGTH(N'dbo.ams_users', N'gender') IS NULL
    ALTER TABLE dbo.ams_users ADD gender NVARCHAR(20) NULL;
 GO
+IF OBJECT_ID(N'dbo.ams_users', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_users', N'site') IS NULL
+   ALTER TABLE dbo.ams_users ADD site NVARCHAR(200) NULL;
+GO
 
 /* Profile columns for the dbo.ams_user_profiles mirror too, so the User Master
    copy exposes the same profile fields as dbo.ams_users. Idempotent + safe on
@@ -1120,6 +1126,10 @@ GO
 IF OBJECT_ID(N'dbo.ams_user_profiles', N'U') IS NOT NULL
    AND COL_LENGTH(N'dbo.ams_user_profiles', N'gender') IS NULL
    ALTER TABLE dbo.ams_user_profiles ADD gender NVARCHAR(20) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_user_profiles', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_user_profiles', N'site') IS NULL
+   ALTER TABLE dbo.ams_user_profiles ADD site NVARCHAR(200) NULL;
 GO
 
 /* ---- Exit Records (handover snapshots) --------------------------------------- */

@@ -1,5 +1,33 @@
 # AMS-Test change log
 
+## 2026-10-28 — Default Style is Apple
+
+Default Theme stays **Dark Grey**. Default Style is now **Apple**
+(was Plain). HTML `data-ui-style="apple"`. Users with no saved Style
+get Apple. Saved per-user Style is unchanged. Cache-bust `?v=t9c`.
+Hard-refresh (Ctrl+F5). If Style still shows Plain, pick Apple once.
+
+## 2026-10-27 — Optional Apple / macOS / iOS / iPadOS Styles
+
+Appearance Style: **Plain**, **Apple**, **macOS**, **iOS**,
+**iPadOS**. Topbar and login have a Style dropdown next to Theme;
+Settings > Appearance has a Style card. CSS chrome only. Nine themes
+and page layout are unchanged. Saved per user (`ams-ui-style-by-user`).
+Hard-refresh (Ctrl+F5).
+
+## 2026-10-27 — User Master Site (Step 1)
+
+User Master create/edit requires **Site** (Site Master list). Stored on
+`dbo.ams_users.site` and the `ams_user_profiles` mirror. Login session
+includes `site`. Super Root / Supreme Root still see all records (no
+site filter yet). Seed accounts may stay without a site until edited.
+
+## 2026-10-26 — Nine themes (Dark Grey default)
+
+Theme list is nine palettes. Default is **Dark Grey**. Look and layout
+are unchanged. Removed names still stored in `ams-theme` map to a kept
+theme (see `THEME_ALIASES` in `js/theme.js`). Hard-refresh (Ctrl+F5).
+
 ## 2026-10-23 — Django HTTPS packages
 
 `server/ams_django/requirements.txt` now includes `uvicorn==0.34.2` and

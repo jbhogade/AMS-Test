@@ -69,6 +69,7 @@ def profile_dict(user):
         "address": user["address"],
         "dob": user["dob"],
         "gender": user["gender"],
+        "site": user.get("site"),
         "remarks": user["remarks"],
     }
 
@@ -80,6 +81,7 @@ def user_summary(user):
         "displayName": user["display_name"],
         "linkedEmployee": user["linked_employee"],
         "email": user["email"],
+        "site": user.get("site"),
         "remarks": user["remarks"],
         "active": user["active"],
     }
@@ -126,6 +128,7 @@ def login(request):
         "address": user["address"],
         "dob": user["dob"],
         "gender": user["gender"],
+        "site": user.get("site"),
     })
 
 
@@ -212,6 +215,9 @@ def users(request):
     username = (body.get("username") or "").strip()
     if not username or not str(body.get("password") or "").strip():
         return JsonResponse({"error": "Username and password are required."}, status=400)
+    site = (body.get("site") or "").strip()
+    if not site:
+        return JsonResponse({"error": "Site is required."}, status=400)
 
     try:
         existing = db.find_user(username)
@@ -225,6 +231,7 @@ def users(request):
             email=body.get("email"),
             remarks=body.get("remarks"),
             active=body.get("active", True),
+            site=site,
         )
         return JsonResponse({"ok": True, "username": username, "role": role})
     except pyodbc.Error:
@@ -267,6 +274,7 @@ def user_detail(request, username):
                 address=body.get("address"),
                 dob=body.get("dob"),
                 gender=body.get("gender"),
+                site=body["site"] if "site" in body else None,
             )
             return JsonResponse({"ok": True, "username": username})
         except pyodbc.Error:
