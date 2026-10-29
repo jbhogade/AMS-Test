@@ -99,7 +99,8 @@ BEGIN
         contact_no      NVARCHAR(50)   NULL,
         address         NVARCHAR(500)  NULL,
         dob             NVARCHAR(20)   NULL,
-        gender          NVARCHAR(20)   NULL
+        gender          NVARCHAR(20)   NULL,
+        site            NVARCHAR(200)  NULL
     );
 END;
 
@@ -125,6 +126,7 @@ BEGIN
         address          NVARCHAR(500) NULL,
         dob              NVARCHAR(20)  NULL,
         gender           NVARCHAR(20)  NULL,
+        site             NVARCHAR(200) NULL,
         linked_employee  NVARCHAR(100) NULL,
         remarks          NVARCHAR(500) NULL,
         active           BIT           NOT NULL DEFAULT 1,
@@ -595,6 +597,8 @@ IF COL_LENGTH(N'dbo.ams_users', N'dob') IS NULL
     ALTER TABLE dbo.ams_users ADD dob NVARCHAR(20) NULL;
 IF COL_LENGTH(N'dbo.ams_users', N'gender') IS NULL
     ALTER TABLE dbo.ams_users ADD gender NVARCHAR(20) NULL;
+IF COL_LENGTH(N'dbo.ams_users', N'site') IS NULL
+    ALTER TABLE dbo.ams_users ADD site NVARCHAR(200) NULL;
 IF OBJECT_ID(N'dbo.ams_user_profiles', N'U') IS NOT NULL
     AND COL_LENGTH(N'dbo.ams_user_profiles', N'email') IS NULL
     ALTER TABLE dbo.ams_user_profiles ADD email NVARCHAR(200) NULL;
@@ -610,6 +614,9 @@ IF OBJECT_ID(N'dbo.ams_user_profiles', N'U') IS NOT NULL
 IF OBJECT_ID(N'dbo.ams_user_profiles', N'U') IS NOT NULL
     AND COL_LENGTH(N'dbo.ams_user_profiles', N'gender') IS NULL
     ALTER TABLE dbo.ams_user_profiles ADD gender NVARCHAR(20) NULL;
+IF OBJECT_ID(N'dbo.ams_user_profiles', N'U') IS NOT NULL
+    AND COL_LENGTH(N'dbo.ams_user_profiles', N'site') IS NULL
+    ALTER TABLE dbo.ams_user_profiles ADD site NVARCHAR(200) NULL;
 IF OBJECT_ID(N'dbo.ams_assets', N'U') IS NOT NULL
     AND COL_LENGTH(N'dbo.ams_assets', N'status') IS NULL
     ALTER TABLE dbo.ams_assets ADD status NVARCHAR(100) NULL;
@@ -1164,7 +1171,8 @@ def _build_table_defs():
         TableDef("users", "ams_user_profiles", key_field="username", columns=[
             c("username", "username"), c("role", "role"), c("display_name", "displayName"),
             c("email", "email"), c("contact_no", "contactNo"), c("address", "address"),
-            c("dob", "dob"), c("gender", "gender"), c("linked_employee", "linkedEmployee"),
+            c("dob", "dob"), c("gender", "gender"), c("site", "site"),
+            c("linked_employee", "linkedEmployee"),
             c("remarks", "remarks"), c("active", "active", "bit"),
         ]),
         TableDef("exitRecords", "ams_exit_records", key_field="exitId", columns=[
@@ -1508,7 +1516,7 @@ class AmsDb:
     # ---- users / login -------------------------------------------------------
     _USER_COLUMNS = (
         "username, password_hash, password_salt, role, linked_employee, email, remarks, active, "
-        "display_name, contact_no, address, dob, gender"
+        "display_name, contact_no, address, dob, gender, site"
     )
 
     def _row_to_user(self, row):
@@ -1526,6 +1534,7 @@ class AmsDb:
             "address": row[10],
             "dob": row[11],
             "gender": row[12],
+            "site": row[13],
         }
 
     def find_user(self, username):
@@ -1550,22 +1559,22 @@ class AmsDb:
     def verify_password(self, user, password):
         return crypto.verify_password(password, user["password_salt"], user["password_hash"])
 
-    def create_user(self, username, password, role, linked_employee, email, remarks, active):
+    def create_user(self, username, password, role, linked_employee, email, remarks, active, site=None):
         salt = crypto.new_salt()
         digest = crypto.hash_password(password, salt)
         conn = pyodbc.connect(self.conn_string)
         try:
             self.exec(
                 conn,
-                "INSERT INTO dbo.ams_users (username, password_hash, password_salt, role, linked_employee, email, remarks, active, display_name) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);",
-                [username, digest, salt, role, linked_employee, email, remarks, bool(active), linked_employee],
+                "INSERT INTO dbo.ams_users (username, password_hash, password_salt, role, linked_employee, email, remarks, active, display_name, site) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+                [username, digest, salt, role, linked_employee, email, remarks, bool(active), linked_employee, site],
             )
         finally:
             conn.close()
 
     def update_user(self, username, new_password, role, linked_employee, email, remarks, active,
-                    display_name, contact_no, address, dob, gender):
+                    display_name, contact_no, address, dob, gender, site=None):
         # Omit role / linked_employee / active when the caller did not send a
         # value. The previous ISNULL(?, col) form truncated "Supreme Root" to
         # "S" because a NULL NVARCHAR parameter is inferred as NVARCHAR(1).
@@ -1594,6 +1603,9 @@ class AmsDb:
         params.append(dob)
         sets.append("gender = ?")
         params.append(gender)
+        if site is not None:
+            sets.append("site = ?")
+            params.append(site)
         if new_password:
             salt = crypto.new_salt()
             digest = crypto.hash_password(new_password, salt)
