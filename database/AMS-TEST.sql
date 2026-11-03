@@ -86,13 +86,25 @@ BEGIN
 END
 GO
 
+/* Legacy JSON collector. Kept so older databases can be migrated into the
+    per-entity tables on first API start (AmsDb.MigrateLegacyCollections). */
+IF OBJECT_ID(N'dbo.ams_collections', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ams_collections (
+        collection_key NVARCHAR(100) NOT NULL PRIMARY KEY,
+        data_json      NVARCHAR(MAX) NOT NULL,
+        updated_at     DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME()
+    );
+END
+GO
+
 /* User Master mirror (the page's own copy without password fields - keeps the
-   generic CRUD engine working while dbo.ams_users stays authoritative). */
+    generic CRUD engine working while dbo.ams_users stays authoritative). */
 IF OBJECT_ID(N'dbo.ams_user_profiles', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.ams_user_profiles (
         row_id       BIGINT IDENTITY(1,1) NOT NULL,
-        record_key   NVARCHAR(100) NOT NULL,
+        record_key   NVARCHAR(200) NOT NULL,
         username         NVARCHAR(100) NULL,
         role             NVARCHAR(50)  NULL,
         display_name     NVARCHAR(200) NULL,
@@ -1016,6 +1028,11 @@ GO
 IF OBJECT_ID(N'dbo.ams_user_profiles', N'U') IS NOT NULL
    AND COL_LENGTH(N'dbo.ams_user_profiles', N'remarks') IS NULL
    ALTER TABLE dbo.ams_user_profiles ADD remarks NVARCHAR(500) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_user_profiles', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_user_profiles', N'record_key') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_user_profiles', N'record_key') < 400
+   ALTER TABLE dbo.ams_user_profiles ALTER COLUMN record_key NVARCHAR(200) NOT NULL;
 GO
 
 /* Indexes on columns that older databases only get via the ALTER block above.
