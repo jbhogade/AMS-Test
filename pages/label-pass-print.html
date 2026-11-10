@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<!--
+#-------------- Start Code for : LABEL/PASS PRINT MASTER (label-pass-print.html) -
+#
+#  PURPOSE   : System Admin shell for Display ID Number labels and Gate Pass.
+#              This slice is two in-page tabs with placeholders only. Item
+#              picker, size, material, print, and download come later.
+#              Reached via the System Administrator Master hub tab, and
+#              embedded with ?embed=1 to hide this page's own sidebar/topbar.
+#
+#  FILES USED :
+#    - css/themes.css, css/main.css, css/ui-styles.css, css/reports.css,
+#      css/embed-mode.css
+#    - js/dummy-data.js, js/theme.js, js/app.js, js/layout.js,
+#      js/embed-mode.js, js/label-pass-print.js
+#------------------------------------------------------------------------------
+-->
+<html lang="en" data-theme="dark-grey" data-ui-style="apple">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Label/Pass Print Master | Asset Management System</title>
+
+    <link rel="stylesheet" href="../css/themes.css?v=t9">
+    <link rel="stylesheet" href="../css/main.css">
+    <link rel="stylesheet" href="../css/ui-styles.css?v=t9c">
+    <link rel="stylesheet" href="../css/reports.css">
+    <link rel="stylesheet" href="../css/embed-mode.css">
+</head>
+<body>
+    <script src="../js/embed-mode.js"></script>
+
+    <div class="app">
+        <aside class="sidebar" id="sidebar">
+            <div id="sidebar-mount"></div>
+        </aside>
+
+        <main class="app-main">
+            <header class="topbar" id="topbar-mount"></header>
+
+            <div class="app-content">
+                <div class="page-heading flex items-center justify-between">
+                    <div>
+                        <h1>Label/Pass Print Master</h1>
+                        <p class="page-sub">Display ID Number labels and Gate Pass - options only in this slice</p>
+                    </div>
+                </div>
+
+                <div class="report-tabs" id="lppTabs">
+                    <button type="button" class="report-tab active" data-lpp-tab="displayId">Display ID Number</button>
+                    <button type="button" class="report-tab" data-lpp-tab="gatePass">Gate Pass</button>
+                </div>
+
+                <div class="report-panel active" id="panel-displayId">
+                    <div class="card">
+                        <p class="page-sub" style="margin:0;">Label size and item picker come next.</p>
+                    </div>
+                </div>
+
+                <div class="report-panel" id="panel-gatePass">
+                    <div class="card">
+                        <p class="page-sub" style="margin:0;">Gate Pass material and item picker come next.</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script defer src="../js/dummy-data.js"></script>
+    <script defer src="../js/theme.js?v=t9c"></script>
+    <script defer src="../js/app.js"></script>
+    <script defer src="../js/layout.js"></script>
+    <script defer src="../js/label-pass-print.js"></script>
+</body>
+</html>
+<!--
+#-------------- End of the code : LABEL/PASS PRINT MASTER -----------------------
+#------------------------------------------------------------------------------
+-->
