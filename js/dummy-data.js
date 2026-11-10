@@ -3419,6 +3419,7 @@ const AMS_PAGE_REGISTRY = [
     { key: "sparePartCategory", label: "Spare Part Category Master" },
     { key: "vendorCategory", label: "Vendor Category Master" },
     { key: "printTerms",    label: "Print Terms Master" },
+    { key: "labelPassPrint", label: "Label/Pass Print Master" },
     { key: "company",       label: "Company Master" },
     { key: "userMaster",    label: "User Master" },
     { key: "accessRights",  label: "Access Rights Control Master (Supreme Root only)" },
@@ -3475,6 +3476,7 @@ const AMS_ROLE_ACCESS_RECOMMENDED = {
     sparePartCategory:      { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
     vendorCategory:         { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
     printTerms:             { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
+    labelPassPrint:         { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "full", "Super Root": "full", "Supreme Root": "full" },
     accessRights:           { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "none", "Super Root": "none", "Supreme Root": "full" },
     roleAccess:             { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "none", "Super Root": "none", "Supreme Root": "full" },
     log:                    { "Standard User": "none", "Viewer (Read-Only)": "none", "Admin": "none", "Super Root": "full", "Supreme Root": "full" },
@@ -3635,6 +3637,7 @@ const AMS_NAV_TO_REGISTRY = {
     "master-spare-part-category": "sparePartCategory",
     "master-vendor-category": "vendorCategory",
     "master-print-terms": "printTerms",
+    "label-pass-print": "labelPassPrint",
 };
 
 function amsGetCurrentUserRecord() {
