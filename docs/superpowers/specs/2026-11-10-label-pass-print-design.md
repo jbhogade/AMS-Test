@@ -4,45 +4,48 @@ AMS-Test first. Port to AMS-v4-0 only after that is asked.
 
 ## Goal
 
-Add a System Admin master named **Label/Pass Print Master**. This first slice ships the master shell and two options only: **Display ID Number** and **Gate Pass**. Admins can open the page and switch tabs. Item picker, label size, Gate Pass material, print, and download come in later slices.
+System Admin master **Label/Pass Print Master** with two tabs: **Display ID Number** and **Gate Pass**. Admins pick Display IDs, set copies per section, hover for item details, and download an Excel file. Label/pass print size and printed text come in a later slice.
 
 ## Placement and access
 
-- New System Admin hub tab **Label/Pass Print Master** after Print Terms Master and before Access Rights Control Master.
-- Dedicated page `pages/label-pass-print.html` (not the generic `masters.html` CRUD table).
-- JS: `js/label-pass-print.js`. Reuse existing hub/embed CSS; add page CSS only if the tab strip needs it.
-- Hub map: `AMS_ADMIN_TABS.labelPassPrint` -> `label-pass-print.html`.
-- Page title in `js/layout.js`: `label-pass-print` -> "Label/Pass Print Master".
-- Role Access key `labelPassPrint`: Admin / Super Root / Supreme Root = `full`; Standard User / Viewer = `none`.
-- Add to `AMS_PAGE_REGISTRY` and `AMS_ROLE_ACCESS_RECOMMENDED`. Hub tab hidden when the signed-in user cannot access it.
+- System Admin hub tab **Label/Pass Print Master** after Print Terms Master and before Access Rights Control Master.
+- Page: `pages/label-pass-print.html`
+- JS: `js/label-pass-print.js`
+- CSS: `css/label-pass-print.css`
+- Hub map: `AMS_ADMIN_TABS.labelPassPrint` -> `label-pass-print.html`
+- Page title in `js/layout.js`: `label-pass-print` -> "Label/Pass Print Master"
+- Role Access key `labelPassPrint`: Admin / Super Root / Supreme Root = `full`; Standard User / Viewer = `none`
 
-## Page layout (this slice)
+## Display ID Number tab
 
-One page with two in-page tabs:
+Lists every record from Asset Master and Mobile Master.
 
-- **Display ID Number** (default)
-- **Gate Pass**
+- One section per **Asset Type** (Laptop, Desktop, Printer, Scanner first, then any other Asset Master types A-Z).
+- A final **Mobiles** section for Mobile Master records.
+- Each section is a **tile grid**. Each tile shows Display ID, Name, Model, Assigned to, and a checkbox.
+- Each section has Select all and one **Copies** field (1-99, default 1).
+- Hover a tile for the same details in a tooltip.
+- Search filters Display ID, name, model, type, and employee.
+- **Print** opens the selected tiles (Copies repeats each ID). Label size is a placeholder until specified.
+- **Download** exports the checked rows as Excel: Display ID, Kind, Section, Assigned To, Name, Model, Copies.
 
-Each tab shows a short placeholder only, for example:
+## Gate Pass tab
 
-- Display ID Number: "Label size and item picker come next."
-- Gate Pass: "Gate Pass material and item picker come next."
+Same picker, but only Asset Master records whose type is **Laptop**. Copies, hover, search, Print, and Download work the same way.
 
-Switching tabs does not save anything. No Asset/Mobile picker, no print, no download, no SQL collection in this slice.
+Printed Gate Pass text:
 
-## Later slices (not this slice)
+Laptop Gate Pass
+The Laptop Serial No. &lt;Serial No.&gt;, Asset Code No. &lt;Display ID&gt;, is issued to
+&lt;Employee Name&gt; (Employee ID &lt;Employee Code&gt;),
+&lt;Company Address&gt;
 
-1. Multi-select Assets (Laptop, Desktop, Printer, and other Asset Master records) and Mobiles.
-2. User chooses Label size and Gate Pass size.
-3. User chooses Gate Pass material / what to print on the pass.
-4. Download file.
+Stamp &amp; Signature
 
-## Out of scope
+## Out of scope (later)
 
-- AMS-v4-0 until explicitly asked
-- Print layout, barcode, or QR
+- Print layout, paper size, and printed text
+- Barcode / QR
 - SIM cards, consumables, spare parts
 - Per-company or per-site templates
-- Label size and Gate Pass material fields (later slice)
-- Item picker and download (later slice)
-- SQL collection / schema (later slice, when there is something to persist)
+- AMS-v4-0 until explicitly asked

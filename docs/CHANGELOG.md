@@ -1,5 +1,51 @@
 # AMS-Test change log
 
+## 2026-11-11 — Dropdown A-Z sort with PIN-first
+
+Dropdowns sort alphabetically. Assign To (Subordinate) keeps None and
+Other / Not in User Master pinned at the top. Same for SIM Assign
+Subordinate. Other name lists (sites, types, departments, vendors,
+employees, master-table selects) are A-Z.
+
+## 2026-11-11 — Laptop Gate Pass print text
+
+Gate Pass print uses: Laptop Gate Pass; Serial No., Asset Code No.
+(Display ID), Employee Name, Employee ID, Company Address from Company
+Master; Stamp & Signature.
+
+## 2026-11-11 — Asset Issue Form remark Display IDs
+
+Remarks on Asset Issue Form now use the full Display ID (Site +
+Department shortnames) for assigned non-legacy assets and mobiles.
+Legacy / custom IDs stay unchanged.
+
+## 2026-11-11 — Full Display ID site/department shortnames
+
+Assigned non-legacy assets and mobiles now show Site + Department
+shortnames on the Display ID (including Label/Pass Print). Lookup is
+case-insensitive and uses Department Master plus the employee AMS ID
+when needed. Legacy / custom IDs stay unchanged.
+
+## 2026-11-11 — Label/Pass Print button
+
+Print sits next to Download on both tabs. It prints the selected
+Display IDs, repeating each by Copies. Label size and Gate Pass extra
+text are still placeholders.
+
+## 2026-11-11 — Label/Pass Print tile picker
+
+Label/Pass Print Master shows Display IDs as tiles (not a list). Each
+tile: Display ID, Name, Model, Assigned to, checkbox. Sections still
+have Select all and Copies. Download Excel is unchanged.
+
+## 2026-11-11 — Label/Pass Print Display ID picker
+
+Label/Pass Print Master now lists Display IDs. Display ID Number:
+Asset Master by type (Laptop, Desktop, Printer, Scanner, then others)
+plus Mobiles. Gate Pass: laptops only. Each section has Select all,
+checkboxes, and Copies. Hover a row for Assigned to, Name, Model.
+Download exports the selection as Excel. Print size/text still later.
+
 ## 2026-10-28 — Default Style is Apple
 
 Default Theme stays **Dark Grey**. Default Style is now **Apple**
