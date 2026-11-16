@@ -62,8 +62,8 @@ AMS-Test/                       <- live-testing project (SQL Server backed)
 ├── database/Setup-AMS-TEST.bat<- sqlcmd setup script (Windows)
 ├── SQL-DB-Backup/             <- full SQL .bak files (Super Root / Supreme Root)
 ├── css/
-│   ├── themes.css          <- 9 color palettes (Dark Grey default)
-│   ├── ui-styles.css       <- Apple (default); also Plain / macOS / iOS / iPadOS
+│   ├── themes.css          <- 9 Graphite Teal palettes (Graphite Teal default)
+│   ├── ui-styles.css       <- unused leftover (not linked; Apple/macOS styles removed)
 │   ├── main.css            <- shared layout & components (incl. font-size attr)
 │   ├── dashboard.css       <- dashboard-only styles
 │   ├── master-table.css    <- generic master-table engine styles
@@ -78,7 +78,7 @@ AMS-Test/                       <- live-testing project (SQL Server backed)
 │   └── settings.css        <- Settings page tab strip, theme gallery, stat rows
 ├── js/
 │   ├── dummy-data.js       <- DB/API layer + in-memory cache + helpers
-│   ├── theme.js            <- Theme dropdown (per-user map; Dark Grey default)
+│   ├── theme.js            <- Theme dropdown (per-user map; Graphite Teal default)
 │   ├── login.js            <- login submit + session + first-login Theme seed
 │   ├── app.js              <- shared helpers (escape, badges, formatting)
 │   ├── layout.js           <- sidebar + header; per-user sidebar Show/Hide pin
@@ -159,35 +159,35 @@ python manage.py runserver
 Then open **http://127.0.0.1:8000/**. Stop the venv later with `deactivate`.
 On Windows you can instead use `run-django.bat` (see `server/ams_django/SETUP-WINDOWS.md`).
 
-Sign in, then use the Theme and Style dropdowns (top-right, also on the login page). Default
-theme is **Dark Grey**. Default style is **Apple**. Theme, Style, and desktop sidebar Show/Hide are stored per
-signed-in username.
+Sign in, then use the Theme dropdown (top-right, also on the login page).
+Default Theme is **Graphite Teal**. Theme and desktop sidebar Show/Hide are
+stored per signed-in username. Apple / macOS / iOS / iPadOS Style UI is removed.
 
 ## Themes
 
-One Theme dropdown. Nine palettes. Default is **Dark Grey**. Removed
-names map in `js/theme.js`. Style is **Apple** (default), **Plain**,
-**macOS**, **iOS**, or **iPadOS**.
-Signed-in users keep their own Theme, Style, and sidebar pin
-(`ams-theme-by-user`, `ams-ui-style-by-user`, `ams-sidebar-show-by-user`).
-Login uses the shared Theme and Style pickers until someone signs in.
+One Theme dropdown. Nine palettes. Default is **Graphite Teal**. Old saved
+names map in `js/theme.js` (`dark-grey` -> graphite, `lite` -> paper,
+`purple` -> plum, `dark-gold` -> gold, plus older aliases). Signed-in users
+keep their own Theme and sidebar pin (`ams-theme-by-user`,
+`ams-sidebar-show-by-user`). Login uses the shared Theme picker until
+someone signs in.
 
-| Theme      | Type  | Notes                         |
-| ---------- | ----- | ----------------------------- |
-| Dark Grey  | dark  | **Default**                   |
-| Midnight   | dark  | Very dark, high contrast      |
-| Slate Blue | dark  | Corporate blue-grey           |
-| Lite       | light | Bright / light                |
-| Forest     | dark  | Dark green                    |
-| Purple     | dark  | Dark purple                   |
-| Ice        | light | Cool pale-blue                |
-| Dark Gold  | dark  | Warm gold accent              |
-| Contrast   | dark  | Pure black high-contrast      |
+| Theme         | Type  | Notes                                      |
+| ------------- | ----- | ------------------------------------------ |
+| Graphite Teal | mixed | **Default** (dark sidebar, light content)  |
+| Midnight      | dark  | Very dark, high contrast                   |
+| Slate Blue    | dark  | Corporate blue-grey                        |
+| Forest        | dark  | Dark green                                 |
+| Plum          | dark  | Dark purple                                |
+| Dark Gold     | dark  | Warm gold accent                           |
+| Ice           | light | Cool pale-blue                             |
+| Paper         | light | Warm light                                 |
+| Contrast      | dark  | Pure black high-contrast                   |
 
 ## Build Roadmap (step by step)
 
 - [x] Project setup + folder structure
-- [x] Theme system (9 themes, Dark Grey default)
+- [x] Theme system (9 themes, Graphite Teal default)
 - [x] Shared layout (sidebar + header)
 - [x] Dashboard page (dummy data)
 - [x] Employee Master (AMS IDs, assets owned/team, Issue & Handover forms, Exit with facility check-off + immutable exit snapshot)
@@ -216,7 +216,7 @@ Login uses the shared Theme and Style pickers until someone signs in.
 - [x] SIM Card Master (`pages/sim-cards.html` + `js/sim-cards.js`) - a separate record type for mobile SIM cards issued to employees, mirroring the Asset Master: auto SIM ID (`SIM-000001`), ICCID/serial, mobile number, operator + plan pick-lists, status (In Store / Issued / Blocked / Retired), assign/reassign/return/block/retire with lifecycle history in the View modal, stock summary tiles, search + status filter, CSV Template/Export/Import, and a DB-backed `simCards` collection (server whitelist updated)
 - [x] Department / Designation Master sync fix - the Department & Designation Masters now reflect lookups created anywhere in the system (Employee form quick-add, bulk Employee import, Import Report quick-add) instead of dropping them on the next page load: departments/designations live in ONE unified view across the hardcoded seeds and the DB-backed masters, every mutation persists to SQL Server, the Employee import reference check accepts lookups from either source, and newly imported employees register their department/designation into both masters automatically
 - [x] Mobile Master (`pages/mobiles.html` + `js/mobiles.js`) - phones / handhelds with SIM link via `amsAssetId`
-- [x] Glass Theme (always-on frosted glass, Platinum default, Blue removed, login Theme dropdown)
+- [x] Graphite Teal appearance (9 palettes, Graphite Teal default; Apple/macOS Style UI removed; split login)
 - [x] Per-user Theme and desktop sidebar Show/Hide (keyed by signed-in username)
 - [x] Themed date picker (viewport-fixed glass calendar for every `input type="date"`)
 - [x] Actions menus under glass (card blur via `::before` so `position:fixed` stays on the viewport)
