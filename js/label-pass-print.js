@@ -290,17 +290,10 @@ function lppPrint(tab) {
             const empCode = r.empCode || "-";
             return `<div class="lpp-print-pass">
                 <div class="lpp-print-pass-title">Laptop Gate Pass</div>
-                <div class="lpp-print-pass-row">
-                    <div class="lpp-print-pass-copy">
-                        <p class="lpp-print-pass-body">The Laptop Serial No. ${lppEsc(serial)}, Asset Code No. ${lppEsc(r.displayId)} is issued to</p>
-                        <p class="lpp-print-pass-body"><strong>${lppEsc(empName)}</strong> (Employee ID ${lppEsc(empCode)})</p>
-                        <p class="lpp-print-pass-body">${lppEsc(address || "-")}</p>
-                    </div>
-                    <div class="lpp-print-sign">
-                        <div class="lpp-print-sign-space"></div>
-                        <div class="lpp-print-sign-label">Stamp &amp; Signature</div>
-                    </div>
-                </div>
+                <p class="lpp-print-pass-body">The Laptop Serial No. ${lppEsc(serial)}, Asset Code No. ${lppEsc(r.displayId)} is issued to</p>
+                <p class="lpp-print-pass-body"><strong>${lppEsc(empName)}</strong> (Employee ID ${lppEsc(empCode)})</p>
+                <p class="lpp-print-pass-body">${lppEsc(address || "-")}</p>
+                <div class="lpp-print-sign">Stamp &amp; Signature</div>
             </div>`;
         };
         const perPage = 6;
@@ -352,39 +345,12 @@ function lppPrint(tab) {
                     text-align: center;
                     margin: 0 0 3mm;
                 }
-                .lpp-print-pass-row {
-                    display: flex;
-                    flex-direction: row;
-                    align-items: stretch;
-                    gap: 6mm;
-                    flex: 1;
-                    min-height: 0;
-                }
-                .lpp-print-pass-copy {
-                    flex: 1;
-                    min-width: 0;
-                }
                 .lpp-print-pass-body { margin: 0 0 1.5mm; }
                 .lpp-print-sign {
-                    flex: 0 0 42mm;
-                    width: 42mm;
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: flex-end;
-                    align-items: center;
-                    border-left: 0.6pt solid #111;
-                    padding-left: 4mm;
-                }
-                .lpp-print-sign-space {
-                    flex: 1;
-                    min-height: 18mm;
-                    width: 100%;
-                }
-                .lpp-print-sign-label {
+                    margin-top: auto;
+                    padding-top: 6mm;
                     font-weight: 700;
-                    text-align: center;
-                    font-size: 9pt;
-                    white-space: nowrap;
+                    text-align: right;
                 }
             </style></head><body>
             ${pages.join("")}
