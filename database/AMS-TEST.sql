@@ -580,6 +580,7 @@ BEGIN
         log_type      NVARCHAR(50)  NULL,
         qty           INT           NULL,
         by_whom       NVARCHAR(300) NULL,
+        issued_to_other NVARCHAR(300) NULL,
         remarks       NVARCHAR(500) NULL,
         data_json     NVARCHAR(MAX) NOT NULL,
         updated_at    DATETIME2     NOT NULL DEFAULT SYSUTCDATETIME(),
@@ -632,6 +633,7 @@ BEGIN
         log_type          NVARCHAR(50)  NULL,
         qty               INT           NULL,
         by_whom           NVARCHAR(300) NULL,
+        issued_to_other   NVARCHAR(300) NULL,
         remarks           NVARCHAR(500) NULL,
         asset_base_id     NVARCHAR(200) NULL,
         asset_id_snapshot NVARCHAR(200) NULL,
@@ -979,6 +981,10 @@ IF OBJECT_ID(N'dbo.ams_consumable_log', N'U') IS NOT NULL
    AND COL_LENGTH(N'dbo.ams_consumable_log', N'remarks') IS NULL
    ALTER TABLE dbo.ams_consumable_log ADD remarks NVARCHAR(500) NULL;
 GO
+IF OBJECT_ID(N'dbo.ams_consumable_log', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_consumable_log', N'issued_to_other') IS NULL
+   ALTER TABLE dbo.ams_consumable_log ADD issued_to_other NVARCHAR(300) NULL;
+GO
 IF OBJECT_ID(N'dbo.ams_spare_part_log', N'U') IS NOT NULL
    AND COL_LENGTH(N'dbo.ams_spare_part_log', N'log_date') IS NULL
    ALTER TABLE dbo.ams_spare_part_log ADD log_date NVARCHAR(20) NULL;
@@ -1010,6 +1016,10 @@ GO
 IF OBJECT_ID(N'dbo.ams_spare_part_log', N'U') IS NOT NULL
    AND COL_LENGTH(N'dbo.ams_spare_part_log', N'remarks') IS NULL
    ALTER TABLE dbo.ams_spare_part_log ADD remarks NVARCHAR(500) NULL;
+GO
+IF OBJECT_ID(N'dbo.ams_spare_part_log', N'U') IS NOT NULL
+   AND COL_LENGTH(N'dbo.ams_spare_part_log', N'issued_to_other') IS NULL
+   ALTER TABLE dbo.ams_spare_part_log ADD issued_to_other NVARCHAR(300) NULL;
 GO
 IF OBJECT_ID(N'dbo.ams_spare_part_log', N'U') IS NOT NULL
    AND COL_LENGTH(N'dbo.ams_spare_part_log', N'asset_base_id') IS NULL
