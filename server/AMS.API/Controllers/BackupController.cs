@@ -3,6 +3,7 @@ using AMS.API.Data;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging;
 
 namespace AMS.API.Controllers;
 
@@ -13,11 +14,13 @@ public class BackupController : ControllerBase
 {
     private readonly AmsDb _db;
     private readonly IWebHostEnvironment _env;
+    private readonly ILogger<BackupController> _log;
 
-    public BackupController(AmsDb db, IWebHostEnvironment env)
+    public BackupController(AmsDb db, IWebHostEnvironment env, ILogger<BackupController> log)
     {
         _db = db;
         _env = env;
+        _log = log;
     }
 
     [HttpPost]
@@ -35,11 +38,13 @@ public class BackupController : ControllerBase
         }
         catch (SqlException ex)
         {
-            return StatusCode(500, new { error = "SQL backup failed. " + ex.Message });
+            _log.LogError(ex, "SQL backup failed.");
+            return StatusCode(500, new { error = "SQL backup failed. Check the API logs for details." });
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { error = "SQL backup failed. " + ex.Message });
+            _log.LogError(ex, "SQL backup failed.");
+            return StatusCode(500, new { error = "SQL backup failed. Check the API logs for details." });
         }
     }
 }
